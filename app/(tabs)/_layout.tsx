@@ -1,45 +1,83 @@
+import React, { createContext, useState, useEffect } from 'react';
+import { Text } from 'react-native';
 import { Tabs } from 'expo-router';
-import React from 'react';
-import { Platform } from 'react-native';
+// eslint-disable-next-line import/no-unresolved
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 
-import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+export const PhotoContext = createContext({
+  photos: [],
+  setPhotos: () => {},
+  loading: false,
+  setLoading: () => {},
+});
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadPhotos();
+  }, []);
+
+  const loadPhotos = async () => {
+    try {
+      const savedPhotos = await AsyncStorage.getItem('progressPhotos');
+      if (savedPhotos) {
+        const parsedPhotos = JSON.parse(savedPhotos);
+        const validPhotos = [];
+        for (const photo of parsedPhotos) {
+          try {
+            const fileInfo = await FileSystem.getInfoAsync(photo.uri);
+            if (fileInfo.exists) {
+              validPhotos.push(photo);
+            }
+          } catch {
+            // ignore
+          }
+        }
+        if (validPhotos.length !== parsedPhotos.length) {
+          await AsyncStorage.setItem('progressPhotos', JSON.stringify(validPhotos));
+        }
+        setPhotos(validPhotos);
+      }
+    } catch (error) {
+      console.error('Error loading photos:', error);
+    }
+  };
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-    </Tabs>
+    <PhotoContext.Provider value={{ photos, setPhotos, loading, setLoading }}>
+      <Tabs initialRouteName="homepage" screenOptions={{ headerShown: false }}>
+        <Tabs.Screen
+          name="homepage"
+          options={{
+            title: 'Home',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>🏠</Text>,
+          }}
+        />
+        <Tabs.Screen
+          name="camera"
+          options={{
+            title: 'Camera',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>📸</Text>,
+          }}
+        />
+        <Tabs.Screen
+          name="progress"
+          options={{
+            title: 'Progress',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>📊</Text>,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>👤</Text>,
+          }}
+        />
+      </Tabs>
+    </PhotoContext.Provider>
   );
 }
