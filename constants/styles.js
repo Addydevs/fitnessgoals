@@ -5,7 +5,7 @@ export const styles = StyleSheet.create({
   // App wide layout
   appBackground: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   appContainer: {
     flex: 1,
@@ -16,7 +16,7 @@ export const styles = StyleSheet.create({
   // Base Layouts
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
 
   // Welcome Screen Styles
@@ -229,7 +229,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomLeftRadius: 25,
     borderBottomRightRadius: 25,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   headerTitle: {
     fontSize: 28,
