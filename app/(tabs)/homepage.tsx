@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   },
   progressSection: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
   },
   progressLabel: {
     position: 'absolute',

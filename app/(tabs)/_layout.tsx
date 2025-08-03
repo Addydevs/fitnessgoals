@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,8 +48,13 @@ export default function TabLayout() {
     }
   };
 
+  const contextValue = useMemo(
+    () => ({ photos, setPhotos, loading, setLoading }),
+    [photos, loading]
+  );
+
   return (
-    <PhotoContext.Provider value={{ photos, setPhotos, loading, setLoading }}>
+    <PhotoContext.Provider value={contextValue}>
       <Tabs
         initialRouteName="homepage"
         screenOptions={{

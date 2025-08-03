@@ -76,7 +76,7 @@ export default function ProgressScreen({ photos, setPhotos }) {
   return (
     <Layout>
       <StatusBar barStyle="dark-content" />
-      <View style={styles.gradientHeader}>
+      <View style={styles.headerSection}>
         <Text style={styles.headerTitle}>Your Journey</Text>
         <Text style={styles.headerSubtitle}>
           {photos.length} {photos.length === 1 ? 'milestone' : 'milestones'} captured

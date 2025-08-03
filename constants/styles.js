@@ -223,7 +223,7 @@ export const styles = StyleSheet.create({
   },
 
   // Header Styles (for other screens)
-  gradientHeader: {
+  headerSection: {
     paddingTop: 50,
     paddingBottom: 30,
     paddingHorizontal: 20,
@@ -234,13 +234,14 @@ export const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: 'white',
+    color: theme.colors.text,
     textAlign: 'center',
     marginBottom: 5,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
+    color: theme.colors.text,
+    opacity: 0.7,
     textAlign: 'center',
     marginBottom: 15,
   },

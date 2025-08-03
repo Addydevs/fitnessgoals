@@ -9,9 +9,14 @@ export default function Layout({ children }) {
     <SafeAreaView
       style={[
         styles.appBackground,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
+        {
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
       ]}
-      edges={['top', 'bottom']}
+      edges={['top', 'bottom', 'left', 'right']}
     >
       <View style={styles.appContainer}>{children}</View>
     </SafeAreaView>

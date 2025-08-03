@@ -45,7 +45,7 @@ export default function ProfileScreen({ photos }) {
   return (
     <Layout>
       <StatusBar barStyle="dark-content" />
-      <View style={styles.gradientHeader}>
+      <View style={styles.headerSection}>
         <Text style={styles.headerTitle}>Your Profile</Text>
         <Text style={styles.headerSubtitle}>Track your transformation</Text>
       </View>
