@@ -6,6 +6,8 @@ import { Camera } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { styles } from '../constants/styles';
+import Layout from './Layout';
+import { theme } from '../constants/theme';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 export default function CameraScreen({ photos, setPhotos, loading, setLoading }) {
@@ -202,7 +204,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
   }
 
   return (
-    <View style={styles.container}>
+    <Layout>
       <StatusBar barStyle="light-content" />
       <View style={styles.modernHeader}>
         <Text style={styles.modernHeaderTitle}>Capture Progress</Text>
@@ -213,7 +215,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
       {loading ? (
         <View style={styles.loadingContainer}>
           <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color="#4285f4" />
+            <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.loadingTitle}>Analyzing Your Progress</Text>
             <Text style={styles.loadingSubtext}>AI is comparing your photos...</Text>
             <View style={styles.loadingDots}>
@@ -249,7 +251,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
           )}
         </View>
       )}
-    </View>
+    </Layout>
   );
 }
 

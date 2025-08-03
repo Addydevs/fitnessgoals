@@ -4,6 +4,8 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, StatusBar, Alert }
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from '../constants/styles';
+import Layout from './Layout';
+import { theme } from '../constants/theme';
 
 export default function ProfileScreen({ photos }) {
   const [goal, setGoal] = useState('');
@@ -42,9 +44,9 @@ export default function ProfileScreen({ photos }) {
   };
 
   return (
-    <View style={styles.container}>
+    <Layout>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={['#4285f4', '#1e3c72']} style={styles.gradientHeader}>
+      <LinearGradient colors={[theme.colors.primary, theme.colors.secondary]} style={styles.gradientHeader}>
         <Text style={styles.headerTitle}>Your Profile</Text>
         <Text style={styles.headerSubtitle}>Track your transformation</Text>
       </LinearGradient>
@@ -54,7 +56,7 @@ export default function ProfileScreen({ photos }) {
           <Text style={styles.sectionTitle}>Journey Statistics</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
-              <LinearGradient colors={['#4285f4', '#1e3c72']} style={styles.statCircle}>
+              <LinearGradient colors={[theme.colors.primary, theme.colors.secondary]} style={styles.statCircle}>
                 <Text style={styles.statNumber}>{photos.length}</Text>
               </LinearGradient>
               <Text style={styles.statLabel}>Progress Photos</Text>
@@ -81,7 +83,7 @@ export default function ProfileScreen({ photos }) {
             />
           </View>
           <TouchableOpacity style={styles.saveGoalButton} onPress={() => saveGoal(goal)} activeOpacity={0.8}>
-            <LinearGradient colors={['#11998e', '#38ef7d']} style={styles.saveGoalGradient}>
+            <LinearGradient colors={[theme.colors.primary, theme.colors.secondary]} style={styles.saveGoalGradient}>
               <Text style={styles.saveGoalButtonText}>💾 Save Goal</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -106,7 +108,7 @@ export default function ProfileScreen({ photos }) {
           </View>
         </View>
       </ScrollView>
-    </View>
+    </Layout>
   );
 }
 

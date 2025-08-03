@@ -5,6 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from '../constants/styles';
+import Layout from './Layout';
+import { theme } from '../constants/theme';
 
 export default function ProgressScreen({ photos, setPhotos }) {
   const [compareMode, setCompareMode] = useState(false);
@@ -73,9 +75,9 @@ export default function ProgressScreen({ photos, setPhotos }) {
   };
 
   return (
-    <View style={styles.container}>
+    <Layout>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={['#4285f4', '#1e3c72']} style={styles.gradientHeader}>
+      <LinearGradient colors={[theme.colors.primary, theme.colors.secondary]} style={styles.gradientHeader}>
         <Text style={styles.headerTitle}>Your Journey</Text>
         <Text style={styles.headerSubtitle}>
           {photos.length} {photos.length === 1 ? 'milestone' : 'milestones'} captured
@@ -181,7 +183,7 @@ export default function ProgressScreen({ photos, setPhotos }) {
           </>
         )}
       </ScrollView>
-    </View>
+    </Layout>
   );
 }
 
