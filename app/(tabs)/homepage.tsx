@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 
 const Icon = ({
   children,
@@ -25,6 +26,7 @@ const Plus = (props: any) => <Icon {...props}>＋</Icon>;
 
 const PhotoProgressApp = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const tabBarHeight = useBottomTabBarHeight();
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentDate(new Date()), 1000);
@@ -43,7 +45,12 @@ const PhotoProgressApp = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: tabBarHeight + 24 },
+        ]}
+      >
         {/* Status Bar */}
         <View style={styles.statusBar}>
           <Text style={styles.statusTime}>9:41</Text>
@@ -169,8 +176,6 @@ const PhotoProgressApp = () => {
             </Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -323,5 +328,4 @@ const styles = StyleSheet.create({
   },
   captureButtonIcon: { fontSize: 20, color: "#fff", marginRight: 8 },
   captureButtonText: { color: "#fff", fontWeight: "500" },
-  bottomSpace: { height: 96 },
 });
