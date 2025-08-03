@@ -62,7 +62,6 @@ export const styles = StyleSheet.create({
     elevation: 10,
   },
   heroImagePlaceholder: {
-    fontSize: 80,
     marginBottom: 10,
   },
   heroImageText: {
@@ -228,6 +227,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomLeftRadius: 25,
     borderBottomRightRadius: 25,
+    backgroundColor: '#fff',
   },
   headerTitle: {
     fontSize: 28,
@@ -400,22 +400,27 @@ export const styles = StyleSheet.create({
     padding: 20,
   },
   compareToggle: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 25,
     alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
   },
   compareToggleActive: {
-    backgroundColor: 'rgba(255,59,48,0.9)',
+    backgroundColor: theme.colors.primary,
   },
   compareToggleText: {
-    color: 'white',
+    color: theme.colors.primary,
     fontSize: 14,
     fontWeight: '600',
+    marginLeft: 6,
   },
   compareToggleTextActive: {
-    color: 'white',
+    color: '#fff',
   },
 
   // Comparison Styles
@@ -517,7 +522,6 @@ export const styles = StyleSheet.create({
     width: '90%',
   },
   emptyStateIcon: {
-    fontSize: 60,
     marginBottom: 20,
   },
   emptyStateTitle: {
@@ -663,6 +667,17 @@ export const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sectionTitleRowText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 8,
+  },
   statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -723,23 +738,28 @@ export const styles = StyleSheet.create({
   },
   saveGoalButton: {
     borderRadius: 15,
-    overflow: 'hidden',
     marginBottom: 10,
-  },
-  saveGoalGradient: {
     padding: 15,
     alignItems: 'center',
+    backgroundColor: theme.colors.primary,
   },
   saveGoalButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
+  goalHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
   goalHint: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
     fontStyle: 'italic',
+    marginLeft: 6,
   },
 
   // Tips Section
@@ -766,7 +786,6 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
   },
   tipIcon: {
-    fontSize: 20,
     marginRight: 15,
   },
   tipText: {

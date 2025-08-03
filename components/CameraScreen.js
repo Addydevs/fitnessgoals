@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Camera } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import { Feather } from '@expo/vector-icons';
 import { styles } from '../constants/styles';
 import Layout from './Layout';
 import { theme } from '../constants/theme';
@@ -175,7 +176,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
         </TouchableOpacity>
         <View style={styles.heroImageContainer}>
           <View style={styles.heroImageBackground}>
-            <Text style={styles.heroImagePlaceholder}>💪</Text>
+            <Feather name="activity" size={80} color="#000" style={styles.heroImagePlaceholder} />
             <Text style={styles.heroImageText}>Progress Photo</Text>
           </View>
         </View>
@@ -228,7 +229,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
         <View style={styles.modernCameraContent}>
           <TouchableOpacity style={styles.modernCameraButton} onPress={takePhoto} activeOpacity={0.8}>
             <View style={styles.modernCameraIcon}>
-              <Text style={styles.cameraIconText}>📸</Text>
+              <Feather name="camera" size={30} color="#fff" />
             </View>
             <Text style={styles.modernCameraButtonText}>Take Progress Photo</Text>
           </TouchableOpacity>

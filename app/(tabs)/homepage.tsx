@@ -1,11 +1,32 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 // eslint-disable-next-line import/no-unresolved
 import Svg, { Circle } from 'react-native-svg';
+import { Feather } from '@expo/vector-icons';
 
 import Layout from '@/components/Layout';
 import { theme } from '@/constants/theme';
+
+const workouts = [
+  {
+    id: 1,
+    title: 'Full Body',
+    time: '8:00 AM',
+    image: require('../../assets/images/react-logo.png'),
+  },
+  {
+    id: 2,
+    title: 'Yoga Stretch',
+    time: '9:00 AM',
+    image: require('../../assets/images/react-logo.png'),
+  },
+  {
+    id: 3,
+    title: 'HIIT Blast',
+    time: '10:00 AM',
+    image: require('../../assets/images/react-logo.png'),
+  },
+];
 
 export default function Homepage() {
   const progress = 0.7;
@@ -17,74 +38,88 @@ export default function Homepage() {
 
   return (
     <Layout>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, John</Text>
-          <Text style={styles.subtitle}>Ready for your workout?</Text>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>Hello, John</Text>
+            <Text style={styles.subtitle}>Ready for your workout?</Text>
+          </View>
+          <Image source={require('../../assets/images/icon.png')} style={styles.avatar} />
         </View>
-        <Image source={require('../../assets/images/icon.png')} style={styles.avatar} />
-      </View>
 
-      <LinearGradient
-        colors={[theme.colors.primary, theme.colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.workoutCard}
-      >
-        <View style={styles.workoutText}>
-          <Text style={styles.workoutTitle}>Daily Workout</Text>
-          <Text style={styles.workoutTime}>8:00 AM</Text>
-          <TouchableOpacity style={styles.workoutButton}>
-            <Text style={styles.workoutButtonText}>Start</Text>
-          </TouchableOpacity>
-        </View>
-        <Image source={require('../../assets/images/react-logo.png')} style={styles.workoutImage} />
-      </LinearGradient>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.workoutScroll}
+        >
+          {workouts.map((item) => (
+            <View key={item.id} style={styles.workoutCard}>
+              <View style={styles.workoutInfo}>
+                <Text style={styles.workoutTitle}>{item.title}</Text>
+                <Text style={styles.workoutTime}>{item.time}</Text>
+                <TouchableOpacity style={styles.playButton}>
+                  <Feather name="play" size={16} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <Image source={item.image} style={styles.workoutImage} />
+            </View>
+          ))}
+        </ScrollView>
 
-      <View style={styles.progressSection}>
-        <Svg width={size} height={size}>
-          <Circle
-            stroke="#e6e6e6"
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            strokeWidth={strokeWidth}
-            fill="none"
-          />
-          <Circle
-            stroke={theme.colors.primary}
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            strokeWidth={strokeWidth}
-            fill="none"
-            strokeDasharray={`${circumference} ${circumference}`}
-            strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
-            rotation="-90"
-            origin={`${size / 2},${size / 2}`}
-          />
-        </Svg>
-        <View style={styles.progressLabel}>
-          <Text style={styles.progressPercent}>70%</Text>
-          <Text style={styles.progressText}>Completed</Text>
+        <View style={styles.progressSection}>
+          <Svg width={size} height={size}>
+            <Circle
+              stroke="#e6e6e6"
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              strokeWidth={strokeWidth}
+              fill="none"
+            />
+            <Circle
+              stroke={theme.colors.primary}
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              strokeWidth={strokeWidth}
+              fill="none"
+              strokeDasharray={`${circumference} ${circumference}`}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              rotation="-90"
+              origin={`${size / 2},${size / 2}`}
+            />
+          </Svg>
+          <View style={styles.progressLabel}>
+            <Text style={styles.progressPercent}>70%</Text>
+            <Text style={styles.progressText}>Completed</Text>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>350</Text>
-          <Text style={styles.statLabel}>Cal</Text>
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Feather name="fire" size={24} color={theme.colors.primary} />
+            <View style={styles.statInfo}>
+              <Text style={styles.statValue}>350</Text>
+              <Text style={styles.statLabel}>Calories</Text>
+            </View>
+          </View>
+          <View style={styles.statCard}>
+            <Feather name="clock" size={24} color={theme.colors.primary} />
+            <View style={styles.statInfo}>
+              <Text style={styles.statValue}>45m</Text>
+              <Text style={styles.statLabel}>Time</Text>
+            </View>
+          </View>
+          <View style={styles.statCard}>
+            <Feather name="heart" size={24} color={theme.colors.primary} />
+            <View style={styles.statInfo}>
+              <Text style={styles.statValue}>120</Text>
+              <Text style={styles.statLabel}>BPM</Text>
+            </View>
+          </View>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>45m</Text>
-          <Text style={styles.statLabel}>Time</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>120</Text>
-          <Text style={styles.statLabel}>BPM</Text>
-        </View>
-      </View>
+      </ScrollView>
     </Layout>
   );
 }
@@ -111,40 +146,47 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
   },
+  workoutScroll: {
+    paddingBottom: 16,
+  },
   workoutCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginRight: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  workoutText: {
+  workoutInfo: {
     flex: 1,
   },
   workoutTitle: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+    color: theme.colors.text,
     marginBottom: 4,
   },
   workoutTime: {
-    color: '#fff',
+    color: '#6B7280',
     marginBottom: 12,
   },
-  workoutButton: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  workoutButtonText: {
-    color: theme.colors.primary,
-    fontWeight: '600',
+  playButton: {
+    backgroundColor: theme.colors.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   workoutImage: {
     width: 80,
     height: 80,
+    marginLeft: 10,
   },
   progressSection: {
     alignItems: 'center',
@@ -165,22 +207,27 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     opacity: 0.7,
   },
-  statsRow: {
+  statsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   statCard: {
-    flex: 1,
-    backgroundColor: '#fff',
-    marginHorizontal: 4,
-    borderRadius: 16,
-    paddingVertical: 16,
+    width: '48%',
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
     shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
     elevation: 3,
+  },
+  statInfo: {
+    marginLeft: 12,
   },
   statValue: {
     fontSize: 18,
