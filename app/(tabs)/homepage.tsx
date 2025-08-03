@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'rea
 // eslint-disable-next-line import/no-unresolved
 import Svg, { Circle } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Layout from '@/components/Layout';
 import { theme } from '@/constants/theme';
@@ -29,6 +30,7 @@ const workouts = [
 ];
 
 export default function Homepage() {
+  const insets = useSafeAreaInsets();
   const progress = 0.7;
   const size = 120;
   const strokeWidth = 12;
@@ -40,7 +42,7 @@ export default function Homepage() {
     <Layout>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
       >
         <View style={styles.header}>
           <View>
