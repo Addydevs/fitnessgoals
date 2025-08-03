@@ -83,7 +83,7 @@ export default function TabLayout() {
           options={{
             title: "Camera",
             tabBarIcon: ({ color, size }) => (
-              <Feather name="image" size={size} color={color} />
+              <Feather name="camera" size={size} color={color} />
             ),
           }}
         />
