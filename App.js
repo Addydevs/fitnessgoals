@@ -9,6 +9,7 @@ import CameraScreen from './components/CameraScreen';
 import ProgressScreen from './components/ProgressScreen';
 import ProfileScreen from './components/ProfileScreen';
 import { styles } from './constants/styles';
+import { theme } from './constants/theme';
 
 const Tab = createBottomTabNavigator();
 
@@ -54,11 +55,11 @@ export default function App() {
     <NavigationContainer>
       <Tab.Navigator
         screenOptions={{
-          tabBarActiveTintColor: '#4285f4',
+          tabBarActiveTintColor: theme.colors.primary,
           tabBarInactiveTintColor: '#8E8E93',
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: 'white',
+            backgroundColor: theme.colors.background,
             borderTopColor: 'transparent',
             elevation: 10,
             shadowColor: '#000',
