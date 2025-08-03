@@ -1,8 +1,15 @@
 import React, { useContext } from "react";
-import ProgressScreen from "@/components/ProgressScreen";
+import CameraScreen from "@/components/CameraScreen";
 import { PhotoContext } from "./_layout";
 
 export default function ProgressPage() {
-  const { photos, setPhotos } = useContext(PhotoContext);
-  return <ProgressScreen photos={photos} setPhotos={setPhotos} />;
+  const { photos, setPhotos, loading, setLoading } = useContext(PhotoContext);
+  return (
+    <CameraScreen
+      photos={photos}
+      setPhotos={setPhotos}
+      loading={loading}
+      setLoading={setLoading}
+    />
+  );
 }
