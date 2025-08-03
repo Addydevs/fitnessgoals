@@ -1,4 +1,5 @@
 import React from 'react';
+import { FontAwesome5 } from '@expo/vector-icons';
 import {
   View,
   SafeAreaView,
@@ -45,12 +46,12 @@ const Layout = ({
 };
 
 // Modern Header Component for consistent headers across screens
-export const ModernHeader = ({ 
-  title, 
-  subtitle, 
-  leftIcon, 
-  rightIcon, 
-  onLeftPress, 
+export const ModernHeader = ({
+  title,
+  subtitle,
+  leftIcon,
+  rightIcon = <FontAwesome5 name="fire" size={24} color="black" />,
+  onLeftPress,
   onRightPress,
   backgroundColor = 'white',
   showBorder = true,

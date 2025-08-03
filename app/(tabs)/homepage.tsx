@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 // eslint-disable-next-line import/no-unresolved
 import Svg, { Circle } from 'react-native-svg';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome5 } from '@expo/vector-icons';
 
 import Layout from '@/components/Layout';
 import { theme } from '@/constants/theme';
@@ -98,7 +98,7 @@ export default function Homepage() {
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Feather name="zap" size={24} color={theme.colors.primary} />
+            <FontAwesome5 name="fire" size={24} color={theme.colors.primary} />
             <View style={styles.statInfo}>
               <Text style={styles.statValue}>350</Text>
               <Text style={styles.statLabel}>Calories</Text>
