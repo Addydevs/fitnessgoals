@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 
-const Layout = ({ 
+const Layout = ({
   children, 
   backgroundColor = '#FAFAFA', 
   statusBarStyle = 'dark-content',
@@ -44,6 +44,7 @@ const Layout = ({
     </>
   );
 };
+
 
 // Modern Header Component for consistent headers across screens
 export const ModernHeader = ({
