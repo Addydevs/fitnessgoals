@@ -1,11 +1,13 @@
-/* eslint-disable import/no-unresolved */
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, ActivityIndicator, Alert, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Camera } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import { Feather } from '@expo/vector-icons';
 import { styles } from '../constants/styles';
+import Layout from './Layout';
+import { theme } from '../constants/theme';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 export default function CameraScreen({ photos, setPhotos, loading, setLoading }) {
@@ -174,7 +176,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
         </TouchableOpacity>
         <View style={styles.heroImageContainer}>
           <View style={styles.heroImageBackground}>
-            <Text style={styles.heroImagePlaceholder}>💪</Text>
+            <Feather name="activity" size={80} color="#000" style={styles.heroImagePlaceholder} />
             <Text style={styles.heroImageText}>Progress Photo</Text>
           </View>
         </View>
@@ -202,7 +204,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
   }
 
   return (
-    <View style={styles.container}>
+    <Layout>
       <StatusBar barStyle="light-content" />
       <View style={styles.modernHeader}>
         <Text style={styles.modernHeaderTitle}>Capture Progress</Text>
@@ -213,7 +215,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
       {loading ? (
         <View style={styles.loadingContainer}>
           <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color="#4285f4" />
+            <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.loadingTitle}>Analyzing Your Progress</Text>
             <Text style={styles.loadingSubtext}>AI is comparing your photos...</Text>
             <View style={styles.loadingDots}>
@@ -227,7 +229,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
         <View style={styles.modernCameraContent}>
           <TouchableOpacity style={styles.modernCameraButton} onPress={takePhoto} activeOpacity={0.8}>
             <View style={styles.modernCameraIcon}>
-              <Text style={styles.cameraIconText}>📸</Text>
+              <Feather name="camera" size={30} color="#fff" />
             </View>
             <Text style={styles.modernCameraButtonText}>Take Progress Photo</Text>
           </TouchableOpacity>
@@ -249,7 +251,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
           )}
         </View>
       )}
-    </View>
+    </Layout>
   );
 }
 
