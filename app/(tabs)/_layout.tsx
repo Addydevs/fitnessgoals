@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/constants/theme';
 
 export const PhotoContext = createContext({
@@ -15,6 +16,7 @@ export const PhotoContext = createContext({
 export default function TabLayout() {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadPhotos();
@@ -59,7 +61,8 @@ export default function TabLayout() {
             backgroundColor: '#fff',
             borderTopWidth: 0,
             elevation: 5,
-            height: 60,
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom,
           },
         }}
       >
