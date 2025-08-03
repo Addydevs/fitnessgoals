@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-// eslint-disable-next-line import/no-unresolved
 import Svg, { Circle } from 'react-native-svg';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 
@@ -12,19 +11,19 @@ const workouts = [
     id: 1,
     title: 'Full Body',
     time: '8:00 AM',
-    image: require('../../assets/images/react-logo.png'),
+    icon: <FontAwesome5 name="dumbbell" size={32} color={theme.colors.primary} />,
   },
   {
     id: 2,
     title: 'Yoga Stretch',
     time: '9:00 AM',
-    image: require('../../assets/images/react-logo.png'),
+    icon: <FontAwesome5 name="spa" size={32} color={theme.colors.primary} />,
   },
   {
     id: 3,
     title: 'HIIT Blast',
     time: '10:00 AM',
-    image: require('../../assets/images/react-logo.png'),
+    icon: <Feather name="activity" size={32} color={theme.colors.primary} />,
   },
 ];
 
@@ -54,14 +53,14 @@ export default function Homepage() {
         >
           {workouts.map((item) => (
             <View key={item.id} style={styles.workoutCard}>
+              <View style={styles.workoutIcon}>{item.icon}</View>
               <View style={styles.workoutInfo}>
                 <Text style={styles.workoutTitle}>{item.title}</Text>
                 <Text style={styles.workoutTime}>{item.time}</Text>
-                <TouchableOpacity style={styles.playButton}>
-                  <Feather name="play" size={16} color="#fff" />
-                </TouchableOpacity>
               </View>
-              <Image source={item.image} style={styles.workoutImage} />
+              <TouchableOpacity style={styles.playButton}>
+                <Feather name="play" size={16} color="#fff" />
+              </TouchableOpacity>
             </View>
           ))}
         </ScrollView>
@@ -162,6 +161,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  workoutIcon: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 12,
+    marginRight: 16,
+  },
   workoutInfo: {
     flex: 1,
   },
@@ -182,11 +187,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  workoutImage: {
-    width: 80,
-    height: 80,
-    marginLeft: 10,
   },
   progressSection: {
     alignItems: 'center',
