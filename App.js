@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import * as FileSystem from 'expo-file-system';
+import { Feather } from '@expo/vector-icons';
 
 import CameraScreen from './components/CameraScreen';
 import ProgressScreen from './components/ProgressScreen';
@@ -79,9 +80,9 @@ export default function App() {
         <Tab.Screen
           name="Camera"
           options={{
-            tabBarIcon: ({ color, focused }) => (
+            tabBarIcon: ({ color, size, focused }) => (
               <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-                <Text style={{ fontSize: 24, color }}>📸</Text>
+                <Feather name="camera" size={size} color={color} />
               </View>
             ),
           }}
@@ -98,9 +99,9 @@ export default function App() {
         <Tab.Screen
           name="Progress"
           options={{
-            tabBarIcon: ({ color, focused }) => (
+            tabBarIcon: ({ color, size, focused }) => (
               <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-                <Text style={{ fontSize: 24, color }}>📊</Text>
+                <Feather name="bar-chart-2" size={size} color={color} />
               </View>
             ),
           }}
@@ -110,9 +111,9 @@ export default function App() {
         <Tab.Screen
           name="Profile"
           options={{
-            tabBarIcon: ({ color, focused }) => (
+            tabBarIcon: ({ color, size, focused }) => (
               <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-                <Text style={{ fontSize: 24, color }}>👤</Text>
+                <Feather name="user" size={size} color={color} />
               </View>
             ),
           }}
