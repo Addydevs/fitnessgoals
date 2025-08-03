@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { Feather } from '@expo/vector-icons';
 
@@ -53,75 +54,84 @@ export default function App() {
   };
 
   return (
-    <NavigationContainer>
-      <Tab.Navigator
-        screenOptions={{
-          tabBarActiveTintColor: theme.colors.primary,
-          tabBarInactiveTintColor: '#8E8E93',
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: theme.colors.background,
-            borderTopColor: 'transparent',
-            elevation: 10,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 10,
-            height: 90,
-            paddingBottom: 25,
-            paddingTop: 10,
-          },
-          tabBarLabelStyle: {
-            fontSize: 12,
-            fontWeight: '600',
-          },
-        }}
-      >
-        <Tab.Screen
-          name="Camera"
-          options={{
-            tabBarIcon: ({ color, size, focused }) => (
-              <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-                <Feather name="camera" size={size} color={color} />
-              </View>
-            ),
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <Tab.Navigator
+          screenOptions={{
+            tabBarActiveTintColor: theme.colors.primary,
+            tabBarInactiveTintColor: '#8E8E93',
+            headerShown: false,
+            tabBarStyle: {
+              backgroundColor: theme.colors.background,
+              borderTopColor: 'transparent',
+              elevation: 10,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
+              // Dynamic height and padding based on platform
+              height: Platform.OS === 'ios' ? 90 : 80,
+              paddingBottom: Platform.OS === 'ios' ? 25 : 15,
+              paddingTop: 10,
+              // Ensure tab bar stays above system navigation
+              position: 'relative',
+            },
+            tabBarLabelStyle: {
+              fontSize: 12,
+              fontWeight: '600',
+              marginBottom: Platform.OS === 'ios' ? 5 : 8,
+            },
+            // Add safe area handling to tab bar items
+            tabBarItemStyle: {
+              paddingVertical: 5,
+            },
           }}
         >
-          {() => (
-            <CameraScreen
-              photos={photos}
-              setPhotos={setPhotos}
-              loading={loading}
-              setLoading={setLoading}
-            />
-          )}
-        </Tab.Screen>
-        <Tab.Screen
-          name="Progress"
-          options={{
-            tabBarIcon: ({ color, size, focused }) => (
-              <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-                <Feather name="bar-chart-2" size={size} color={color} />
-              </View>
-            ),
-          }}
-        >
-          {() => <ProgressScreen photos={photos} setPhotos={setPhotos} />}
-        </Tab.Screen>
-        <Tab.Screen
-          name="Profile"
-          options={{
-            tabBarIcon: ({ color, size, focused }) => (
-              <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-                <Feather name="user" size={size} color={color} />
-              </View>
-            ),
-          }}
-        >
-          {() => <ProfileScreen photos={photos} />}
-        </Tab.Screen>
-      </Tab.Navigator>
-    </NavigationContainer>
+          <Tab.Screen
+            name="Camera"
+            options={{
+              tabBarIcon: ({ color, size, focused }) => (
+                <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
+                  <Feather name="camera" size={size} color={color} />
+                </View>
+              ),
+            }}
+          >
+            {() => (
+              <CameraScreen
+                photos={photos}
+                setPhotos={setPhotos}
+                loading={loading}
+                setLoading={setLoading}
+              />
+            )}
+          </Tab.Screen>
+          <Tab.Screen
+            name="Progress"
+            options={{
+              tabBarIcon: ({ color, size, focused }) => (
+                <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
+                  <Feather name="bar-chart-2" size={size} color={color} />
+                </View>
+              ),
+            }}
+          >
+            {() => <ProgressScreen photos={photos} setPhotos={setPhotos} />}
+          </Tab.Screen>
+          <Tab.Screen
+            name="Profile"
+            options={{
+              tabBarIcon: ({ color, size, focused }) => (
+                <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
+                  <Feather name="user" size={size} color={color} />
+                </View>
+              ),
+            }}
+          >
+            {() => <ProfileScreen photos={photos} />}
+          </Tab.Screen>
+        </Tab.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
-
