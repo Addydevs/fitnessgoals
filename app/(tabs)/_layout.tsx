@@ -1,9 +1,10 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { Text } from 'react-native';
 import { Tabs } from 'expo-router';
-// eslint-disable-next-line import/no-unresolved
+import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
+import { theme } from '@/constants/theme';
 
 export const PhotoContext = createContext({
   photos: [],
@@ -15,6 +16,7 @@ export const PhotoContext = createContext({
 export default function TabLayout() {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadPhotos();
@@ -48,33 +50,48 @@ export default function TabLayout() {
 
   return (
     <PhotoContext.Provider value={{ photos, setPhotos, loading, setLoading }}>
-      <Tabs initialRouteName="homepage" screenOptions={{ headerShown: false }}>
+      <Tabs
+        initialRouteName="homepage"
+        screenOptions={{
+          headerShown: false,
+          tabBarShowLabel: false,
+          tabBarActiveTintColor: theme.colors.primary,
+          tabBarInactiveTintColor: '#9AA1B9',
+          tabBarStyle: {
+            backgroundColor: '#fff',
+            borderTopWidth: 0,
+            elevation: 5,
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom,
+          },
+        }}
+      >
         <Tabs.Screen
           name="homepage"
           options={{
             title: 'Home',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>🏠</Text>,
+            tabBarIcon: ({ color, size }) => <Feather name="home" size={size} color={color} />,
           }}
         />
         <Tabs.Screen
           name="camera"
           options={{
             title: 'Camera',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>📸</Text>,
+            tabBarIcon: ({ color, size }) => <Feather name="camera" size={size} color={color} />,
           }}
         />
         <Tabs.Screen
           name="progress"
           options={{
             title: 'Progress',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>📊</Text>,
+            tabBarIcon: ({ color, size }) => <Feather name="bar-chart-2" size={size} color={color} />,
           }}
         />
         <Tabs.Screen
           name="profile"
           options={{
             title: 'Profile',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>👤</Text>,
+            tabBarIcon: ({ color, size }) => <Feather name="user" size={size} color={color} />,
           }}
         />
       </Tabs>
