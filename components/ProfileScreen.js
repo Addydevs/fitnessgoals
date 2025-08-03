@@ -1,9 +1,10 @@
-/* eslint-disable import/no-unresolved */
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StatusBar, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import { styles } from '../constants/styles';
+import Layout from './Layout';
+import { theme } from '../constants/theme';
 
 export default function ProfileScreen({ photos }) {
   const [goal, setGoal] = useState('');
@@ -27,7 +28,7 @@ export default function ProfileScreen({ photos }) {
     try {
       await AsyncStorage.setItem('fitnessGoal', newGoal);
       setGoal(newGoal);
-      Alert.alert('🎯 Goal Saved!', 'Your AI analysis will now be personalized to your goal.');
+      Alert.alert('Goal Saved!', 'Your AI analysis will now be personalized to your goal.');
     } catch (error) {
       console.error('Error saving goal:', error);
     }
@@ -42,34 +43,37 @@ export default function ProfileScreen({ photos }) {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={['#4285f4', '#1e3c72']} style={styles.gradientHeader}>
+    <Layout>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.gradientHeader}>
         <Text style={styles.headerTitle}>Your Profile</Text>
         <Text style={styles.headerSubtitle}>Track your transformation</Text>
-      </LinearGradient>
+      </View>
 
       <ScrollView style={styles.profileScrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.statsCard}>
           <Text style={styles.sectionTitle}>Journey Statistics</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
-              <LinearGradient colors={['#4285f4', '#1e3c72']} style={styles.statCircle}>
+              <View style={[styles.statCircle, { backgroundColor: theme.colors.primary }]}>
                 <Text style={styles.statNumber}>{photos.length}</Text>
-              </LinearGradient>
+              </View>
               <Text style={styles.statLabel}>Progress Photos</Text>
             </View>
             <View style={styles.statItem}>
-              <LinearGradient colors={['#f093fb', '#f5576c']} style={styles.statCircle}>
+              <View style={[styles.statCircle, { backgroundColor: '#f5576c' }]}>
                 <Text style={styles.statNumber}>{getJourneyDays()}</Text>
-              </LinearGradient>
+              </View>
               <Text style={styles.statLabel}>Days Tracking</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.goalCard}>
-          <Text style={styles.sectionTitle}>🎯 Fitness Goal</Text>
+          <View style={styles.sectionTitleRow}>
+            <Feather name="target" size={20} color={theme.colors.text} />
+            <Text style={styles.sectionTitleRowText}>Fitness Goal</Text>
+          </View>
           <View style={styles.goalInputContainer}>
             <TextInput
               style={styles.goalInput}
@@ -81,32 +85,36 @@ export default function ProfileScreen({ photos }) {
             />
           </View>
           <TouchableOpacity style={styles.saveGoalButton} onPress={() => saveGoal(goal)} activeOpacity={0.8}>
-            <LinearGradient colors={['#11998e', '#38ef7d']} style={styles.saveGoalGradient}>
-              <Text style={styles.saveGoalButtonText}>💾 Save Goal</Text>
-            </LinearGradient>
+            <Text style={styles.saveGoalButtonText}>Save Goal</Text>
           </TouchableOpacity>
-          <Text style={styles.goalHint}>💡 Setting a goal helps AI provide personalized feedback!</Text>
+          <View style={styles.goalHintRow}>
+            <Feather name="info" size={16} color="#666" />
+            <Text style={styles.goalHint}>Setting a goal helps AI provide personalized feedback!</Text>
+          </View>
         </View>
 
         <View style={styles.tipsCard}>
-          <Text style={styles.sectionTitle}>📸 Photography Tips</Text>
+          <View style={styles.sectionTitleRow}>
+            <Feather name="camera" size={20} color={theme.colors.text} />
+            <Text style={styles.sectionTitleRowText}>Photography Tips</Text>
+          </View>
           <View style={styles.tipsList}>
             {[
-              { icon: '📍', text: 'Use the same location every time' },
-              { icon: '💡', text: 'Keep lighting consistent' },
-              { icon: '👕', text: 'Wear similar clothing' },
-              { icon: '⏰', text: 'Take photos at the same time' },
-              { icon: '🧍', text: 'Maintain the same pose' },
+              { icon: 'map-pin', text: 'Use the same location every time' },
+              { icon: 'sun', text: 'Keep lighting consistent' },
+              { icon: 'shopping-bag', text: 'Wear similar clothing' },
+              { icon: 'clock', text: 'Take photos at the same time' },
+              { icon: 'user', text: 'Maintain the same pose' },
             ].map((tip, index) => (
               <View key={index} style={styles.tipItem}>
-                <Text style={styles.tipIcon}>{tip.icon}</Text>
+                <Feather name={tip.icon} size={20} color={theme.colors.primary} style={styles.tipIcon} />
                 <Text style={styles.tipText}>{tip.text}</Text>
               </View>
             ))}
           </View>
         </View>
       </ScrollView>
-    </View>
+    </Layout>
   );
 }
 

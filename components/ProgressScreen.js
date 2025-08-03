@@ -1,10 +1,11 @@
-/* eslint-disable import/no-unresolved */
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, Alert, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import { styles } from '../constants/styles';
+import Layout from './Layout';
+import { theme } from '../constants/theme';
 
 export default function ProgressScreen({ photos, setPhotos }) {
   const [compareMode, setCompareMode] = useState(false);
@@ -73,9 +74,9 @@ export default function ProgressScreen({ photos, setPhotos }) {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={['#4285f4', '#1e3c72']} style={styles.gradientHeader}>
+    <Layout>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.gradientHeader}>
         <Text style={styles.headerTitle}>Your Journey</Text>
         <Text style={styles.headerSubtitle}>
           {photos.length} {photos.length === 1 ? 'milestone' : 'milestones'} captured
@@ -85,12 +86,17 @@ export default function ProgressScreen({ photos, setPhotos }) {
             style={[styles.compareToggle, compareMode && styles.compareToggleActive]}
             onPress={toggleCompareMode}
           >
+            {compareMode ? (
+              <Feather name="x" size={16} color={compareMode ? '#fff' : theme.colors.primary} />
+            ) : (
+              <Feather name="bar-chart-2" size={16} color={theme.colors.primary} />
+            )}
             <Text style={[styles.compareToggleText, compareMode && styles.compareToggleTextActive]}>
-              {compareMode ? '✕ Cancel' : '📊 Compare'}
+              {compareMode ? 'Cancel' : 'Compare'}
             </Text>
           </TouchableOpacity>
         )}
-      </LinearGradient>
+      </View>
 
       {compareMode && selectedPhotos.length === 2 && (
         <View style={styles.comparisonContainer}>
@@ -115,7 +121,7 @@ export default function ProgressScreen({ photos, setPhotos }) {
         {photos.length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <View style={styles.emptyStateCard}>
-              <Text style={styles.emptyStateIcon}>📷</Text>
+              <Feather name="camera" size={40} color={theme.colors.primary} style={styles.emptyStateIcon} />
               <Text style={styles.emptyStateTitle}>No Progress Yet</Text>
               <Text style={styles.emptyStateText}>
                 Start your journey by taking your first progress photo
@@ -131,10 +137,10 @@ export default function ProgressScreen({ photos, setPhotos }) {
               <View style={styles.compareInstructionsContainer}>
                 <Text style={styles.compareInstructions}>
                   {selectedPhotos.length === 0
-                    ? '👆 Select two photos to compare'
+                    ? 'Select two photos to compare'
                     : selectedPhotos.length === 1
-                    ? '👆 Select one more photo'
-                    : '✨ Comparison ready! Tap photos to change selection'}
+                    ? 'Select one more photo'
+                    : 'Comparison ready! Tap photos to change selection'}
                 </Text>
               </View>
             )}
@@ -160,15 +166,12 @@ export default function ProgressScreen({ photos, setPhotos }) {
                   )}
                   <View style={styles.photoImageContainer}>
                     <Image source={{ uri: photo.uri }} style={styles.photoImage} />
-                    <LinearGradient
-                      colors={['transparent', 'rgba(0,0,0,0.7)']}
-                      style={styles.photoGradientOverlay}
-                    >
+                    <View style={[styles.photoGradientOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}> 
                       <View style={styles.photoHeader}>
                         <Text style={styles.photoNumber}>#{photos.length - index}</Text>
                         <Text style={styles.photoDate}>{formatDate(photo.timestamp)}</Text>
                       </View>
-                    </LinearGradient>
+                    </View>
                   </View>
                   {!compareMode && photo.analysis && (
                     <View style={styles.analysisContainer}>
@@ -181,7 +184,7 @@ export default function ProgressScreen({ photos, setPhotos }) {
           </>
         )}
       </ScrollView>
-    </View>
+    </Layout>
   );
 }
 

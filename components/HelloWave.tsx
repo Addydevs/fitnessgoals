@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -8,7 +9,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { ThemedText } from '@/components/ThemedText';
 
 export function HelloWave() {
   const rotationAnimation = useSharedValue(0);
@@ -26,15 +26,13 @@ export function HelloWave() {
 
   return (
     <Animated.View style={animatedStyle}>
-      <ThemedText style={styles.text}>👋</ThemedText>
+      <Feather name="hand" size={28} color="#000" style={styles.icon} />
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  text: {
-    fontSize: 28,
-    lineHeight: 32,
+  icon: {
     marginTop: -6,
   },
 });
