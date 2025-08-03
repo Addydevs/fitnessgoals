@@ -1,10 +1,20 @@
 import { StyleSheet } from 'react-native';
+import { theme } from './theme';
 
 export const styles = StyleSheet.create({
+  // App wide layout
+  appBackground: {
+    flex: 1,
+  },
+  appContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+
   // Base Layouts
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
   },
 
   // Welcome Screen Styles
