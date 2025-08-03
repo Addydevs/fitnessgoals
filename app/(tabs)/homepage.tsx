@@ -98,7 +98,7 @@ export default function Homepage() {
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Feather name="fire" size={24} color={theme.colors.primary} />
+            <Feather name="zap" size={24} color={theme.colors.primary} />
             <View style={styles.statInfo}>
               <Text style={styles.statValue}>350</Text>
               <Text style={styles.statLabel}>Calories</Text>
