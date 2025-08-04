@@ -5,6 +5,9 @@ import {
   StatusBar,
   Platform,
   StyleSheet,
+  TouchableOpacity,
+  Text,
+  ActivityIndicator,
 } from 'react-native';
 
 const Layout = ({ 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Settings, Camera, Edit3, Share2, Eye } from 'lucide-react';
+import { Feather } from '@expo/vector-icons';
 
 const CaptureFitProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -97,11 +97,11 @@ const CaptureFitProfile = () => {
         {/* Header */}
         <div className="flex justify-between items-center px-6 pt-4 pb-6">
           <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
+            <Feather name="arrow-left" size={20} color="#4B5563" />
           </button>
           <h1 className="text-lg font-semibold text-gray-900">Profile</h1>
           <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
-            <Settings className="w-5 h-5 text-gray-600" />
+            <Feather name="settings" size={20} color="#4B5563" />
           </button>
         </div>
 
@@ -118,7 +118,7 @@ const CaptureFitProfile = () => {
                 <div className="flex items-center gap-2 mb-2">
                   <h2 className="text-xl font-bold text-gray-900">{userData?.name || 'User'}</h2>
                   <button className="p-1">
-                    <Edit3 className="w-4 h-4 text-gray-400" />
+                    <Feather name="edit-3" size={16} color="#9CA3AF" />
                   </button>
                 </div>
                 <p className="text-gray-400 text-sm">
@@ -163,17 +163,19 @@ const CaptureFitProfile = () => {
                     </div>
                     <div className="flex gap-2">
                       <button className="p-2 bg-gray-100 rounded-full">
-                        <Eye className="w-4 h-4 text-gray-600" />
+                        <Feather name="eye" size={16} color="#4B5563" />
                       </button>
                       <button className="p-2 bg-gray-100 rounded-full">
-                        <Share2 className="w-4 h-4 text-gray-600" />
+                        <Feather name="share-2" size={16} color="#4B5563" />
                       </button>
                     </div>
                   </div>
                   
                   <div className="aspect-[4/5] bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
                     <div className="text-center">
-                      <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <div className="mx-auto mb-2">
+                        <Feather name="camera" size={32} color="#9CA3AF" />
+                      </div>
                       <p className="text-gray-500 text-sm">Progress Photo</p>
                     </div>
                   </div>
@@ -182,7 +184,9 @@ const CaptureFitProfile = () => {
             </div>
           ) : (
             <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
-              <Camera className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <div className="mx-auto mb-4">
+                <Feather name="camera" size={48} color="#D1D5DB" />
+              </div>
               <h4 className="font-semibold text-gray-900 mb-2">No photos yet</h4>
               <p className="text-gray-500 text-sm mb-4">Start your progress journey by taking your first photo</p>
               <button className="bg-gray-900 text-white px-6 py-3 rounded-2xl font-medium">
@@ -197,13 +201,17 @@ const CaptureFitProfile = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 gap-4">
             <button className="bg-gradient-to-br from-blue-500 to-green-500 rounded-2xl p-4 text-white text-left">
-              <Camera className="w-6 h-6 mb-2" />
+              <div className="mb-2">
+                <Feather name="camera" size={24} color="white" />
+              </div>
               <h4 className="font-semibold text-sm">Take Photo</h4>
               <p className="text-blue-100 text-xs">Capture progress</p>
             </button>
-            
+
             <button className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-4 text-white text-left">
-              <Share2 className="w-6 h-6 mb-2" />
+              <div className="mb-2">
+                <Feather name="share-2" size={24} color="white" />
+              </div>
               <h4 className="font-semibold text-sm">Share Progress</h4>
               <p className="text-purple-100 text-xs">Show your journey</p>
             </button>
