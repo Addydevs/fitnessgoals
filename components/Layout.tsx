@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 
-const Layout = ({
+export function Layout({
   children,
   backgroundColor = "#FAFAFA",
   statusBarStyle = "dark-content",
@@ -19,7 +19,7 @@ const Layout = ({
   padding = 0,
   paddingHorizontal = 0,
   paddingVertical = 0,
-}) => {
+}) {
   return (
     <>
       <StatusBar
@@ -46,7 +46,7 @@ const Layout = ({
       </SafeAreaView>
     </>
   );
-};
+}
 
 // Modern Header Component for consistent headers across screens
 export const ModernHeader = ({
@@ -110,8 +110,6 @@ export const ModernCard = ({
   marginVertical = 0,
   backgroundColor = "white",
   borderRadius = 15,
-  shadowColor = "#000",
-  shadowOpacity = 0.05,
   elevation = 3,
   onPress,
 }) => {
@@ -124,8 +122,7 @@ export const ModernCard = ({
       marginVertical,
       backgroundColor,
       borderRadius,
-      shadowColor,
-      shadowOpacity,
+      boxShadow: "0px 2px 10px rgba(0,0,0,0.05)",
       elevation,
     },
     style,
@@ -271,9 +268,7 @@ const styles = StyleSheet.create({
 
   // Modern Card Styles
   modernCard: {
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 10,
-    // Android shadow
+    boxShadow: "0px 2px 10px rgba(0,0,0,0.05)",
     elevation: 3,
   },
 
@@ -323,10 +318,7 @@ const styles = StyleSheet.create({
     padding: 30,
     alignItems: "center",
     margin: 40,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
+    boxShadow: "0px 10px 20px rgba(0,0,0,0.1)",
     elevation: 10,
   },
   loadingTitle: {
@@ -356,10 +348,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
     maxWidth: 300,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
+    boxShadow: "0px 5px 15px rgba(0,0,0,0.1)",
     elevation: 8,
   },
   emptyStateIcon: {
@@ -384,10 +373,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 25,
-    shadowColor: "#8B5FBF",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    boxShadow: "0px 4px 8px rgba(139,95,191,0.3)",
     elevation: 5,
   },
   emptyStateButtonText: {
@@ -396,5 +382,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
-export default Layout;

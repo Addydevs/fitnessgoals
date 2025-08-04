@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Camera as ExpoCamera } from "expo-camera";
 import { Feather } from "@expo/vector-icons";
-import Layout from "@/components/Layout";
+import { Layout } from "@/components/Layout";
 
 const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
