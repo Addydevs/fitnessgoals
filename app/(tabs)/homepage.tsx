@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-// eslint-disable-next-line import/no-unresolved
 import Svg, { Circle } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 
