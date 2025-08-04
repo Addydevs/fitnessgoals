@@ -24,7 +24,6 @@ const OPENAI_API_KEY = 'your-api-key-here'; // Replace with your actual key
 export default function CameraScreen({ photos, setPhotos, loading, setLoading }) {
   const [cameraPermission, setCameraPermission] = useState(null);
   const [showWelcome, setShowWelcome] = useState(true);
-  const [currentDate, setCurrentDate] = useState(new Date());
 
   useEffect(() => {
     getCameraPermission();
@@ -250,7 +249,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
             />
             <View style={styles.greetingContainer}>
               <Text style={styles.greeting}>Hello, User</Text>
-              <Text style={styles.date}>Today {currentDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</Text>
+              <Text style={styles.date}>Today {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.searchButton}>
