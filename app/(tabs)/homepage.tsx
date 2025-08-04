@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Camera as ExpoCamera } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
 import { Feather } from "@expo/vector-icons";
 import { Layout } from "@/components/Layout";
 
@@ -16,7 +16,6 @@ const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function PhotoProgressApp() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [showCamera, setShowCamera] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -34,8 +33,6 @@ export default function PhotoProgressApp() {
     lastWeek: null as string | null,
     allPhotos: [] as any[],
   });
-
-  const cameraRef = useRef<ExpoCamera>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentDate(new Date()), 1000);
@@ -120,25 +117,6 @@ export default function PhotoProgressApp() {
     }));
   };
 
-  const startCamera = async () => {
-    const { status } = await ExpoCamera.requestCameraPermissionsAsync();
-    if (status === "granted") {
-      setShowCamera(true);
-    } else {
-      alert("Camera permission not granted");
-    }
-  };
-
-  const capturePhoto = async () => {
-    if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
-      setShowCamera(false);
-      sendToAPI(photo);
-    }
-  };
-
-  const stopCamera = () => setShowCamera(false);
-
   const sendToAPI = async (photo: any) => {
     setIsAnalyzing(true);
     try {
@@ -185,7 +163,22 @@ export default function PhotoProgressApp() {
     return Math.ceil((pastDays + startOfYear.getDay() + 1) / 7);
   };
 
-  const handleCameraClick = () => startCamera();
+  const handleCameraClick = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      alert("Camera permission not granted");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      await sendToAPI(result.assets[0]);
+    }
+  };
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-US", {
@@ -203,52 +196,6 @@ export default function PhotoProgressApp() {
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="small" color="#3B82F6" />
           <Text style={styles.loadingText}>Loading your progress...</Text>
-        </View>
-      )}
-
-      {showCamera && (
-        <View style={styles.cameraContainer}>
-          <ExpoCamera
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            type="front"
-          />
-          <View style={styles.cameraHeader}>
-            <TouchableOpacity onPress={stopCamera}>
-              <Feather name="x" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={styles.cameraTitle}>CaptureFit Camera</Text>
-            <View style={{ width: 24 }} />
-          </View>
-          <View style={styles.cameraGuideWrapper}>
-            <View style={styles.cameraGuide}>
-              <Text style={styles.cameraGuideText}>
-                Position yourself within the frame for best results
-              </Text>
-            </View>
-          </View>
-          <View style={styles.shutterWrapper}>
-            <TouchableOpacity
-              onPress={capturePhoto}
-              disabled={isAnalyzing}
-              style={styles.shutterOuter}
-            >
-              <View style={styles.shutterInner}>
-                <Feather name="camera" size={32} color="#FFFFFF" />
-              </View>
-            </TouchableOpacity>
-          </View>
-          {isAnalyzing && (
-            <View style={styles.analyzingOverlay}>
-              <ActivityIndicator size="small" color="#FFFFFF" />
-              <Text style={styles.analyzingText}>
-                Analyzing your progress...
-              </Text>
-              <Text style={styles.analyzingSubtext}>
-                AI is processing your photo
-              </Text>
-            </View>
-          )}
         </View>
       )}
 
@@ -415,86 +362,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: "#4B5563",
     fontWeight: "500",
-  },
-  cameraContainer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#000000",
-    zIndex: 50,
-  },
-  cameraHeader: {
-    position: "absolute",
-    top: 32,
-    left: 24,
-    right: 24,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  cameraTitle: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  cameraGuideWrapper: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cameraGuide: {
-    width: 256,
-    height: 320,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.5)",
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 16,
-  },
-  cameraGuideText: {
-    color: "rgba(255,255,255,0.7)",
-    textAlign: "center",
-    fontSize: 14,
-  },
-  shutterWrapper: {
-    position: "absolute",
-    bottom: 48,
-    width: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  shutterOuter: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  shutterInner: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#3B82F6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  analyzingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  analyzingText: {
-    marginTop: 16,
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  analyzingSubtext: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    marginTop: 4,
-    opacity: 0.7,
   },
   statusBar: {
     flexDirection: "row",
