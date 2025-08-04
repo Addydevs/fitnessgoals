@@ -1,24 +1,191 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
+  ActivityIndicator,
   Image,
-  TouchableOpacity,
   ScrollView,
   StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { Camera as ExpoCamera, CameraType } from "expo-camera";
 import { Feather } from "@expo/vector-icons";
 import Layout from "@/components/Layout";
 
 const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export default function Homepage() {
+export default function PhotoProgressApp() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [showCamera, setShowCamera] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [userProgress, setUserProgress] = useState({
+    weekStreak: 0,
+    totalPhotos: 0,
+    daysTracked: 0,
+    photosThisWeek: 0,
+    lastPhotoDate: null as string | null,
+    needsPhotoToday: false,
+  });
+
+  const [photoHistory, setPhotoHistory] = useState({
+    thisWeek: null as string | null,
+    lastWeek: null as string | null,
+    allPhotos: [] as any[],
+  });
+
+  const cameraRef = useRef<ExpoCamera>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentDate(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    fetchUserProgress();
+    fetchPhotoHistory();
+  }, []);
+
+  const fetchUserProgress = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/user/progress", {
+        headers: {
+          Authorization: "Bearer YOUR_API_TOKEN",
+          "Content-Type": "application/json",
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUserProgress({
+          weekStreak: data.weekStreak || 0,
+          totalPhotos: data.totalPhotos || 0,
+          daysTracked: data.daysTracked || 0,
+          photosThisWeek: data.photosThisWeek || 0,
+          lastPhotoDate: data.lastPhotoDate || null,
+          needsPhotoToday: data.needsPhotoToday || false,
+        });
+      } else {
+        setUserProgress({
+          weekStreak: 0,
+          totalPhotos: 0,
+          daysTracked: 0,
+          photosThisWeek: 0,
+          lastPhotoDate: null,
+          needsPhotoToday: true,
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching user progress:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchPhotoHistory = async () => {
+    try {
+      const response = await fetch("/api/user/photos", {
+        headers: {
+          Authorization: "Bearer YOUR_API_TOKEN",
+          "Content-Type": "application/json",
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPhotoHistory({
+          thisWeek: data.thisWeek || null,
+          lastWeek: data.lastWeek || null,
+          allPhotos: data.allPhotos || [],
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching photo history:", err);
+    }
+  };
+
+  const updateProgressAfterPhoto = (newPhotoData: any) => {
+    setUserProgress((prev) => ({
+      ...prev,
+      totalPhotos: prev.totalPhotos + 1,
+      photosThisWeek: prev.photosThisWeek + 1,
+      lastPhotoDate: new Date().toISOString(),
+      needsPhotoToday: false,
+      weekStreak: newPhotoData.weekStreak || prev.weekStreak,
+    }));
+    setPhotoHistory((prev) => ({
+      ...prev,
+      thisWeek: newPhotoData.photoUrl,
+      allPhotos: [newPhotoData, ...prev.allPhotos],
+    }));
+  };
+
+  const startCamera = async () => {
+    const { status } = await ExpoCamera.requestCameraPermissionsAsync();
+    if (status === "granted") {
+      setShowCamera(true);
+    } else {
+      alert("Camera permission not granted");
+    }
+  };
+
+  const capturePhoto = async () => {
+    if (cameraRef.current) {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+      setShowCamera(false);
+      sendToAPI(photo);
+    }
+  };
+
+  const stopCamera = () => setShowCamera(false);
+
+  const sendToAPI = async (photo: any) => {
+    setIsAnalyzing(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", {
+        uri: photo.uri,
+        name: "progress-photo.jpg",
+        type: "image/jpeg",
+      } as any);
+      formData.append("userId", "john_123");
+      formData.append("timestamp", new Date().toISOString());
+      formData.append("weekNumber", String(getWeekNumber(new Date())));
+      const apiResponse = await fetch("/api/photos/upload", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer YOUR_API_TOKEN",
+        },
+        body: formData,
+      });
+      if (apiResponse.ok) {
+        const result = await apiResponse.json();
+        updateProgressAfterPhoto({
+          id: result.photoId,
+          photoUrl: result.photoUrl,
+          date: result.date,
+          weekStreak: result.updatedWeekStreak,
+          week: result.weekNumber,
+        });
+        alert("Photo uploaded successfully! Keep up the great progress.");
+      } else {
+        throw new Error("API request failed");
+      }
+    } catch (err) {
+      console.error("Error uploading photo:", err);
+      alert("Error uploading photo. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const getWeekNumber = (date: Date) => {
+    const startOfYear = new Date(date.getFullYear(), 0, 1);
+    const pastDays = (date.getTime() - startOfYear.getTime()) / 86400000;
+    return Math.ceil((pastDays + startOfYear.getDay() + 1) / 7);
+  };
+
+  const handleCameraClick = () => startCamera();
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-US", {
@@ -32,6 +199,59 @@ export default function Homepage() {
 
   return (
     <Layout paddingHorizontal={24} paddingVertical={24}>
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="small" color="#3B82F6" />
+          <Text style={styles.loadingText}>Loading your progress...</Text>
+        </View>
+      )}
+
+      {showCamera && (
+        <View style={styles.cameraContainer}>
+          <ExpoCamera
+            ref={cameraRef}
+            style={StyleSheet.absoluteFill}
+            type={CameraType.front}
+          />
+          <View style={styles.cameraHeader}>
+            <TouchableOpacity onPress={stopCamera}>
+              <Feather name="x" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.cameraTitle}>CaptureFit Camera</Text>
+            <View style={{ width: 24 }} />
+          </View>
+          <View style={styles.cameraGuideWrapper}>
+            <View style={styles.cameraGuide}>
+              <Text style={styles.cameraGuideText}>
+                Position yourself within the frame for best results
+              </Text>
+            </View>
+          </View>
+          <View style={styles.shutterWrapper}>
+            <TouchableOpacity
+              onPress={capturePhoto}
+              disabled={isAnalyzing}
+              style={styles.shutterOuter}
+            >
+              <View style={styles.shutterInner}>
+                <Feather name="camera" size={32} color="#FFFFFF" />
+              </View>
+            </TouchableOpacity>
+          </View>
+          {isAnalyzing && (
+            <View style={styles.analyzingOverlay}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.analyzingText}>
+                Analyzing your progress...
+              </Text>
+              <Text style={styles.analyzingSubtext}>
+                AI is processing your photo
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Status Bar */}
         <View style={styles.statusBar}>
@@ -66,7 +286,7 @@ export default function Homepage() {
         <View style={styles.challengeCard}>
           <Text style={styles.challengeTitle}>CaptureFit challenge</Text>
           <Text style={styles.challengeSubtitle}>
-            AI-powered progress tracking
+            Track your visual progress journey
           </Text>
         </View>
 
@@ -94,57 +314,89 @@ export default function Homepage() {
           ))}
         </View>
 
-        {/* Progress Section */}
+        {/* Your Progress Section */}
         <Text style={styles.sectionHeader}>Your progress</Text>
         <View style={styles.progressRow}>
           <View style={[styles.progressCard, { marginRight: 12 }]}>
             <Feather name="camera" size={24} color="#9A3412" />
             <Text style={styles.progressTitle}>CaptureFit Analysis</Text>
-            <Text style={styles.progressText}>AI body tracking</Text>
+            <Text style={styles.progressText}>Visual progress tracking</Text>
           </View>
           <View style={styles.progressCard}>
             <Feather name="trending-up" size={24} color="#1E3A8A" />
             <Text style={styles.progressTitle}>Progress Stats</Text>
-            <Text style={styles.progressText}>12 day streak</Text>
+            <Text style={styles.progressText}>
+              {userProgress.weekStreak} week streak
+            </Text>
           </View>
         </View>
 
         {/* Today's Metrics */}
-        <Text style={styles.sectionHeader}>Today&apos;s Progress</Text>
+        <Text style={styles.sectionHeader}>This Week&apos;s Progress</Text>
         <View style={styles.metricsRow}>
           <View style={styles.metricItem}>
-            <Text style={styles.metricEmoji}>💪</Text>
-            <Text style={styles.metricValue}>+8%</Text>
-            <Text style={styles.metricLabel}>Muscle def.</Text>
+            <Text style={styles.metricEmoji}>📸</Text>
+            <Text style={styles.metricValue}>
+              {userProgress.photosThisWeek}
+            </Text>
+            <Text style={styles.metricLabel}>Photos taken</Text>
           </View>
           <View style={styles.metricItem}>
             <Text style={styles.metricEmoji}>🔥</Text>
-            <Text style={styles.metricValue}>-2.1%</Text>
-            <Text style={styles.metricLabel}>Body fat</Text>
+            <Text style={styles.metricValue}>{userProgress.weekStreak}</Text>
+            <Text style={styles.metricLabel}>Week streak</Text>
           </View>
           <View style={styles.metricItem}>
-            <Text style={styles.metricEmoji}>📏</Text>
-            <Text style={styles.metricValue}>89</Text>
-            <Text style={styles.metricLabel}>Total pics</Text>
+            <Text style={styles.metricEmoji}>📅</Text>
+            <Text style={styles.metricValue}>{userProgress.daysTracked}</Text>
+            <Text style={styles.metricLabel}>Days tracked</Text>
           </View>
         </View>
 
-        {/* Photo Comparison */}
-        <Text style={styles.sectionHeader}>Photo Comparison</Text>
+        {/* Photo Comparison Section */}
+        <Text style={styles.sectionHeader}>Visual Comparison</Text>
         <View style={styles.comparisonRow}>
           <View style={styles.compareBox}>
-            <Feather name="calendar" size={32} color="#9CA3AF" />
-            <Text style={styles.compareLabel}>7 days ago</Text>
+            {photoHistory.lastWeek ? (
+              <Image
+                source={{ uri: photoHistory.lastWeek }}
+                style={styles.compareImage}
+              />
+            ) : (
+              <>
+                <Feather name="calendar" size={32} color="#9CA3AF" />
+                <Text style={styles.compareLabel}>Last week</Text>
+              </>
+            )}
           </View>
           <View style={styles.compareSpacer} />
-          <View style={styles.compareBox}>
-            <Feather name="plus" size={32} color="#9CA3AF" />
-            <Text style={styles.compareLabel}>Take photo</Text>
-          </View>
+          <TouchableOpacity
+            style={[styles.compareBox, styles.dashedBox]}
+            onPress={handleCameraClick}
+          >
+            {photoHistory.thisWeek ? (
+              <Image
+                source={{ uri: photoHistory.thisWeek }}
+                style={styles.compareImage}
+              />
+            ) : (
+              <>
+                <Feather name="plus" size={32} color="#9CA3AF" />
+                <Text style={styles.compareLabel}>This week</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.captureButton}>
+
+        <TouchableOpacity
+          onPress={handleCameraClick}
+          style={styles.captureButton}
+          disabled={isAnalyzing}
+        >
           <Feather name="camera" size={20} color="#FFFFFF" />
-          <Text style={styles.captureText}>Capture with CaptureFit</Text>
+          <Text style={styles.captureText}>
+            {isAnalyzing ? "Analyzing..." : "Capture with CaptureFit"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </Layout>
@@ -152,6 +404,98 @@ export default function Homepage() {
 }
 
 const styles = StyleSheet.create({
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#F9FAFB",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 40,
+  },
+  loadingText: {
+    marginTop: 8,
+    color: "#4B5563",
+    fontWeight: "500",
+  },
+  cameraContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000000",
+    zIndex: 50,
+  },
+  cameraHeader: {
+    position: "absolute",
+    top: 32,
+    left: 24,
+    right: 24,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  cameraTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  cameraGuideWrapper: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cameraGuide: {
+    width: 256,
+    height: 320,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.5)",
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  cameraGuideText: {
+    color: "rgba(255,255,255,0.7)",
+    textAlign: "center",
+    fontSize: 14,
+  },
+  shutterWrapper: {
+    position: "absolute",
+    bottom: 48,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  shutterOuter: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  shutterInner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#3B82F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  analyzingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  analyzingText: {
+    marginTop: 16,
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  analyzingSubtext: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    marginTop: 4,
+    opacity: 0.7,
+  },
   statusBar: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -316,6 +660,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  compareImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 16,
+  },
+  dashedBox: {
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "#E5E7EB",
+  },
   compareSpacer: {
     width: 16,
   },
@@ -337,3 +691,4 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
+
