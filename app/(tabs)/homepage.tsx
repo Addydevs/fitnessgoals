@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Camera as ExpoCamera, CameraType } from "expo-camera";
+import { Camera as ExpoCamera } from "expo-camera";
 import { Feather } from "@expo/vector-icons";
 import Layout from "@/components/Layout";
 
@@ -211,7 +211,7 @@ export default function PhotoProgressApp() {
           <ExpoCamera
             ref={cameraRef}
             style={StyleSheet.absoluteFill}
-            type={CameraType.front}
+            type="front"
           />
           <View style={styles.cameraHeader}>
             <TouchableOpacity onPress={stopCamera}>
@@ -691,4 +691,3 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
-
