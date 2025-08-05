@@ -2,711 +2,441 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
-  TextInput,
   ScrollView,
-  Alert,
+  TouchableOpacity,
+  ActivityIndicator,
   StyleSheet,
-  Switch,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import Layout, { 
-  ModernHeader, 
-  ModernCard, 
-  SectionHeader 
-} from './Layout';
+import {
+  ArrowLeft,
+  Settings,
+  Camera,
+  Edit3,
+  Share2,
+  Eye,
+} from 'lucide-react-native';
+import Layout from './Layout';
 
-export default function ProfileScreen({ photos }) {
-  const [goal, setGoal] = useState('');
-  const [userName, setUserName] = useState('Sandra Glam');
-  const [userLocation, setUserLocation] = useState('Denmark, Copenhagen');
-  const [startWeight, setStartWeight] = useState('53.3');
-  const [goalWeight, setGoalWeight] = useState('50.0');
-  const [dailyCalories, setDailyCalories] = useState('740');
-  const [followers, setFollowers] = useState(72);
-  const [following, setFollowing] = useState(162);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
+const CaptureFitProfile = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [userData, setUserData] = useState(null);
 
   useEffect(() => {
-    loadUserData();
+    fetchUserData();
   }, []);
 
-  const loadUserData = async () => {
+  const fetchUserData = async () => {
     try {
-      const savedGoal = await AsyncStorage.getItem('fitnessGoal');
-      const savedUserName = await AsyncStorage.getItem('userName');
-      const savedStartWeight = await AsyncStorage.getItem('startWeight');
-      const savedGoalWeight = await AsyncStorage.getItem('goalWeight');
-      
-      if (savedGoal) setGoal(savedGoal);
-      if (savedUserName) setUserName(savedUserName);
-      if (savedStartWeight) setStartWeight(savedStartWeight);
-      if (savedGoalWeight) setGoalWeight(savedGoalWeight);
+      setIsLoading(true);
+      const response = await fetch('/api/user', {
+        headers: {
+          Authorization: 'Bearer YOUR_API_TOKEN',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserData(data);
+      } else {
+        setUserData({
+          name: 'John Smith',
+          joinDate: '2024-06-15',
+          avatar: null,
+          totalPhotos: 8,
+          weekStreak: 3,
+          daysTracked: 21,
+          recentPhotos: [
+            { id: 1, date: '2025-08-03', week: 'This week' },
+            { id: 2, date: '2025-07-27', week: 'Last week' },
+            { id: 3, date: '2025-07-20', week: '2 weeks ago' },
+          ],
+        });
+      }
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('Error fetching user data:', error);
+      setUserData({
+        name: 'User',
+        joinDate: new Date().toISOString(),
+        avatar: null,
+        totalPhotos: 0,
+        weekStreak: 0,
+        daysTracked: 0,
+        recentPhotos: [],
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const saveUserData = async () => {
-    try {
-      await AsyncStorage.setItem('fitnessGoal', goal);
-      await AsyncStorage.setItem('userName', userName);
-      await AsyncStorage.setItem('startWeight', startWeight);
-      await AsyncStorage.setItem('goalWeight', goalWeight);
-      
-      setIsEditingProfile(false);
-      Alert.alert('✅ Profile Updated!', 'Your changes have been saved successfully.');
-    } catch (error) {
-      console.error('Error saving user data:', error);
-      Alert.alert('Error', 'Failed to save profile changes.');
-    }
-  };
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
 
-  const getJourneyStats = () => {
-    if (photos.length === 0) return { days: 0, thisMonth: 0 };
-    
-    const firstPhoto = new Date(photos[0].timestamp);
-    const now = new Date();
-    const days = Math.ceil((now - firstPhoto) / (1000 * 60 * 60 * 24));
-    
-    const monthAgo = new Date();
-    monthAgo.setMonth(monthAgo.getMonth() - 1);
-    const thisMonth = photos.filter(photo => 
-      new Date(photo.timestamp) >= monthAgo
-    ).length;
-    
-    return { days, thisMonth };
-  };
-
-  const stats = getJourneyStats();
-
-  const handleMenuPress = (item) => {
-    switch (item) {
-      case 'physical':
-        Alert.alert('Physical Activity', 'Track your workouts and activities');
-        break;
-      case 'statistics':
-        Alert.alert('Statistics', 'View detailed progress analytics');
-        break;
-      case 'routes':
-        Alert.alert('Routes', 'Explore workout routes and locations');
-        break;
-      case 'bestTime':
-        Alert.alert('Best Time', 'Find your optimal workout times');
-        break;
-      case 'equipment':
-        Alert.alert('Equipment', 'Manage your fitness equipment');
-        break;
-      case 'settings':
-        Alert.alert('Settings', 'App preferences and configuration');
-        break;
-      default:
-        break;
-    }
-  };
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
-    <Layout backgroundColor="#FAFAFA">
-      <ModernHeader 
-        title="Profile" 
-        leftIcon={<Feather name="arrow-left" size={20} color="#666" />}
-        rightIcon={<Feather name="settings" size={20} color="#666" />}
-        onRightPress={() => handleMenuPress('settings')}
-      />
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Profile Header */}
-        <ModernCard style={styles.profileCard}>
-          <View style={styles.profileHeader}>
-            <View style={styles.avatarContainer}>
-              <LinearGradient
-                colors={['#8B5FBF', '#6A4C93']}
-                style={styles.avatarGradient}
-              >
-                <Text style={styles.avatarText}>
-                  {userName.split(' ').map(n => n[0]).join('')}
-                </Text>
-              </LinearGradient>
-            </View>
-            
-            <View style={styles.profileInfo}>
-              {isEditingProfile ? (
-                <View style={styles.editingContainer}>
-                  <TextInput
-                    style={styles.nameInput}
-                    value={userName}
-                    onChangeText={setUserName}
-                    placeholder="Your name"
-                  />
-                  <TextInput
-                    style={styles.locationInput}
-                    value={userLocation}
-                    onChangeText={setUserLocation}
-                    placeholder="Location"
-                  />
-                </View>
-              ) : (
-                <View>
-                  <Text style={styles.userName}>{userName}</Text>
-                  <Text style={styles.userLocation}>{userLocation}</Text>
-                </View>
-              )}
-            </View>
-
-            <TouchableOpacity 
-              style={styles.editButton}
-              onPress={isEditingProfile ? saveUserData : () => setIsEditingProfile(true)}
-            >
-              <Feather 
-                name={isEditingProfile ? "check" : "edit-2"} 
-                size={16} 
-                color="#8B5FBF" 
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Follow Stats */}
-          <View style={styles.followStats}>
-            <View style={styles.followItem}>
-              <Text style={styles.followNumber}>{followers}</Text>
-              <Text style={styles.followLabel}>Followers</Text>
-            </View>
-            <View style={styles.followDivider} />
-            <View style={styles.followItem}>
-              <Text style={styles.followNumber}>{following}</Text>
-              <Text style={styles.followLabel}>Following</Text>
-            </View>
-          </View>
-        </ModernCard>
-
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statsGrid}>
-            {/* Start Weight */}
-            <View style={styles.statCard}>
-              <LinearGradient
-                colors={['#A8E6CF', '#7FCDCD']}
-                style={styles.statGradient}
-              >
-                <Text style={styles.statLabel}>Start weight</Text>
-                {isEditingProfile ? (
-                  <TextInput
-                    style={styles.statInput}
-                    value={startWeight}
-                    onChangeText={setStartWeight}
-                    keyboardType="numeric"
-                    placeholder="0.0"
-                  />
-                ) : (
-                  <Text style={styles.statValue}>{startWeight} kg</Text>
-                )}
-              </LinearGradient>
-            </View>
-
-            {/* Goal Weight */}
-            <View style={styles.statCard}>
-              <LinearGradient
-                colors={['#FFB347', '#FF8C42']}
-                style={styles.statGradient}
-              >
-                <Text style={styles.statLabel}>Goal</Text>
-                {isEditingProfile ? (
-                  <TextInput
-                    style={styles.statInput}
-                    value={goalWeight}
-                    onChangeText={setGoalWeight}
-                    keyboardType="numeric"
-                    placeholder="0.0"
-                  />
-                ) : (
-                  <Text style={styles.statValue}>{goalWeight} kg</Text>
-                )}
-              </LinearGradient>
-            </View>
-
-            {/* Daily Calories */}
-            <View style={styles.statCard}>
-              <LinearGradient
-                colors={['#8B5FBF', '#6A4C93']}
-                style={styles.statGradient}
-              >
-                <Text style={styles.statLabel}>Daily calories</Text>
-                {isEditingProfile ? (
-                  <TextInput
-                    style={styles.statInput}
-                    value={dailyCalories}
-                    onChangeText={setDailyCalories}
-                    keyboardType="numeric"
-                    placeholder="0"
-                  />
-                ) : (
-                  <Text style={styles.statValue}>{dailyCalories} kcal</Text>
-                )}
-              </LinearGradient>
-            </View>
-          </View>
+    <Layout>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerButton}>
+            <ArrowLeft size={20} color="#6B7280" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <TouchableOpacity style={styles.headerButton}>
+            <Settings size={20} color="#6B7280" />
+          </TouchableOpacity>
         </View>
 
-        {/* Progress Stats */}
-        <ModernCard style={styles.progressCard}>
-          <SectionHeader 
-            title="Progress Overview"
-            subtitle="Your fitness journey"
-          />
-          <View style={styles.progressStats}>
-            <View style={styles.progressItem}>
-              <View style={styles.progressIconContainer}>
-                <Feather name="calendar" size={20} color="#8B5FBF" />
-              </View>
-              <View style={styles.progressContent}>
-                <Text style={styles.progressValue}>{stats.days} days</Text>
-                <Text style={styles.progressLabel}>Journey started</Text>
-              </View>
-            </View>
-            
-            <View style={styles.progressItem}>
-              <View style={styles.progressIconContainer}>
-                <Feather name="camera" size={20} color="#FF8C42" />
-              </View>
-              <View style={styles.progressContent}>
-                <Text style={styles.progressValue}>{photos.length} photos</Text>
-                <Text style={styles.progressLabel}>Progress captured</Text>
-              </View>
-            </View>
-            
-            <View style={styles.progressItem}>
-              <View style={styles.progressIconContainer}>
-                <Feather name="trending-up" size={20} color="#A8E6CF" />
-              </View>
-              <View style={styles.progressContent}>
-                <Text style={styles.progressValue}>{stats.thisMonth} this month</Text>
-                <Text style={styles.progressLabel}>Recent activity</Text>
-              </View>
-            </View>
-          </View>
-        </ModernCard>
-
-        {/* Fitness Goal */}
-        <ModernCard style={styles.goalCard}>
-          <SectionHeader 
-            title="🎯 Fitness Goal"
-            subtitle="What drives your journey"
-          />
-          {isEditingProfile ? (
-            <TextInput
-              style={styles.goalInput}
-              value={goal}
-              onChangeText={setGoal}
-              placeholder="Describe your fitness goal... (e.g., Lose 20lbs, Build muscle, Get stronger)"
-              multiline
-              numberOfLines={4}
-            />
-          ) : (
-            <View style={styles.goalDisplay}>
-              <Text style={styles.goalText}>
-                {goal || "Set your fitness goal to get personalized AI feedback!"}
+        <View style={styles.profileCard}>
+          <View style={styles.profileRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarInitial}>
+                {userData?.name?.charAt(0) || 'U'}
               </Text>
             </View>
-          )}
-        </ModernCard>
-
-        {/* Menu Items */}
-        <View style={styles.menuSection}>
-          <SectionHeader title="Quick Actions" />
-          
-          {/* Physical Activity */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => handleMenuPress('physical')}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuIcon, { backgroundColor: '#E8F4FD' }]}>
-                <Feather name="activity" size={20} color="#4A90E2" />
+            <View style={styles.profileInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{userData?.name || 'User'}</Text>
+                <TouchableOpacity>
+                  <Edit3 size={16} color="#9CA3AF" />
+                </TouchableOpacity>
               </View>
-              <View style={styles.menuItemContent}>
-                <Text style={styles.menuItemTitle}>Physical activity</Text>
-                <Text style={styles.menuItemSubtitle}>{stats.thisMonth} days ago</Text>
-              </View>
+              <Text style={styles.joined}>
+                Joined {formatDate(userData?.joinDate || new Date().toISOString())}
+              </Text>
             </View>
-            <Feather name="chevron-right" size={20} color="#C7C7CC" />
-          </TouchableOpacity>
-
-          {/* Statistics */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => handleMenuPress('statistics')}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuIcon, { backgroundColor: '#FFF3E0' }]}>
-                <Feather name="bar-chart-2" size={20} color="#FF8C42" />
-              </View>
-              <View style={styles.menuItemContent}>
-                <Text style={styles.menuItemTitle}>Statistics</Text>
-                <Text style={styles.menuItemSubtitle}>This year, {Math.floor(stats.days / 30)} months tracking</Text>
-              </View>
+          </View>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{userData?.totalPhotos || 0}</Text>
+              <Text style={styles.statLabel}>Photos</Text>
             </View>
-            <Feather name="chevron-right" size={20} color="#C7C7CC" />
-          </TouchableOpacity>
-
-          {/* Routes */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => handleMenuPress('routes')}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuIcon, { backgroundColor: '#F3E5F5' }]}>
-                <Feather name="map-pin" size={20} color="#8B5FBF" />
-              </View>
-              <View style={styles.menuItemContent}>
-                <Text style={styles.menuItemTitle}>Routes</Text>
-                <Text style={styles.menuItemSubtitle}>0 km</Text>
-              </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{userData?.weekStreak || 0}</Text>
+              <Text style={styles.statLabel}>Week Streak</Text>
             </View>
-            <Feather name="chevron-right" size={20} color="#C7C7CC" />
-          </TouchableOpacity>
-
-          {/* Best Time */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => handleMenuPress('bestTime')}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuIcon, { backgroundColor: '#E8F5E8' }]}>
-                <Feather name="clock" size={20} color="#4CAF50" />
-              </View>
-              <View style={styles.menuItemContent}>
-                <Text style={styles.menuItemTitle}>Best time</Text>
-                <Text style={styles.menuItemSubtitle}>Show all</Text>
-              </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{userData?.daysTracked || 0}</Text>
+              <Text style={styles.statLabel}>Days</Text>
             </View>
-            <Feather name="chevron-right" size={20} color="#C7C7CC" />
-          </TouchableOpacity>
-
-          {/* Equipment */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => handleMenuPress('equipment')}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuIcon, { backgroundColor: '#FDE7E7' }]}>
-                <Feather name="target" size={20} color="#E57373" />
-              </View>
-              <View style={styles.menuItemContent}>
-                <Text style={styles.menuItemTitle}>Equipment</Text>
-                <Text style={styles.menuItemSubtitle}>Nike Pegasus 3000-130.4 km</Text>
-              </View>
-            </View>
-            <Feather name="chevron-right" size={20} color="#C7C7CC" />
-          </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Settings */}
-        <ModernCard style={styles.settingsCard}>
-          <SectionHeader title="Preferences" />
-          
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Feather name="bell" size={20} color="#8B5FBF" />
-              <Text style={styles.settingText}>Push Notifications</Text>
-            </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
-              trackColor={{ false: '#E0E0E0', true: '#8B5FBF' }}
-              thumbColor={notificationsEnabled ? 'white' : '#f4f3f4'}
-            />
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Photos</Text>
+            <TouchableOpacity>
+              <Text style={styles.sectionAction}>View All</Text>
+            </TouchableOpacity>
           </View>
-        </ModernCard>
+          {userData?.recentPhotos?.length > 0 ? (
+            userData.recentPhotos.slice(0, 3).map((photo) => (
+              <View key={photo.id} style={styles.photoCard}>
+                <View style={styles.photoHeader}>
+                  <View>
+                    <Text style={styles.photoWeek}>{photo.week}</Text>
+                    <Text style={styles.photoDate}>{formatDate(photo.date)}</Text>
+                  </View>
+                  <View style={styles.photoActions}>
+                    <TouchableOpacity style={styles.iconCircle}>
+                      <Eye size={16} color="#4B5563" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.iconCircle}>
+                      <Share2 size={16} color="#4B5563" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <View style={styles.photoPlaceholder}>
+                  <Camera size={32} color="#9CA3AF" />
+                  <Text style={styles.photoPlaceholderText}>Progress Photo</Text>
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Camera size={48} color="#D1D5DB" />
+              <Text style={styles.emptyTitle}>No photos yet</Text>
+              <Text style={styles.emptyText}>
+                Start your progress journey by taking your first photo
+              </Text>
+              <TouchableOpacity style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>Take First Photo</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
-        {/* Bottom Spacing */}
-        <View style={styles.bottomSpacing} />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={[styles.actionCard, styles.cameraAction]}>
+              <Camera size={24} color="white" />
+              <Text style={styles.actionTitle}>Take Photo</Text>
+              <Text style={styles.actionSubtitle}>Capture progress</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionCard, styles.shareAction]}>
+              <Share2 size={24} color="white" />
+              <Text style={styles.actionTitle}>Share Progress</Text>
+              <Text style={styles.actionSubtitle}>Show your journey</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={{ height: 96 }} />
       </ScrollView>
     </Layout>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  scrollView: {
+  loadingContainer: {
     flex: 1,
-    paddingHorizontal: 20,
-  },
-
-  // Profile Card
-  profileCard: {
-    marginBottom: 20,
-    padding: 20,
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  avatarContainer: {
-    marginRight: 16,
-  },
-  avatarGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: 'white',
+  loadingText: {
+    marginTop: 8,
+    color: '#4B5563',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  profileCard: {
+    marginHorizontal: 24,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: '700',
   },
   profileInfo: {
     flex: 1,
+    marginLeft: 16,
   },
-  userName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  userLocation: {
-    fontSize: 14,
-    color: '#666',
-  },
-  editingContainer: {
-    flex: 1,
-  },
-  nameInput: {
+  name: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    paddingVertical: 4,
-    marginBottom: 8,
+    fontWeight: '700',
+    color: '#111827',
+    marginRight: 8,
   },
-  locationInput: {
-    fontSize: 14,
-    color: '#666',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    paddingVertical: 4,
+  joined: {
+    color: '#9CA3AF',
   },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F8F9FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  followStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  followItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  followNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  followLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  followDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: '#E0E0E0',
-    marginHorizontal: 20,
-  },
-
-  // Stats Cards
-  statsContainer: {
-    marginBottom: 20,
-  },
-  statsGrid: {
+  statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 16,
   },
-  statCard: {
-    flex: 1,
-    marginHorizontal: 4,
-    borderRadius: 15,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  statGradient: {
-    padding: 16,
+  statItem: {
     alignItems: 'center',
-    minHeight: 80,
-    justifyContent: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
   },
   statLabel: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 8,
-    textAlign: 'center',
+    color: '#6B7280',
+    marginTop: 4,
   },
-  statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
+  section: {
+    marginBottom: 24,
+    paddingHorizontal: 24,
   },
-  statInput: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.5)',
-    paddingVertical: 4,
-    minWidth: 60,
-  },
-
-  // Progress Card
-  progressCard: {
-    marginBottom: 20,
-    padding: 20,
-  },
-  progressStats: {
-    marginTop: 12,
-  },
-  progressItem: {
+  sectionHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  progressIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8F9FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  progressContent: {
-    flex: 1,
-  },
-  progressValue: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: '#111827',
   },
-  progressLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+  sectionAction: {
+    color: '#3B82F6',
+    fontWeight: '500',
   },
-
-  // Goal Card
-  goalCard: {
-    marginBottom: 24,
+  photoCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
     padding: 20,
-  },
-  goalInput: {
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    minHeight: 100,
-    textAlignVertical: 'top',
-    backgroundColor: '#F8F9FA',
-    marginTop: 12,
-  },
-  goalDisplay: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 12,
-  },
-  goalText: {
-    fontSize: 16,
-    color: '#333',
-    lineHeight: 24,
-  },
-
-  // Menu Section
-  menuSection: {
-    marginBottom: 24,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
+    borderColor: '#F3F4F6',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 4,
     elevation: 2,
   },
-  menuItemLeft: {
+  photoHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    flex: 1,
+    marginBottom: 12,
   },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  menuItemContent: {
-    flex: 1,
-  },
-  menuItemTitle: {
-    fontSize: 16,
+  photoWeek: {
     fontWeight: '600',
-    color: '#000',
+    color: '#111827',
   },
-  menuItemSubtitle: {
-    fontSize: 14,
-    color: '#666',
+  photoDate: {
+    color: '#6B7280',
+    fontSize: 12,
     marginTop: 2,
   },
-
-  // Settings Card
-  settingsCard: {
-    marginBottom: 20,
-    padding: 20,
-  },
-  settingItem: {
+  photoActions: {
     flexDirection: 'row',
+  },
+  iconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 8,
+  },
+  photoPlaceholder: {
+    height: 160,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoPlaceholderText: {
+    marginTop: 8,
+    color: '#6B7280',
+    fontSize: 12,
+  },
+  emptyState: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emptyTitle: {
+    marginTop: 8,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  emptyText: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: '#6B7280',
+    fontSize: 12,
+  },
+  primaryButton: {
+    marginTop: 16,
+    backgroundColor: '#111827',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+  },
+  primaryButtonText: {
+    color: 'white',
+    fontWeight: '500',
+  },
+  actionsRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
   },
-  settingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  actionCard: {
     flex: 1,
+    borderRadius: 20,
+    padding: 16,
+    marginRight: 16,
   },
-  settingText: {
-    fontSize: 16,
-    color: '#000',
-    marginLeft: 12,
+  cameraAction: {
+    backgroundColor: '#3B82F6',
   },
-
-  bottomSpacing: {
-    height: 30,
+  shareAction: {
+    backgroundColor: '#8B5CF6',
+    marginRight: 0,
+  },
+  actionTitle: {
+    marginTop: 8,
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  actionSubtitle: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
   },
 });
+
+export default CaptureFitProfile;
+
