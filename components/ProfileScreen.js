@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
-// eslint-disable-next-line import/no-unresolved
-import { ArrowLeft, Settings, Camera, Edit3, Share2, Eye } from 'lucide-react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import Layout from './Layout';
 
 const CaptureFitProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -10,22 +18,20 @@ const CaptureFitProfile = () => {
     fetchUserData();
   }, []);
 
-  // Single API call for all user data
   const fetchUserData = async () => {
     try {
       setIsLoading(true);
       const response = await fetch('/api/user', {
         headers: {
-          'Authorization': 'Bearer YOUR_API_TOKEN',
-          'Content-Type': 'application/json'
-        }
+          Authorization: 'Bearer YOUR_API_TOKEN',
+          'Content-Type': 'application/json',
+        },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setUserData(data);
       } else {
-        // Fallback data for demo
         setUserData({
           name: 'John Smith',
           joinDate: '2024-06-15',
@@ -36,13 +42,12 @@ const CaptureFitProfile = () => {
           recentPhotos: [
             { id: 1, date: '2025-08-03', week: 'This week' },
             { id: 2, date: '2025-07-27', week: 'Last week' },
-            { id: 3, date: '2025-07-20', week: '2 weeks ago' }
-          ]
+            { id: 3, date: '2025-07-20', week: '2 weeks ago' },
+          ],
         });
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
-      // Set fallback data on error
       setUserData({
         name: 'User',
         joinDate: new Date().toISOString(),
@@ -50,199 +55,381 @@ const CaptureFitProfile = () => {
         totalPhotos: 0,
         weekStreak: 0,
         daysTracked: 0,
-        recentPhotos: []
+        recentPhotos: [],
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     });
-  };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading profile...</p>
-        </div>
-      </div>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-sm mx-auto bg-gray-50 min-h-screen">
-        
-        {/* Status Bar */}
-        <div className="flex justify-between items-center px-6 pt-3 pb-2">
-          <div className="text-sm font-medium">9:41</div>
-          <div className="flex items-center gap-1">
-            <div className="flex gap-1">
-              <div className="w-1 h-1 bg-gray-900 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-900 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-900 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-            </div>
-            <div className="ml-2 text-sm">📶</div>
-            <div className="text-sm">🔋</div>
-          </div>
-        </div>
+    <Layout>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerButton}>
+            <Feather name="arrow-left" size={20} color="#6B7280" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <TouchableOpacity style={styles.headerButton}>
+            <Feather name="settings" size={20} color="#6B7280" />
+          </TouchableOpacity>
+        </View>
 
-        {/* Header */}
-        <div className="flex justify-between items-center px-6 pt-4 pb-6">
-          <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-900">Profile</h1>
-          <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
-            <Settings className="w-5 h-5 text-gray-600" />
-          </button>
-        </div>
+        <View style={styles.profileCard}>
+          <View style={styles.profileRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarInitial}>
+                {userData?.name?.charAt(0) || 'U'}
+              </Text>
+            </View>
+            <View style={styles.profileInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{userData?.name || 'User'}</Text>
+                <TouchableOpacity>
+                  <Feather name="edit-3" size={16} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.joined}>
+                Joined {formatDate(userData?.joinDate || new Date().toISOString())}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{userData?.totalPhotos || 0}</Text>
+              <Text style={styles.statLabel}>Photos</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{userData?.weekStreak || 0}</Text>
+              <Text style={styles.statLabel}>Week Streak</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{userData?.daysTracked || 0}</Text>
+              <Text style={styles.statLabel}>Days</Text>
+            </View>
+          </View>
+        </View>
 
-        {/* Profile Card */}
-        <div className="px-6 mb-6">
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-2xl">
-                  {userData?.name?.charAt(0) || 'U'}
-                </span>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <h2 className="text-xl font-bold text-gray-900">{userData?.name || 'User'}</h2>
-                  <button className="p-1">
-                    <Edit3 className="w-4 h-4 text-gray-400" />
-                  </button>
-                </div>
-                <p className="text-gray-400 text-sm">
-                  Joined {formatDate(userData?.joinDate || new Date().toISOString())}
-                </p>
-              </div>
-            </div>
-            
-            {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{userData?.totalPhotos || 0}</p>
-                <p className="text-gray-500 text-xs">Photos</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{userData?.weekStreak || 0}</p>
-                <p className="text-gray-500 text-xs">Week Streak</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{userData?.daysTracked || 0}</p>
-                <p className="text-gray-500 text-xs">Days</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Photos */}
-        <div className="px-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Photos</h3>
-            <button className="text-blue-500 text-sm font-medium">View All</button>
-          </div>
-          
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Photos</Text>
+            <TouchableOpacity>
+              <Text style={styles.sectionAction}>View All</Text>
+            </TouchableOpacity>
+          </View>
           {userData?.recentPhotos?.length > 0 ? (
-            <div className="space-y-4">
-              {userData.recentPhotos.slice(0, 3).map((photo) => (
-                <div key={photo.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h4 className="font-semibold text-gray-900">{photo.week}</h4>
-                      <p className="text-gray-500 text-sm">{formatDate(photo.date)}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button className="p-2 bg-gray-100 rounded-full">
-                        <Eye className="w-4 h-4 text-gray-600" />
-                      </button>
-                      <button className="p-2 bg-gray-100 rounded-full">
-                        <Share2 className="w-4 h-4 text-gray-600" />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="aspect-[4/5] bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
-                    <div className="text-center">
-                      <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-500 text-sm">Progress Photo</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            userData.recentPhotos.slice(0, 3).map((photo) => (
+              <View key={photo.id} style={styles.photoCard}>
+                <View style={styles.photoHeader}>
+                  <View>
+                    <Text style={styles.photoWeek}>{photo.week}</Text>
+                    <Text style={styles.photoDate}>{formatDate(photo.date)}</Text>
+                  </View>
+                  <View style={styles.photoActions}>
+                    <TouchableOpacity style={styles.iconCircle}>
+                      <Feather name="eye" size={16} color="#4B5563" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.iconCircle}>
+                      <Feather name="share-2" size={16} color="#4B5563" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <View style={styles.photoPlaceholder}>
+                  <Feather name="camera" size={32} color="#9CA3AF" />
+                  <Text style={styles.photoPlaceholderText}>Progress Photo</Text>
+                </View>
+              </View>
+            ))
           ) : (
-            <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
-              <Camera className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h4 className="font-semibold text-gray-900 mb-2">No photos yet</h4>
-              <p className="text-gray-500 text-sm mb-4">Start your progress journey by taking your first photo</p>
-              <button className="bg-gray-900 text-white px-6 py-3 rounded-2xl font-medium">
-                Take First Photo
-              </button>
-            </div>
+            <View style={styles.emptyState}>
+              <Feather name="camera" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyTitle}>No photos yet</Text>
+              <Text style={styles.emptyText}>
+                Start your progress journey by taking your first photo
+              </Text>
+              <TouchableOpacity style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>Take First Photo</Text>
+              </TouchableOpacity>
+            </View>
           )}
-        </div>
+        </View>
 
-        {/* Quick Actions */}
-        <div className="px-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <button className="bg-gradient-to-br from-blue-500 to-green-500 rounded-2xl p-4 text-white text-left">
-              <Camera className="w-6 h-6 mb-2" />
-              <h4 className="font-semibold text-sm">Take Photo</h4>
-              <p className="text-blue-100 text-xs">Capture progress</p>
-            </button>
-            
-            <button className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-4 text-white text-left">
-              <Share2 className="w-6 h-6 mb-2" />
-              <h4 className="font-semibold text-sm">Share Progress</h4>
-              <p className="text-purple-100 text-xs">Show your journey</p>
-            </button>
-          </div>
-        </div>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={[styles.actionCard, styles.cameraAction]}>
+              <Feather name="camera" size={24} color="white" />
+              <Text style={styles.actionTitle}>Take Photo</Text>
+              <Text style={styles.actionSubtitle}>Capture progress</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionCard, styles.shareAction]}>
+              <Feather name="share-2" size={24} color="white" />
+              <Text style={styles.actionTitle}>Share Progress</Text>
+              <Text style={styles.actionSubtitle}>Show your journey</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        {/* Bottom spacing for navigation */}
-        <div className="h-24"></div>
-
-        {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm">
-          <div className="bg-gray-900 mx-4 mb-6 rounded-3xl px-6 py-4">
-            <div className="flex justify-around items-center">
-              <button className="p-2">
-                <div className="w-6 h-6 bg-gray-400 rounded-lg"></div>
-              </button>
-              <button className="p-2">
-                <div className="w-6 h-6 border-2 border-gray-400 rounded-lg flex items-center justify-center">
-                  <div className="w-2 h-2 bg-gray-400 rounded-sm"></div>
-                </div>
-              </button>
-              <button className="p-2">
-                <div className="w-6 h-6 border-2 border-gray-400 rounded-lg flex flex-col gap-0.5 p-1">
-                  <div className="flex-1 bg-gray-400 rounded-xs"></div>
-                  <div className="flex-1 bg-gray-400 rounded-xs"></div>
-                  <div className="flex-1 bg-gray-400 rounded-xs"></div>
-                </div>
-              </button>
-              <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                <div className="w-6 h-6 bg-gray-900 rounded-full"></div>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+        <View style={{ height: 96 }} />
+      </ScrollView>
+    </Layout>
   );
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    color: '#4B5563',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  profileCard: {
+    marginHorizontal: 24,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: '700',
+  },
+  profileInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  name: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginRight: 8,
+  },
+  joined: {
+    color: '#9CA3AF',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  section: {
+    marginBottom: 24,
+    paddingHorizontal: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  sectionAction: {
+    color: '#3B82F6',
+    fontWeight: '500',
+  },
+  photoCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  photoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  photoWeek: {
+    fontWeight: '600',
+    color: '#111827',
+  },
+  photoDate: {
+    color: '#6B7280',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  photoActions: {
+    flexDirection: 'row',
+  },
+  iconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  photoPlaceholder: {
+    height: 160,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoPlaceholderText: {
+    marginTop: 8,
+    color: '#6B7280',
+    fontSize: 12,
+  },
+  emptyState: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emptyTitle: {
+    marginTop: 8,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  emptyText: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: '#6B7280',
+    fontSize: 12,
+  },
+  primaryButton: {
+    marginTop: 16,
+    backgroundColor: '#111827',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+  },
+  primaryButtonText: {
+    color: 'white',
+    fontWeight: '500',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionCard: {
+    flex: 1,
+    borderRadius: 20,
+    padding: 16,
+    marginRight: 16,
+  },
+  cameraAction: {
+    backgroundColor: '#3B82F6',
+  },
+  shareAction: {
+    backgroundColor: '#8B5CF6',
+    marginRight: 0,
+  },
+  actionTitle: {
+    marginTop: 8,
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  actionSubtitle: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+  },
+});
 
 export default CaptureFitProfile;
 
