@@ -1,19 +1,32 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import * as FileSystem from 'expo-file-system';
-import { Feather } from '@expo/vector-icons';
+import React, { useState, useEffect } from "react";
+import { View, Text, Platform, StyleSheet } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { NavigationContainer } from "@react-navigation/native";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import * as FileSystem from "expo-file-system";
+import { Feather } from "@expo/vector-icons";
 
-import CameraScreen from './components/CameraScreen';
-import ProgressScreen from './components/ProgressScreen';
-import ProfileScreen from './components/ProfileScreen';
-import { styles } from './constants/styles';
-import { theme } from './constants/theme';
+import CameraScreen from "./components/CameraScreen";
+import ProgressScreen from "./components/ProgressScreen";
+import ProfileScreen from "./components/ProfileScreen";
+import { theme } from "./constants/theme";
 
 const Tab = createBottomTabNavigator();
+
+const tabStyles = StyleSheet.create({
+  tabIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tabIconFocused: {
+    backgroundColor: "rgba(66, 133, 244, 0.1)",
+    transform: [{ scale: 1.1 }],
+  },
+});
 
 export default function App() {
   const [photos, setPhotos] = useState([]);
@@ -21,13 +34,13 @@ export default function App() {
 
   useEffect(() => {
     loadPhotos();
-    console.log('App Documents Directory:', FileSystem.documentDirectory);
-    console.log('App Cache Directory:', FileSystem.cacheDirectory);
+    console.log("App Documents Directory:", FileSystem.documentDirectory);
+    console.log("App Cache Directory:", FileSystem.cacheDirectory);
   }, []);
 
   const loadPhotos = async () => {
     try {
-      const savedPhotos = await AsyncStorage.getItem('progressPhotos');
+      const savedPhotos = await AsyncStorage.getItem("progressPhotos");
       if (savedPhotos) {
         const parsedPhotos = JSON.parse(savedPhotos);
         const validPhotos = [];
@@ -37,19 +50,25 @@ export default function App() {
             if (fileInfo.exists) {
               validPhotos.push(photo);
             } else {
-              console.log('Photo file not found, removing from list:', photo.uri);
+              console.log(
+                "Photo file not found, removing from list:",
+                photo.uri,
+              );
             }
           } catch (error) {
-            console.log('Error checking photo file:', error);
+            console.log("Error checking photo file:", error);
           }
         }
         if (validPhotos.length !== parsedPhotos.length) {
-          await AsyncStorage.setItem('progressPhotos', JSON.stringify(validPhotos));
+          await AsyncStorage.setItem(
+            "progressPhotos",
+            JSON.stringify(validPhotos),
+          );
         }
         setPhotos(validPhotos);
       }
     } catch (error) {
-      console.error('Error loading photos:', error);
+      console.error("Error loading photos:", error);
     }
   };
 
@@ -59,27 +78,24 @@ export default function App() {
         <Tab.Navigator
           screenOptions={{
             tabBarActiveTintColor: theme.colors.primary,
-            tabBarInactiveTintColor: '#8E8E93',
+            tabBarInactiveTintColor: "#8E8E93",
             headerShown: false,
             tabBarStyle: {
               backgroundColor: theme.colors.background,
-              borderTopColor: 'transparent',
+              borderTopColor: "transparent",
               elevation: 10,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 10,
+              boxShadow: "0px -2px 10px rgba(0,0,0,0.1)",
               // Dynamic height and padding based on platform
-              height: Platform.OS === 'ios' ? 90 : 80,
-              paddingBottom: Platform.OS === 'ios' ? 25 : 15,
+              height: Platform.OS === "ios" ? 90 : 80,
+              paddingBottom: Platform.OS === "ios" ? 25 : 15,
               paddingTop: 10,
               // Ensure tab bar stays above system navigation
-              position: 'relative',
+              position: "relative",
             },
             tabBarLabelStyle: {
               fontSize: 12,
-              fontWeight: '600',
-              marginBottom: Platform.OS === 'ios' ? 5 : 8,
+              fontWeight: "600",
+              marginBottom: Platform.OS === "ios" ? 5 : 8,
             },
             // Add safe area handling to tab bar items
             tabBarItemStyle: {
@@ -91,7 +107,12 @@ export default function App() {
             name="Camera"
             options={{
               tabBarIcon: ({ color, size, focused }) => (
-                <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
+                <View
+                  style={[
+                    tabStyles.tabIcon,
+                    focused && tabStyles.tabIconFocused,
+                  ]}
+                >
                   <Feather name="camera" size={size} color={color} />
                 </View>
               ),
@@ -110,7 +131,12 @@ export default function App() {
             name="Progress"
             options={{
               tabBarIcon: ({ color, size, focused }) => (
-                <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
+                <View
+                  style={[
+                    tabStyles.tabIcon,
+                    focused && tabStyles.tabIconFocused,
+                  ]}
+                >
                   <Feather name="bar-chart-2" size={size} color={color} />
                 </View>
               ),
@@ -122,7 +148,12 @@ export default function App() {
             name="Profile"
             options={{
               tabBarIcon: ({ color, size, focused }) => (
-                <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
+                <View
+                  style={[
+                    tabStyles.tabIcon,
+                    focused && tabStyles.tabIconFocused,
+                  ]}
+                >
                   <Feather name="user" size={size} color={color} />
                 </View>
               ),
