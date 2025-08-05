@@ -96,18 +96,6 @@ export default function App() {
           )}
         </Tab.Screen>
         <Tab.Screen
-          name="Progress"
-          options={{
-            tabBarIcon: ({ color, focused }) => (
-              <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-                <Text style={{ fontSize: 24, color }}>📊</Text>
-              </View>
-            ),
-          }}
-        >
-          {() => <ProgressScreen photos={photos} setPhotos={setPhotos} />}
-        </Tab.Screen>
-        <Tab.Screen
           name="AI Coach"
           options={{
             tabBarIcon: ({ color, focused }) => (
@@ -118,6 +106,18 @@ export default function App() {
           }}
         >
           {() => <AICoachPage />}
+        </Tab.Screen>
+        <Tab.Screen
+          name="Progress"
+          options={{
+            tabBarIcon: ({ color, focused }) => (
+              <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
+                <Text style={{ fontSize: 24, color }}>📊</Text>
+              </View>
+            ),
+          }}
+        >
+          {() => <ProgressScreen photos={photos} setPhotos={setPhotos} />}
         </Tab.Screen>
         <Tab.Screen
           name="Profile"
