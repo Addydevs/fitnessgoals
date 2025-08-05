@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import Layout from './Layout';
+import { Layout } from './Layout';
 
 const CaptureFitProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
