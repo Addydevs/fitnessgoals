@@ -8,6 +8,7 @@ import * as FileSystem from 'expo-file-system';
 import CameraScreen from './components/CameraScreen';
 import ProgressScreen from './components/ProgressScreen';
 import ProfileScreen from './components/ProfileScreen';
+import AICoachPage from './components/AICoachPage';
 import { styles } from './constants/styles';
 
 const Tab = createBottomTabNavigator();
@@ -105,6 +106,18 @@ export default function App() {
           }}
         >
           {() => <ProgressScreen photos={photos} setPhotos={setPhotos} />}
+        </Tab.Screen>
+        <Tab.Screen
+          name="AI Coach"
+          options={{
+            tabBarIcon: ({ color, focused }) => (
+              <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
+                <Text style={{ fontSize: 24, color }}>🤖</Text>
+              </View>
+            ),
+          }}
+        >
+          {() => <AICoachPage />}
         </Tab.Screen>
         <Tab.Screen
           name="Profile"
