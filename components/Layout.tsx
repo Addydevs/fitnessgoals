@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 
-export function Layout({
+export default function Layout({
   children,
   backgroundColor = "#FAFAFA",
   statusBarStyle = "dark-content",
