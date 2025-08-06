@@ -5,11 +5,12 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as FileSystem from "expo-file-system";
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import CameraScreen from "./components/CameraScreen";
 import ProgressScreen from "./components/ProgressScreen";
 import ProfileScreen from "./components/ProfileScreen";
+import AICoachScreen from "./components/AICoachScreen";
 import { theme } from "./constants/theme";
 
 const Tab = createBottomTabNavigator();
@@ -126,6 +127,23 @@ export default function App() {
                 setLoading={setLoading}
               />
             )}
+          </Tab.Screen>
+          <Tab.Screen
+            name="AI Coach"
+            options={{
+              tabBarIcon: ({ color, size, focused }) => (
+                <View
+                  style={[
+                    tabStyles.tabIcon,
+                    focused && tabStyles.tabIconFocused,
+                  ]}
+                >
+                  <MaterialCommunityIcons name="robot-outline" size={size} color={color} />
+                </View>
+              ),
+            }}
+          >
+            {() => <AICoachScreen />}
           </Tab.Screen>
           <Tab.Screen
             name="Progress"
