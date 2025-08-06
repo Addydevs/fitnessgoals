@@ -6,9 +6,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import * as FileSystem from 'expo-file-system';
 
 import CameraScreen from './components/CameraScreen';
+import AICoachScreen from './components/AICoachScreen';
 import ProgressScreen from './components/ProgressScreen';
 import ProfileScreen from './components/ProfileScreen';
-import AICoachPage from './components/AICoachPage';
+import { Feather } from '@expo/vector-icons';
 import { styles } from './constants/styles';
 
 const Tab = createBottomTabNavigator();
@@ -97,16 +98,15 @@ export default function App() {
         </Tab.Screen>
         <Tab.Screen
           name="AI Coach"
+          component={AICoachScreen}
           options={{
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-                <Text style={{ fontSize: 24, color }}>🤖</Text>
+                <Feather name="cpu" size={24} color={color} />
               </View>
             ),
           }}
-        >
-          {() => <AICoachPage />}
-        </Tab.Screen>
+        />
         <Tab.Screen
           name="Progress"
           options={{
