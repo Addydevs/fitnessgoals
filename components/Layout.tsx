@@ -1,13 +1,13 @@
 import React from "react";
 import {
-  View,
-  SafeAreaView,
-  StatusBar,
-  Platform,
-  StyleSheet,
-  TouchableOpacity,
-  Text,
-  ActivityIndicator,
+    ActivityIndicator,
+    Platform,
+    SafeAreaView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 export default function Layout({
