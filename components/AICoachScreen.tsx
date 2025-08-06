@@ -1,8 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-export default function AICoachScreen() {
+const AICoachScreen = () => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
     {
@@ -52,7 +59,9 @@ export default function AICoachScreen() {
       </View>
     </View>
   );
-}
+};
+
+export default AICoachScreen;
 
 const styles = StyleSheet.create({
   container: {
