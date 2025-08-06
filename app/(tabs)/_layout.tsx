@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from "react";
 import { Tabs } from "expo-router";
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -84,6 +84,15 @@ export default function TabLayout() {
             title: "Camera",
             tabBarIcon: ({ color, size }) => (
               <Feather name="camera" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="aicoach"
+          options={{
+            title: "AI Coach",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialCommunityIcons name="robot" size={size} color={color} />
             ),
           }}
         />
