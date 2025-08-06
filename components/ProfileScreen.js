@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import React, { useEffect, useState } from "react";
+import {
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import Layout from './Layout';
 
 const CaptureFitProfile = () => {
