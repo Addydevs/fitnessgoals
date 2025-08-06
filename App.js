@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, Platform, StyleSheet } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import * as FileSystem from "expo-file-system";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { NavigationContainer } from "@react-navigation/native";
+import * as FileSystem from "expo-file-system";
+import React, { useEffect, useState } from "react";
+import { Platform, StyleSheet, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import CameraScreen from "./components/CameraScreen";
-import ProgressScreen from "./components/ProgressScreen";
-import ProfileScreen from "./components/ProfileScreen";
 import AICoachScreen from "./components/AICoachScreen";
+import CameraScreen from "./components/CameraScreen";
+import ProfileScreen from "./components/ProfileScreen";
+import ProgressScreen from "./components/ProgressScreen";
 import { theme } from "./constants/theme";
 
 const Tab = createBottomTabNavigator();
