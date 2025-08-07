@@ -384,32 +384,22 @@ export default function CameraScreen({
         </View>
 
         <View style={styles.planGrid}>
-          {/* Progress Photos Card */}
-          <TouchableOpacity
-            style={[styles.planCard, styles.progressCard]}
-            onPress={takePhoto}
-          >
+          {/* Take Photo Card */}
+          <TouchableOpacity style={styles.planCard} onPress={takePhoto}>
             <LinearGradient
               colors={["#FF9A56", "#FF6B35"]}
               style={styles.planCardGradient}
             >
               <View style={styles.planCardContent}>
-                <Text style={styles.planCardTitle}>Progress{"\n"}Photos</Text>
+                <Text style={styles.planCardTitle}>Take{"\n"}Photo</Text>
+                <Text style={styles.planCardSubtitle}>AI Analysis</Text>
                 <Text style={styles.planCardDate}>
                   {new Date().toLocaleDateString("en-US", {
                     day: "numeric",
                     month: "short",
                   })}
                 </Text>
-                <Text style={styles.planCardTime}>Take Photo</Text>
-                <Text style={styles.planCardLocation}>AI Analysis</Text>
-
-                <View style={styles.planCardTrainer}>
-                  <Feather name="camera" size={16} color="#FF9A56" />
-                  <Text style={styles.trainerName}>AI Coach</Text>
-                </View>
               </View>
-
               <View style={styles.planCardIcon}>
                 <Feather
                   name="camera"
@@ -421,28 +411,23 @@ export default function CameraScreen({
           </TouchableOpacity>
 
           {/* View Progress Card */}
-          <TouchableOpacity style={[styles.planCard, styles.balanceCard]}>
+          <TouchableOpacity style={styles.planCard}>
             <LinearGradient
               colors={["#A8E6CF", "#7FCDCD"]}
               style={styles.planCardGradient}
             >
               <View style={styles.planCardContent}>
                 <Text style={styles.planCardTitle}>View{"\n"}Progress</Text>
+                <Text style={styles.planCardSubtitle}>
+                  {photos.length} photos
+                </Text>
                 <Text style={styles.planCardDate}>
                   {new Date().toLocaleDateString("en-US", {
                     day: "numeric",
                     month: "short",
                   })}
                 </Text>
-                <Text style={styles.planCardTime}>{photos.length} photos</Text>
-                <Text style={styles.planCardLocation}>Gallery</Text>
-
-                <View style={styles.planCardTrainer}>
-                  <Feather name="trending-up" size={16} color="#A8E6CF" />
-                  <Text style={styles.trainerName}>Progress</Text>
-                </View>
               </View>
-
               <View style={styles.planCardIcon}>
                 <Feather
                   name="bar-chart-2"
@@ -536,7 +521,10 @@ const styles = {
     borderRadius: 40,
     justifyContent: "center",
     alignItems: "center",
-    boxShadow: "0px 10px 20px rgba(0,0,0,0.1)",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 10 },
     elevation: 10,
   },
   heroImageText: {
@@ -588,7 +576,10 @@ const styles = {
     borderRadius: 30,
     width: "100%",
     alignItems: "center",
-    boxShadow: "0px 4px 8px rgba(168,230,207,0.3)",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
   getStartedText: {
@@ -653,7 +644,10 @@ const styles = {
     marginBottom: 20,
     borderRadius: 20,
     overflow: "hidden",
-    boxShadow: "0px 8px 20px rgba(139,95,191,0.3)",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 10,
   },
   challengeGradient: {
@@ -726,7 +720,10 @@ const styles = {
     borderRadius: 15,
     padding: 8,
     marginBottom: 20,
-    boxShadow: "0px 2px 10px rgba(0,0,0,0.05)",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
   dayButton: {
@@ -774,7 +771,10 @@ const styles = {
     height: 180,
     borderRadius: 20,
     overflow: "hidden",
-    boxShadow: "0px 8px 20px rgba(0,0,0,0.15)",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
   planCardGradient: {
@@ -792,36 +792,15 @@ const styles = {
     lineHeight: 22,
     marginBottom: 8,
   },
-  planCardDate: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.8)",
-    marginBottom: 2,
-  },
-  planCardTime: {
+  planCardSubtitle: {
     fontSize: 14,
     color: "rgba(255,255,255,0.9)",
     fontWeight: "600",
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  planCardLocation: {
+  planCardDate: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.7)",
-    marginBottom: 12,
-  },
-  planCardTrainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: "flex-start",
-  },
-  trainerName: {
-    fontSize: 12,
-    color: "white",
-    marginLeft: 4,
-    fontWeight: "500",
+    color: "rgba(255,255,255,0.8)",
   },
   planCardIcon: {
     position: "absolute",
@@ -838,7 +817,10 @@ const styles = {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 12,
-    boxShadow: "0px 2px 10px rgba(0,0,0,0.05)",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
   recentPhotoImage: {
