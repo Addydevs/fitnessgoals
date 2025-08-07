@@ -8,16 +8,27 @@ import {
     TouchableOpacity,
     View,
     Dimensions,
+    Modal,
+    TextInput,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Layout from './Layout';
 
 const CaptureFitProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [userData, setUserData] = useState(null);
+  const [stats, setStats] = useState({
+    startWeight: 117,
+    goalWeight: 110,
+    dailyCalories: 2000,
+  });
+  const [editField, setEditField] = useState(null);
+  const [tempValue, setTempValue] = useState('');
 
   useEffect(() => {
     fetchUserData();
+    loadStats();
   }, []);
 
   const fetchUserData = async () => {
@@ -62,6 +73,45 @@ const CaptureFitProfile = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loadStats = async () => {
+    try {
+      const start = await AsyncStorage.getItem('startWeight');
+      const goal = await AsyncStorage.getItem('goalWeight');
+      const calories = await AsyncStorage.getItem('dailyCalories');
+      setStats({
+        startWeight: start ? parseFloat(start) : 117,
+        goalWeight: goal ? parseFloat(goal) : 110,
+        dailyCalories: calories ? parseInt(calories) : 2000,
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
+
+  const openEditor = (field) => {
+    setTempValue(String(stats[field]));
+    setEditField(field);
+  };
+
+  const saveStat = async () => {
+    try {
+      const value = parseFloat(tempValue);
+      const newStats = { ...stats, [editField]: value };
+      setStats(newStats);
+      await AsyncStorage.setItem(editField, value.toString());
+    } catch (error) {
+      console.error('Error saving stat:', error);
+    } finally {
+      setEditField(null);
+    }
+  };
+
+  const fieldLabels = {
+    startWeight: 'Start Weight (lbs)',
+    goalWeight: 'Goal Weight (lbs)',
+    dailyCalories: 'Daily Calories (kcal)',
   };
 
   const formatDate = (dateString) =>
@@ -113,27 +163,36 @@ const CaptureFitProfile = () => {
             </View>
           </View>
           <View style={styles.statsGrid}>
-            <LinearGradient
-              colors={['#A8E6CF', '#7FCDCD']}
-              style={styles.statCard}
-            >
-              <Text style={styles.statNumber}>53.3 kg</Text>
-              <Text style={styles.statLabel}>Start Weight</Text>
-            </LinearGradient>
-            <LinearGradient
-              colors={['#FF9A56', '#FF6B35']}
-              style={styles.statCard}
-            >
-              <Text style={styles.statNumber}>50.0 kg</Text>
-              <Text style={styles.statLabel}>Goal Weight</Text>
-            </LinearGradient>
-            <LinearGradient
-              colors={['#8B5FBF', '#6A4C93']}
-              style={styles.statCard}
-            >
-              <Text style={styles.statNumber}>740 kcal</Text>
-              <Text style={styles.statLabel}>Daily Calories</Text>
-            </LinearGradient>
+            <TouchableOpacity onPress={() => openEditor('startWeight')}>
+              <LinearGradient
+                colors={['#A8E6CF', '#7FCDCD']}
+                style={styles.statCard}
+              >
+                <Feather name="edit-3" size={14} color="#fff" style={styles.editIcon} />
+                <Text style={styles.statNumber}>{stats.startWeight} lbs</Text>
+                <Text style={styles.statLabel}>Start Weight</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openEditor('goalWeight')}>
+              <LinearGradient
+                colors={['#FF9A56', '#FF6B35']}
+                style={styles.statCard}
+              >
+                <Feather name="edit-3" size={14} color="#fff" style={styles.editIcon} />
+                <Text style={styles.statNumber}>{stats.goalWeight} lbs</Text>
+                <Text style={styles.statLabel}>Goal Weight</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openEditor('dailyCalories')}>
+              <LinearGradient
+                colors={['#8B5FBF', '#6A4C93']}
+                style={styles.statCard}
+              >
+                <Feather name="edit-3" size={14} color="#fff" style={styles.editIcon} />
+                <Text style={styles.statNumber}>{stats.dailyCalories} kcal</Text>
+                <Text style={styles.statLabel}>Daily Calories</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -199,6 +258,27 @@ const CaptureFitProfile = () => {
 
         <View style={{ height: 96 }} />
       </ScrollView>
+      <Modal transparent visible={!!editField} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{fieldLabels[editField] || ''}</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={tempValue}
+              onChangeText={setTempValue}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalButton} onPress={() => setEditField(null)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButton} onPress={saveStat}>
+                <Text style={styles.modalButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Layout>
   );
 };
@@ -299,6 +379,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 15,
     padding: 16,
+    marginHorizontal: 4,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -308,7 +389,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   statNumber: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#fff',
     textAlign: 'center',
@@ -318,6 +399,47 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 4,
     textAlign: 'center',
+  },
+  editIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#111827',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    marginLeft: 12,
+  },
+  modalButtonText: {
+    color: '#3B82F6',
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,
