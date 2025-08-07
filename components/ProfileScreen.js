@@ -1,12 +1,55 @@
 /* eslint-disable import/no-unresolved */
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StatusBar, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  StatusBar,
+  Alert,
+  Dimensions,
+  StyleSheet,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from '../constants/styles';
 
 export default function ProfileScreen({ photos }) {
   const [goal, setGoal] = useState('');
+  const screenWidth = Dimensions.get('window').width;
+  const statCardWidth = (screenWidth - 80) / 3;
+  const statCardStyles = StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginHorizontal: 20,
+      marginTop: 20,
+    },
+    card: {
+      width: statCardWidth,
+      borderRadius: 12,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginHorizontal: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    cardValue: {
+      color: 'white',
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    cardLabel: {
+      color: 'white',
+      fontSize: 12,
+      marginTop: 4,
+      textAlign: 'center',
+    },
+  });
 
   useEffect(() => {
     loadGoal();
@@ -50,6 +93,22 @@ export default function ProfileScreen({ photos }) {
       </LinearGradient>
 
       <ScrollView style={styles.profileScrollView} showsVerticalScrollIndicator={false}>
+        <View style={statCardStyles.row}>
+          {[
+            { label: 'Start Weight', value: '0', colors: ['#11998e', '#38ef7d'] },
+            { label: 'Goal Weight', value: '0', colors: ['#f7971e', '#ffd200'] },
+            { label: 'Daily Calories', value: '0', colors: ['#8e2de2', '#4a00e0'] },
+          ].map((card, index) => (
+            <LinearGradient
+              key={index}
+              colors={card.colors}
+              style={statCardStyles.card}
+            >
+              <Text style={statCardStyles.cardValue}>{card.value}</Text>
+              <Text style={statCardStyles.cardLabel}>{card.label}</Text>
+            </LinearGradient>
+          ))}
+        </View>
         <View style={styles.statsCard}>
           <Text style={styles.sectionTitle}>Journey Statistics</Text>
           <View style={styles.statsGrid}>
