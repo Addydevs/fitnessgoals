@@ -16,9 +16,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Layout from './Layout';
 
 const screenWidth = Dimensions.get('window').width;
+const PROFILE_CARD_MARGIN = 24;
+const PROFILE_CARD_PADDING = 24;
 const H_PADDING = 24;
 const GAP = 16;
-const cardWidth = (screenWidth - 100) / 3;
+const cardWidth =
+  (screenWidth -
+    2 * PROFILE_CARD_MARGIN -
+    2 * PROFILE_CARD_PADDING -
+    2 * H_PADDING -
+    2 * GAP) /
+  3;
 
 const CaptureFitProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -363,10 +371,10 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   profileCard: {
-    marginHorizontal: 24,
+    marginHorizontal: PROFILE_CARD_MARGIN,
     backgroundColor: '#fff',
     borderRadius: 24,
-    padding: 24,
+    padding: PROFILE_CARD_PADDING,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowRadius: 6,
