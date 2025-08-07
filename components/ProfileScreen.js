@@ -15,6 +15,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Layout from './Layout';
 
+const screenWidth = Dimensions.get('window').width;
+const H_PADDING = 24;
+const GAP = 12;
+const containerWidth = screenWidth - H_PADDING * 2;
+const cardWidth = (containerWidth - GAP * 2) / 3;
+
 const CaptureFitProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [userData, setUserData] = useState(null);
@@ -114,6 +120,48 @@ const CaptureFitProfile = () => {
     dailyCalories: 'Daily Calories (kcal)',
   };
 
+  const startLbs =
+    stats.startWeight ??
+    (userData?.startWeightLbs ??
+      (userData?.startWeightKg != null
+        ? Math.round(userData.startWeightKg * 2.20462)
+        : 117));
+  const goalLbs =
+    stats.goalWeight ??
+    (userData?.goalWeightLbs ??
+      (userData?.goalWeightKg != null
+        ? Math.round(userData.goalWeightKg * 2.20462)
+        : 110));
+  const dailyCals = stats.dailyCalories ?? (userData?.dailyCalories ?? 2000);
+
+  const renderStatCard = ({ value, label, colors, onPress }, index) => (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      style={{ width: cardWidth, marginRight: index < 2 ? GAP : 0 }}
+      onPress={onPress}
+    >
+      <LinearGradient
+        colors={colors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.statCard}
+      >
+        <Feather
+          name="edit-3"
+          size={14}
+          color="rgba(255,255,255,0.95)"
+          style={styles.statEditIcon}
+        />
+        <Text style={styles.statValue} numberOfLines={1}>
+          {value}
+        </Text>
+        <Text style={styles.statLabel} numberOfLines={1}>
+          {label}
+        </Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+
   const formatDate = (dateString) =>
     new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -162,37 +210,34 @@ const CaptureFitProfile = () => {
               </Text>
             </View>
           </View>
-          <View style={styles.statsGrid}>
-            <TouchableOpacity onPress={() => openEditor('startWeight')}>
-              <LinearGradient
-                colors={['#A8E6CF', '#7FCDCD']}
-                style={styles.statCard}
-              >
-                <Feather name="edit-3" size={14} color="#fff" style={styles.editIcon} />
-                <Text style={styles.statNumber}>{stats.startWeight} lbs</Text>
-                <Text style={styles.statLabel}>Start Weight</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => openEditor('goalWeight')}>
-              <LinearGradient
-                colors={['#FF9A56', '#FF6B35']}
-                style={styles.statCard}
-              >
-                <Feather name="edit-3" size={14} color="#fff" style={styles.editIcon} />
-                <Text style={styles.statNumber}>{stats.goalWeight} lbs</Text>
-                <Text style={styles.statLabel}>Goal Weight</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => openEditor('dailyCalories')}>
-              <LinearGradient
-                colors={['#8B5FBF', '#6A4C93']}
-                style={styles.statCard}
-              >
-                <Feather name="edit-3" size={14} color="#fff" style={styles.editIcon} />
-                <Text style={styles.statNumber}>{stats.dailyCalories} kcal</Text>
-                <Text style={styles.statLabel}>Daily Calories</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+          <View style={[styles.statsRow, { paddingHorizontal: H_PADDING }]}>
+            {renderStatCard(
+              {
+                value: `${startLbs} lbs`,
+                label: 'Start Weight',
+                colors: ['#A8E6CF', '#7FCDCD'],
+                onPress: () => openEditor('startWeight'),
+              },
+              0
+            )}
+            {renderStatCard(
+              {
+                value: `${goalLbs} lbs`,
+                label: 'Goal Weight',
+                colors: ['#FF9A56', '#FF6B35'],
+                onPress: () => openEditor('goalWeight'),
+              },
+              1
+            )}
+            {renderStatCard(
+              {
+                value: `${dailyCals} kcal`,
+                label: 'Daily Calories',
+                colors: ['#8B5FBF', '#6A4C93'],
+                onPress: () => openEditor('dailyCalories'),
+              },
+              2
+            )}
           </View>
         </View>
 
@@ -283,8 +328,6 @@ const CaptureFitProfile = () => {
   );
 };
 
-const cardWidth = (Dimensions.get('window').width - 60) / 3;
-
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
@@ -369,41 +412,43 @@ const styles = StyleSheet.create({
   joined: {
     color: '#9CA3AF',
   },
-  statsGrid: {
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 8,
   },
   statCard: {
-    width: cardWidth,
-    height: 80,
-    borderRadius: 15,
-    padding: 16,
-    marginHorizontal: 4,
+    height: 72,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 8,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
   },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
+  statValue: {
     color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
     textAlign: 'center',
   },
   statLabel: {
+    color: 'rgba(255,255,255,0.95)',
     fontSize: 12,
-    color: '#fff',
-    marginTop: 4,
+    marginTop: 3,
     textAlign: 'center',
+    fontWeight: '500',
   },
-  editIcon: {
+  statEditIcon: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 6,
+    right: 6,
   },
   modalOverlay: {
     flex: 1,
