@@ -7,7 +7,9 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Layout from './Layout';
 
 const CaptureFitProfile = () => {
@@ -110,19 +112,28 @@ const CaptureFitProfile = () => {
               </Text>
             </View>
           </View>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userData?.totalPhotos || 0}</Text>
-              <Text style={styles.statLabel}>Photos</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userData?.weekStreak || 0}</Text>
-              <Text style={styles.statLabel}>Week Streak</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userData?.daysTracked || 0}</Text>
-              <Text style={styles.statLabel}>Days</Text>
-            </View>
+          <View style={styles.statsGrid}>
+            <LinearGradient
+              colors={['#A8E6CF', '#7FCDCD']}
+              style={styles.statCard}
+            >
+              <Text style={styles.statNumber}>53.3 kg</Text>
+              <Text style={styles.statLabel}>Start Weight</Text>
+            </LinearGradient>
+            <LinearGradient
+              colors={['#FF9A56', '#FF6B35']}
+              style={styles.statCard}
+            >
+              <Text style={styles.statNumber}>50.0 kg</Text>
+              <Text style={styles.statLabel}>Goal Weight</Text>
+            </LinearGradient>
+            <LinearGradient
+              colors={['#8B5FBF', '#6A4C93']}
+              style={styles.statCard}
+            >
+              <Text style={styles.statNumber}>740 kcal</Text>
+              <Text style={styles.statLabel}>Daily Calories</Text>
+            </LinearGradient>
           </View>
         </View>
 
@@ -191,6 +202,8 @@ const CaptureFitProfile = () => {
     </Layout>
   );
 };
+
+const cardWidth = (Dimensions.get('window').width - 60) / 3;
 
 const styles = StyleSheet.create({
   loadingContainer: {
@@ -276,26 +289,35 @@ const styles = StyleSheet.create({
   joined: {
     color: '#9CA3AF',
   },
-  statsRow: {
+  statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 16,
+    marginTop: 16,
   },
-  statItem: {
+  statCard: {
+    width: cardWidth,
+    height: 80,
+    borderRadius: 15,
+    padding: 16,
+    justifyContent: 'center',
     alignItems: 'center',
-    flex: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 8,
   },
-  statValue: {
-    fontSize: 20,
+  statNumber: {
+    fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#fff',
+    textAlign: 'center',
   },
   statLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#fff',
     marginTop: 4,
+    textAlign: 'center',
   },
   section: {
     marginBottom: 24,
