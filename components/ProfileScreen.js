@@ -16,9 +16,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Layout from './Layout';
 
 const screenWidth = Dimensions.get('window').width;
+const PROFILE_CARD_MARGIN = 24;
+const PROFILE_CARD_PADDING = 24;
 const H_PADDING = 24;
 const GAP = 16;
-const cardWidth = (screenWidth - 100) / 3;
+const cardWidth =
+  (screenWidth -
+    2 * PROFILE_CARD_MARGIN -
+    2 * PROFILE_CARD_PADDING -
+    2 * H_PADDING -
+    2 * GAP) /
+  3;
 
 const CaptureFitProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -133,7 +141,10 @@ const CaptureFitProfile = () => {
         : 110));
   const dailyCals = stats.dailyCalories ?? (userData?.dailyCalories ?? 2000);
 
-  const renderStatCard = ({ value, label, colors, onPress }, index) => (
+  const renderStatCard = (
+    { value, unit, label, colors, onPress },
+    index
+  ) => (
     <TouchableOpacity
       activeOpacity={0.9}
       style={{ width: cardWidth, marginRight: index < 2 ? GAP : 0 }}
@@ -154,7 +165,12 @@ const CaptureFitProfile = () => {
         <Text style={styles.statValue} numberOfLines={1}>
           {value}
         </Text>
-        <Text style={styles.statLabel} numberOfLines={2}>
+        {unit && (
+          <Text style={styles.statUnit} numberOfLines={1}>
+            {unit}
+          </Text>
+        )}
+        <Text style={styles.statLabel} numberOfLines={1}>
           {label}
         </Text>
       </LinearGradient>
@@ -212,7 +228,8 @@ const CaptureFitProfile = () => {
           <View style={[styles.statsRow, { paddingHorizontal: H_PADDING }]}>
             {renderStatCard(
               {
-                value: `${startLbs} lbs`,
+                value: startLbs,
+                unit: 'lbs',
                 label: 'Start',
                 colors: ['#A8E6CF', '#7FCDCD'],
                 onPress: () => openEditor('startWeight'),
@@ -221,7 +238,8 @@ const CaptureFitProfile = () => {
             )}
             {renderStatCard(
               {
-                value: `${goalLbs} lbs`,
+                value: goalLbs,
+                unit: 'lbs',
                 label: 'Goal',
                 colors: ['#FF9A56', '#FF6B35'],
                 onPress: () => openEditor('goalWeight'),
@@ -230,8 +248,9 @@ const CaptureFitProfile = () => {
             )}
             {renderStatCard(
               {
-                value: `${dailyCals} kcal`,
-                label: 'Daily Cals',
+                value: dailyCals,
+                unit: 'cal',
+                label: 'Daily',
                 colors: ['#8B5FBF', '#6A4C93'],
                 onPress: () => openEditor('dailyCalories'),
               },
@@ -363,10 +382,10 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   profileCard: {
-    marginHorizontal: 24,
+    marginHorizontal: PROFILE_CARD_MARGIN,
     backgroundColor: '#fff',
     borderRadius: 24,
-    padding: 24,
+    padding: PROFILE_CARD_PADDING,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowRadius: 6,
@@ -435,6 +454,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 20,
     fontWeight: '800',
+    textAlign: 'center',
+  },
+  statUnit: {
+    color: 'rgba(255,255,255,0.95)',
+    fontSize: 10,
+    marginTop: 2,
     textAlign: 'center',
   },
   statLabel: {
