@@ -120,14 +120,7 @@ export default function App() {
               ),
             }}
           >
-            {() => (
-              <HomeScreen
-                photos={photos}
-                setPhotos={setPhotos}
-                loading={loading}
-                setLoading={setLoading}
-              />
-            )}
+            {() => <HomeScreen photos={photos} />}
           </Tab.Screen>
           <Tab.Screen
             name="Camera"
@@ -185,7 +178,7 @@ export default function App() {
               ),
             }}
           >
-            {() => <ProgressScreen photos={photos} setPhotos={setPhotos} />}
+            {() => <ProgressScreen photos={photos} />}
           </Tab.Screen>
           <Tab.Screen
             name="Profile"
