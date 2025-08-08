@@ -7,6 +7,8 @@ import React, { useEffect, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import AuthFlow from "./components/AuthFlow";
+
 import HomeScreen from "./components/HomeScreen";
 import AICoachScreen from "./components/AICoachScreen";
 import CameraScreen from "./components/CameraScreen";
@@ -33,8 +35,18 @@ const tabStyles = StyleSheet.create({
 export default function App() {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
+    const init = async () => {
+      const token = await AsyncStorage.getItem("userToken");
+      if (token) {
+        setIsAuthenticated(true);
+      }
+      setCheckingAuth(false);
+    };
+    init();
     loadPhotos();
     console.log("App Documents Directory:", FileSystem.documentDirectory);
     console.log("App Cache Directory:", FileSystem.cacheDirectory);
@@ -73,6 +85,18 @@ export default function App() {
       console.error("Error loading photos:", error);
     }
   };
+
+  if (checkingAuth) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaProvider>
+        <AuthFlow onAuthSuccess={() => setIsAuthenticated(true)} />
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
