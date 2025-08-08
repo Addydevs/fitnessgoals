@@ -4,11 +4,13 @@ import { View, Text, ScrollView, Image, TouchableOpacity, Alert, StatusBar } fro
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 import { styles } from '../constants/styles';
 
 export default function ProgressScreen({ photos, setPhotos }) {
   const [compareMode, setCompareMode] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState([]);
+  const navigation = useNavigation();
 
   const formatDate = (timestamp) => {
     return new Date(timestamp).toLocaleDateString('en-US', {
@@ -120,9 +122,12 @@ export default function ProgressScreen({ photos, setPhotos }) {
               <Text style={styles.emptyStateText}>
                 Start your journey by taking your first progress photo
               </Text>
-              <View style={styles.emptyStateButton}>
+              <TouchableOpacity
+                style={styles.emptyStateButton}
+                onPress={() => navigation.navigate('camera')}
+              >
                 <Text style={styles.emptyStateButtonText}>Go to Camera Tab</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
         ) : (

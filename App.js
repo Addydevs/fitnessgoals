@@ -76,7 +76,7 @@ export default function App() {
         }}
       >
         <Tab.Screen
-          name="Camera"
+          name="camera"
           options={{
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
@@ -95,7 +95,7 @@ export default function App() {
           )}
         </Tab.Screen>
         <Tab.Screen
-          name="Progress"
+          name="progress"
           options={{
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
@@ -107,7 +107,7 @@ export default function App() {
           {() => <ProgressScreen photos={photos} setPhotos={setPhotos} />}
         </Tab.Screen>
         <Tab.Screen
-          name="Profile"
+          name="profile"
           options={{
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>

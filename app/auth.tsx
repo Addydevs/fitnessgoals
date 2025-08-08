@@ -12,7 +12,7 @@ export default function Auth() {
   };
 
   const handleAuth = () => {
-    router.replace('/(tabs)');
+    router.replace('/camera');
   };
 
   return (
