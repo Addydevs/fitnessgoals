@@ -1,4 +1,4 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer } from "@react-navigation/native";
@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import HomeScreen from "./components/HomeScreen";
 import AICoachScreen from "./components/AICoachScreen";
 import CameraScreen from "./components/CameraScreen";
 import ProfileScreen from "./components/ProfileScreen";
@@ -105,6 +106,30 @@ export default function App() {
           }}
         >
           <Tab.Screen
+            name="Home"
+            options={{
+              tabBarIcon: ({ color, size, focused }) => (
+                <View
+                  style={[
+                    tabStyles.tabIcon,
+                    focused && tabStyles.tabIconFocused,
+                  ]}
+                >
+                  <Feather name="home" size={size} color={color} />
+                </View>
+              ),
+            }}
+          >
+            {() => (
+              <HomeScreen
+                photos={photos}
+                setPhotos={setPhotos}
+                loading={loading}
+                setLoading={setLoading}
+              />
+            )}
+          </Tab.Screen>
+          <Tab.Screen
             name="Camera"
             options={{
               tabBarIcon: ({ color, size, focused }) => (
@@ -138,7 +163,7 @@ export default function App() {
                     focused && tabStyles.tabIconFocused,
                   ]}
                 >
-                  <MaterialCommunityIcons name="robot-outline" size={size} color={color} />
+                  <Feather name="message-circle" size={size} color={color} />
                 </View>
               ),
             }}
@@ -155,7 +180,7 @@ export default function App() {
                     focused && tabStyles.tabIconFocused,
                   ]}
                 >
-                  <Feather name="bar-chart-2" size={size} color={color} />
+                  <Feather name="trending-up" size={size} color={color} />
                 </View>
               ),
             }}
