@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const slides = [
   {
@@ -29,17 +30,34 @@ export default function IntroScreen() {
   const router = useRouter();
   const slide = slides[index];
 
+  useEffect(() => {
+    AsyncStorage.getItem("onboarded").then((done) => {
+      if (done) {
+        router.replace("/(auth)/login");
+      }
+    });
+  }, [router]);
+
   const next = () => {
     if (index < slides.length - 1) {
       setIndex(index + 1);
     } else {
-      router.replace("/(auth)/login");
+      AsyncStorage.setItem("onboarded", "true").then(() => {
+        router.replace("/(auth)/login");
+      });
     }
   };
 
   return (
     <LinearGradient colors={slide.colors} style={styles.container}>
-      <Pressable onPress={() => router.replace("/(auth)/login")} style={styles.skip}>
+      <Pressable
+        onPress={() =>
+          AsyncStorage.setItem("onboarded", "true").then(() =>
+            router.replace("/(auth)/login")
+          )
+        }
+        style={styles.skip}
+      >
         <Text style={styles.skipText}>Skip</Text>
       </Pressable>
 
