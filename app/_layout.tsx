@@ -1,13 +1,13 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { useFonts } from "expo-font";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, {
   createContext,
   useEffect,
   useState,
 } from "react";
-import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
