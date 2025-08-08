@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Stack } from "expo-router";
+import React, { useEffect, useState } from "react";
 
 export default function AuthLayout() {
   const [ready, setReady] = useState(false);
@@ -21,6 +21,10 @@ export default function AuthLayout() {
     <Stack
       initialRouteName={onboarded ? "login" : "index"}
       screenOptions={{ headerShown: false }}
-    />
+    >
+      <Stack.Screen name="index" />
+      <Stack.Screen name="login" />
+      <Stack.Screen name="signup" />
+    </Stack>
   );
 }
