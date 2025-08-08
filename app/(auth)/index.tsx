@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -36,14 +36,6 @@ export default function IntroScreen() {
   const [index, setIndex] = useState(0);
   const router = useRouter();
   const slide = slides[index];
-
-  useEffect(() => {
-    AsyncStorage.getItem("onboarded").then((done) => {
-      if (done) {
-        router.replace("/(auth)/login");
-      }
-    });
-  }, [router]);
 
   const next = () => {
     if (index < slides.length - 1) {
