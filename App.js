@@ -120,7 +120,15 @@ export default function App() {
               ),
             }}
           >
-            {() => <HomeScreen photos={photos} />}
+            {({ navigation }) => (
+              <HomeScreen
+                photos={photos}
+                setPhotos={setPhotos}
+                loading={loading}
+                setLoading={setLoading}
+                navigation={navigation}
+              />
+            )}
           </Tab.Screen>
           <Tab.Screen
             name="Camera"
