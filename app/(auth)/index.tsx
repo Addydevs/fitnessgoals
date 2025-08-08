@@ -4,7 +4,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const slides = [
+type Slide = {
+  title: string;
+  subtitle: string;
+  icon: string;
+  colors: readonly [string, string];
+};
+
+const slides: Slide[] = [
   {
     title: "Track Your Progress",
     subtitle: "Take photos and let AI analyze your fitness journey",
