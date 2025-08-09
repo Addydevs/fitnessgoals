@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 
 export default function SettingsScreen() {
   const [user, setUser] = useState({ fullName: 'User', email: 'user@example.com' });
@@ -203,6 +203,15 @@ export default function SettingsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       {/* User Profile Section - No redundant header, works with existing navigation */}
       <View style={[styles.userSection, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => {
+            console.log('⬅️ Back button pressed - returning to previous screen');
+            router.back();
+          }}
+        >
+          <Ionicons name="arrow-back" size={24} color="white" />
+        </TouchableOpacity>
         <View style={styles.userContent}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{user?.fullName?.charAt(0)?.toUpperCase() || 'U'}</Text>
@@ -442,6 +451,12 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 100,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 20,
+    left: 16,
+    padding: 8,
   },
 });
 
