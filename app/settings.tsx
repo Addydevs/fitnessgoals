@@ -1,9 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Switch, ScrollView, StyleSheet, Image, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Switch,
+  ScrollView,
+  StyleSheet,
+  Image,
+  Alert,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { useColorSchemeContext } from '@/hooks/useColorScheme';
 
 interface User {
   name: string;
@@ -16,14 +26,23 @@ const SettingsScreen = () => {
   const [autoSave, setAutoSave] = useState(false);
   const [notifications, setNotifications] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const { colorScheme, setColorScheme } = useColorSchemeContext();
 
   useEffect(() => {
-    const loadUser = async () => {
+    const loadSettings = async () => {
       const userData = await AsyncStorage.getItem('user');
       if (userData) setUser(JSON.parse(userData));
+      const auto = await AsyncStorage.getItem('autoSave');
+      if (auto !== null) setAutoSave(auto === 'true');
+      const notif = await AsyncStorage.getItem('notifications');
+      if (notif !== null) setNotifications(notif === 'true');
     };
-    loadUser();
+    loadSettings();
   }, []);
+
+  useEffect(() => {
+    setDarkMode(colorScheme === 'dark');
+  }, [colorScheme]);
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure?', [
@@ -81,7 +100,13 @@ const SettingsScreen = () => {
         <Text style={styles.sectionTitle}>Camera & Photos</Text>
         <View style={styles.row}>
           <Text style={styles.rowText}>Auto Save to Gallery</Text>
-          <Switch value={autoSave} onValueChange={setAutoSave} />
+          <Switch
+            value={autoSave}
+            onValueChange={async (v) => {
+              setAutoSave(v);
+              await AsyncStorage.setItem('autoSave', v.toString());
+            }}
+          />
         </View>
       </View>
 
@@ -89,11 +114,23 @@ const SettingsScreen = () => {
         <Text style={styles.sectionTitle}>App Settings</Text>
         <View style={styles.row}>
           <Text style={styles.rowText}>Notifications</Text>
-          <Switch value={notifications} onValueChange={setNotifications} />
+          <Switch
+            value={notifications}
+            onValueChange={async (v) => {
+              setNotifications(v);
+              await AsyncStorage.setItem('notifications', v.toString());
+            }}
+          />
         </View>
         <View style={styles.row}>
           <Text style={styles.rowText}>Dark Mode</Text>
-          <Switch value={darkMode} onValueChange={setDarkMode} />
+          <Switch
+            value={darkMode}
+            onValueChange={(v) => {
+              setDarkMode(v);
+              setColorScheme(v ? 'dark' : 'light');
+            }}
+          />
         </View>
         <TouchableOpacity style={styles.row}>
           <Text style={styles.rowText}>Language</Text>

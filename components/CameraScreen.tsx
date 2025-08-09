@@ -24,9 +24,22 @@ export default function CameraScreen({
   setLoading,
 }: CameraScreenProps) {
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
+  const [autoSave, setAutoSave] = useState(false);
 
   useEffect(() => {
     getCameraPermission();
+    (async () => {
+      try {
+        // eslint-disable-next-line import/no-unresolved
+        const MediaLibrary = await import("expo-media-library");
+        await MediaLibrary.requestPermissionsAsync();
+      } catch (e) {
+        console.log("MediaLibrary unavailable", e);
+      }
+    })();
+    AsyncStorage.getItem("autoSave").then((v) => {
+      if (v !== null) setAutoSave(v === "true");
+    });
   }, []);
 
   const getCameraPermission = async (): Promise<void> => {
@@ -78,6 +91,15 @@ export default function CameraScreen({
       const updatedPhotos = [...photos, newPhoto];
       await AsyncStorage.setItem("progressPhotos", JSON.stringify(updatedPhotos));
       setPhotos(updatedPhotos);
+      if (autoSave) {
+        try {
+          // eslint-disable-next-line import/no-unresolved
+          const MediaLibrary = await import("expo-media-library");
+          await MediaLibrary.saveToLibraryAsync(permanentUri);
+        } catch (e) {
+          console.error("Auto save failed", e);
+        }
+      }
     } catch (error) {
       console.error("Error processing photo:", error);
       Alert.alert("Error", "Failed to save photo. Please try again.");
