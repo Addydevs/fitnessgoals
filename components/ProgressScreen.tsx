@@ -2,7 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Layout, { ModernHeader, SectionHeader, ModernCard } from './Layout';
 
-export default function ProgressScreen({ photos = [] }) {
+interface ProgressScreenProps {
+  photos?: any[];
+}
+
+export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
   const totalPhotos = photos.length;
   const weeklyData = [1, 2, 1, 0, 3, 0, 2];
 

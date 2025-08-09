@@ -20,7 +20,7 @@ const { width: screenWidth } = Dimensions.get("window");
 const OPENAI_API_KEY = "your-api-key-here"; // Replace with your actual key
 
 // Helper Functions for Data Tracking
-const getCurrentStreak = (photos) => {
+const getCurrentStreak = (photos: any[]): number => {
   if (photos.length === 0) return 0;
 
   let streak = 0;
@@ -45,7 +45,7 @@ const getCurrentStreak = (photos) => {
   return streak;
 };
 
-const getPhotosThisWeek = (photos) => {
+const getPhotosThisWeek = (photos: any[]): number => {
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
@@ -55,14 +55,14 @@ const getPhotosThisWeek = (photos) => {
   }).length;
 };
 
-const hasPhotoOnDate = (photos, targetDate) => {
+const hasPhotoOnDate = (photos: any[], targetDate: Date): boolean => {
   return photos.some((photo) => {
     const photoDate = new Date(photo.timestamp);
     return photoDate.toDateString() === targetDate.toDateString();
   });
 };
 
-const saveUserStats = async (photos) => {
+const saveUserStats = async (photos: any[]): Promise<any> => {
   const stats = {
     totalPhotos: photos.length,
     lastPhotoDate:
@@ -85,7 +85,7 @@ const saveUserStats = async (photos) => {
   }
 };
 
-const loadUserStats = async () => {
+const loadUserStats = async (): Promise<any> => {
   try {
     const stats = await AsyncStorage.getItem("userStats");
     return stats
@@ -111,7 +111,7 @@ const loadUserStats = async () => {
   }
 };
 
-const extractProgressScore = (analysis) => {
+const extractProgressScore = (analysis: string | null): number | null => {
   if (!analysis) return null;
 
   const positiveWords = [
@@ -139,17 +139,30 @@ const extractProgressScore = (analysis) => {
 };
 
 // Main Component
+interface HomeScreenProps {
+  photos: any[];
+  setPhotos: (photos: any[]) => void;
+  loading: boolean;
+  setLoading: (loading: boolean) => void;
+  navigation?: any;
+}
+
 export default function HomeScreen({
   photos,
   setPhotos,
   loading,
   setLoading,
   navigation,
-}) {
-  const [cameraPermission, setCameraPermission] = useState(null);
-  const [showWelcome, setShowWelcome] = useState(true);
-  const [currentDate] = useState(new Date());
-  const [userStats, setUserStats] = useState({
+}: HomeScreenProps) {
+  const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
+  const [showWelcome, setShowWelcome] = useState<boolean>(true);
+  const [currentDate] = useState<Date>(new Date());
+  const [userStats, setUserStats] = useState<{
+    totalPhotos: number;
+    currentStreak: number;
+    photosThisWeek: number;
+    lastPhotoDate: string | null;
+  }>({
     totalPhotos: 0,
     currentStreak: 0,
     photosThisWeek: 0,
@@ -173,12 +186,12 @@ export default function HomeScreen({
     updateUserStats();
   }, [updateUserStats]);
 
-  const loadUserStatsData = async () => {
+  const loadUserStatsData = async (): Promise<void> => {
     const stats = await loadUserStats();
     setUserStats(stats);
   };
 
-  const checkWelcomeStatus = async () => {
+  const checkWelcomeStatus = async (): Promise<void> => {
     try {
       const hasSeenWelcome = await AsyncStorage.getItem("hasSeenWelcome");
       if (hasSeenWelcome === "true") {
@@ -189,7 +202,7 @@ export default function HomeScreen({
     }
   };
 
-  const handleGetStarted = async () => {
+  const handleGetStarted = async (): Promise<void> => {
     try {
       await AsyncStorage.setItem("hasSeenWelcome", "true");
       setShowWelcome(false);
@@ -198,12 +211,12 @@ export default function HomeScreen({
     }
   };
 
-  const getCameraPermission = async () => {
+  const getCameraPermission = async (): Promise<void> => {
     const { status } = await Camera.requestCameraPermissionsAsync();
     setCameraPermission(status === "granted");
   };
 
-  const takePhoto = async () => {
+  const takePhoto = async (): Promise<void> => {
     if (!cameraPermission) {
       Alert.alert("Camera permission required");
       return;
@@ -221,7 +234,7 @@ export default function HomeScreen({
     }
   };
 
-  const processNewPhoto = async (photo) => {
+  const processNewPhoto = async (photo: any): Promise<void> => {
     setLoading(true);
     try {
       const fileName = `progress_photo_${Date.now()}.jpg`;
@@ -232,13 +245,13 @@ export default function HomeScreen({
         to: permanentUri,
       });
 
-      const newPhoto = {
+      const newPhoto: any = {
         id: Date.now().toString(),
         uri: permanentUri,
         timestamp: new Date().toISOString(),
-        analysis: null,
+        analysis: null as string | null,
         analyzed: false,
-        progressScore: null,
+        progressScore: null as number | null,
       };
 
       const previousPhoto = photos.length > 0 ? photos[photos.length - 1] : null;
@@ -276,7 +289,10 @@ export default function HomeScreen({
     }
   };
 
-  const getAIAnalysis = async (previousPhotoUri, currentPhotoUri) => {
+  const getAIAnalysis = async (
+    previousPhotoUri: string,
+    currentPhotoUri: string,
+  ): Promise<string> => {
     try {
       const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
       const previousBase64 = await uriToBase64(previousPhotoUri);
@@ -333,7 +349,7 @@ export default function HomeScreen({
     }
   };
 
-  const uriToBase64 = async (uri) => {
+  const uriToBase64 = async (uri: string): Promise<string | null> => {
     try {
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
@@ -345,7 +361,7 @@ export default function HomeScreen({
     }
   };
 
-  const savePhotos = async (newPhotos) => {
+  const savePhotos = async (newPhotos: any[]): Promise<void> => {
     try {
       await AsyncStorage.setItem("progressPhotos", JSON.stringify(newPhotos));
     } catch (error) {
@@ -353,7 +369,7 @@ export default function HomeScreen({
     }
   };
 
-  const generateWeekDays = () => {
+  const generateWeekDays = (): any[] => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const today = new Date();
     const currentDay = today.getDay();
