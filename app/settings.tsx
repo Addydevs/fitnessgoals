@@ -14,6 +14,8 @@ import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export const options = { headerShown: false };
+
 export default function SettingsScreen() {
   const [user, setUser] = useState({ fullName: 'User', email: 'user@example.com' });
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -236,8 +238,7 @@ export default function SettingsScreen() {
         <View>
           <Text style={[styles.settingsItemTitle, { color: colors.text }]}>{title}</Text>
           {subtitle && (
-            <Text style={[styles.settingsItemSubtitle, { color: colors.textSecondary }]}>\n              {subtitle}
-            </Text>
+            <Text style={[styles.settingsItemSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
           )}
         </View>
       </View>
