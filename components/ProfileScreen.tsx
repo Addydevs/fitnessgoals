@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
@@ -11,6 +11,7 @@ import {
     Modal,
     TextInput,
 } from 'react-native';
+import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Layout from './Layout';
@@ -207,8 +208,11 @@ const CaptureFitProfile = () => {
             <Feather name="arrow-left" size={20} color="#6B7280" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity style={styles.headerButton}>
-            <Feather name="settings" size={20} color="#6B7280" />
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => router.push('/settings')}
+          >
+            <Ionicons name="settings" size={24} color="#666" />
           </TouchableOpacity>
         </View>
 
