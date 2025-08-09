@@ -3,6 +3,7 @@ import { theme } from "@/constants/theme";
 import { useRouter } from "expo-router";
 import React, { useContext, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SignupScreen() {
   const { signIn } = useContext(AuthContext);
@@ -12,8 +13,13 @@ export default function SignupScreen() {
   const [password, setPassword] = useState("");
 
   const handleSignup = async () => {
-    await signIn("token");
-    router.replace("/(tabs)/homepage");
+    await signIn('token');
+    const userData = {
+      fullName: name,
+      email,
+    };
+    await AsyncStorage.setItem('user', JSON.stringify(userData));
+    router.replace('/(tabs)/homepage');
   };
 
   return (
