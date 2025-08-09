@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from "react";
 import { Tabs } from "expo-router";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -110,7 +110,7 @@ export default function TabLayout() {
           options={{
             title: "Profile",
             tabBarIcon: ({ color, size }) => (
-              <Feather name="user" size={size} color={color} />
+              <Ionicons name="person" size={size} color={color} />
             ),
           }}
         />

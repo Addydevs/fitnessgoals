@@ -1,17 +1,17 @@
-import { AuthContext } from "@/app/_layout";
 import { theme } from "@/constants/theme";
 import { useRouter } from "expo-router";
-import React, { useContext, useState } from "react";
+import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function LoginScreen() {
-  const { signIn } = useContext(AuthContext);
+  const { login } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
-    await signIn("token");
+    await login(email, password);
     router.replace("/(tabs)/homepage");
   };
 
