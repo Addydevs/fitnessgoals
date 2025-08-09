@@ -3,16 +3,46 @@ import { theme } from "@/constants/theme";
 import { useRouter } from "expo-router";
 import React, { useContext, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const { signIn } = useContext(AuthContext);
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [, setLoading] = useState(false);
+
+  const extractNameFromEmail = (email: string) => {
+    const username = email.split('@')[0];
+    return username
+      .split(/[._-]/)
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+  };
 
   const handleLogin = async () => {
-    await signIn("token");
-    router.replace("/(tabs)/homepage");
+    if (!email || !password) return;
+
+    setLoading(true);
+
+    try {
+      // Save user data (extract name from email)
+      const userData = {
+        fullName: extractNameFromEmail(email),
+        email: email,
+      };
+
+      console.log('💾 Saving user data:', userData);
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      console.log('✅ User data saved successfully');
+
+      await signIn("token");
+      router.replace("/(tabs)/homepage");
+    } catch (error) {
+      console.log('❌ Login error:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
