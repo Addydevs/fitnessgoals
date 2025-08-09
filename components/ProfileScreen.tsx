@@ -28,23 +28,29 @@ const cardWidth =
     2 * GAP) /
   3;
 
+interface Stats {
+  startWeight: number;
+  goalWeight: number;
+  dailyCalories: number;
+}
+
 const CaptureFitProfile = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [userData, setUserData] = useState(null);
-  const [stats, setStats] = useState({
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [userData, setUserData] = useState<any>(null);
+  const [stats, setStats] = useState<Stats>({
     startWeight: 117,
     goalWeight: 110,
     dailyCalories: 2000,
   });
-  const [editField, setEditField] = useState(null);
-  const [tempValue, setTempValue] = useState('');
+  const [editField, setEditField] = useState<keyof Stats | null>(null);
+  const [tempValue, setTempValue] = useState<string>('');
 
   useEffect(() => {
     fetchUserData();
     loadStats();
   }, []);
 
-  const fetchUserData = async () => {
+  const fetchUserData = async (): Promise<void> => {
     try {
       setIsLoading(true);
       const response = await fetch('/api/user', {
@@ -88,7 +94,7 @@ const CaptureFitProfile = () => {
     }
   };
 
-  const loadStats = async () => {
+  const loadStats = async (): Promise<void> => {
     try {
       const start = await AsyncStorage.getItem('startWeight');
       const goal = await AsyncStorage.getItem('goalWeight');
@@ -103,12 +109,12 @@ const CaptureFitProfile = () => {
     }
   };
 
-  const openEditor = (field) => {
+  const openEditor = (field: keyof Stats): void => {
     setTempValue(String(stats[field]));
     setEditField(field);
   };
 
-  const saveStat = async () => {
+  const saveStat = async (): Promise<void> => {
     try {
       const value = parseFloat(tempValue);
       const newStats = { ...stats, [editField]: value };
@@ -121,7 +127,7 @@ const CaptureFitProfile = () => {
     }
   };
 
-  const fieldLabels = {
+  const fieldLabels: Record<keyof Stats, string> = {
     startWeight: 'Start Weight (lbs)',
     goalWeight: 'Goal Weight (lbs)',
     dailyCalories: 'Daily Calories (kcal)',
@@ -142,8 +148,8 @@ const CaptureFitProfile = () => {
   const dailyCals = stats.dailyCalories ?? (userData?.dailyCalories ?? 2000);
 
   const renderStatCard = (
-    { value, unit, label, colors, onPress },
-    index
+    { value, unit, label, colors, onPress }: any,
+    index: number
   ) => (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -177,7 +183,7 @@ const CaptureFitProfile = () => {
     </TouchableOpacity>
   );
 
-  const formatDate = (dateString) =>
+  const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',

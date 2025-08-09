@@ -9,9 +9,15 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+interface Message {
+  id: number;
+  type: 'ai' | 'user';
+  text: string;
+}
+
 const AICoachScreen = () => {
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState([
+  const [input, setInput] = useState<string>('');
+  const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
       type: 'ai',
@@ -19,9 +25,9 @@ const AICoachScreen = () => {
     },
   ]);
 
-  const handleSend = () => {
+  const handleSend = (): void => {
     if (!input.trim()) return;
-    const userMessage = { id: Date.now(), type: 'user', text: input.trim() };
+    const userMessage: Message = { id: Date.now(), type: 'user', text: input.trim() };
     setMessages((prev) => [
       ...prev,
       userMessage,
