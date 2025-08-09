@@ -31,8 +31,8 @@ const tabStyles = StyleSheet.create({
 });
 
 export default function App() {
-  const [photos, setPhotos] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     loadPhotos();
@@ -40,12 +40,12 @@ export default function App() {
     console.log("App Cache Directory:", FileSystem.cacheDirectory);
   }, []);
 
-  const loadPhotos = async () => {
+  const loadPhotos = async (): Promise<void> => {
     try {
       const savedPhotos = await AsyncStorage.getItem("progressPhotos");
       if (savedPhotos) {
         const parsedPhotos = JSON.parse(savedPhotos);
-        const validPhotos = [];
+        const validPhotos: any[] = [];
         for (const photo of parsedPhotos) {
           try {
             const fileInfo = await FileSystem.getInfoAsync(photo.uri);
