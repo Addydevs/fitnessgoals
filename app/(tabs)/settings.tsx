@@ -157,9 +157,6 @@ export default function SettingsScreen() {
           <Text style={[styles.itemText, { color: theme.text }]}>Dark Mode</Text>
           <Switch value={darkMode} onValueChange={toggleDarkMode} />
         </View>
-        <TouchableOpacity style={styles.item}>
-          <Text style={[styles.itemText, { color: theme.text }]}>Language</Text>
-        </TouchableOpacity>
       </View>
 
       <View style={[styles.section, { backgroundColor: theme.card }]}>
