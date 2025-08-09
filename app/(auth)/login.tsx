@@ -3,16 +3,49 @@ import { theme } from "@/constants/theme";
 import { useRouter } from "expo-router";
 import React, { useContext, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function LoginScreen() {
   const { signIn } = useContext(AuthContext);
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const validateForm = () => {
+    return email.trim() !== "" && password.trim() !== "";
+  };
+
+  const extractNameFromEmail = (email: string) => {
+    const username = email.split("@")[0];
+    return username
+      .split(/[._-]/)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(" ");
+  };
 
   const handleLogin = async () => {
-    await signIn("token");
-    router.replace("/(tabs)/homepage");
+    if (!validateForm()) return;
+
+    setLoading(true);
+
+    try {
+      const userData = {
+        fullName: extractNameFromEmail(email),
+        email,
+      };
+
+      console.log("\u{1F4BE} Saving user data from login:", userData);
+      await AsyncStorage.setItem("user", JSON.stringify(userData));
+      console.log("\u2705 User data saved successfully");
+
+      await signIn("token");
+      router.replace("/(tabs)/homepage");
+    } catch (error) {
+      console.log("\u274C Login error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,7 +67,7 @@ export default function LoginScreen() {
           style={styles.input}
           secureTextEntry
         />
-        <Pressable style={styles.button} onPress={handleLogin}>
+        <Pressable style={styles.button} onPress={handleLogin} disabled={loading}>
           <Text style={styles.buttonText}>Sign In</Text>
         </Pressable>
         <Pressable onPress={() => router.push("/(auth)/signup")}>

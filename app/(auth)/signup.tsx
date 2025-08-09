@@ -3,6 +3,7 @@ import { theme } from "@/constants/theme";
 import { useRouter } from "expo-router";
 import React, { useContext, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function SignupScreen() {
   const { signIn } = useContext(AuthContext);
@@ -10,10 +11,34 @@ export default function SignupScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const validateForm = () => {
+    return name.trim() !== "" && email.trim() !== "" && password.trim() !== "";
+  };
 
   const handleSignup = async () => {
-    await signIn("token");
-    router.replace("/(tabs)/homepage");
+    if (!validateForm()) return;
+
+    setLoading(true);
+
+    try {
+      const userData = {
+        fullName: name,
+        email,
+      };
+
+      console.log("\u{1F4BE} Saving user data from signup:", userData);
+      await AsyncStorage.setItem("user", JSON.stringify(userData));
+      console.log("\u2705 User data saved successfully");
+
+      await signIn("token");
+      router.replace("/(tabs)/homepage");
+    } catch (error) {
+      console.log("\u274C Signup error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -41,7 +66,7 @@ export default function SignupScreen() {
           style={styles.input}
           secureTextEntry
         />
-        <Pressable style={styles.button} onPress={handleSignup}>
+        <Pressable style={styles.button} onPress={handleSignup} disabled={loading}>
           <Text style={styles.buttonText}>Create Account</Text>
         </Pressable>
         <Pressable onPress={() => router.push("/(auth)/login")}>
