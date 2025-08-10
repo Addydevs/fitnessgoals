@@ -1,26 +1,60 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Camera } from "expo-camera";
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Modal,
   ScrollView,
   StatusBar,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { Photo, RootStackParamList } from "../app/(tabs)/_layout"; // Import Photo and RootStackParamList from _layout.tsx
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+
+interface Notification {
+  id: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+}
+
+interface UserStats {
+  totalPhotos: number;
+  lastPhotoDate: string | null;
+  startDate: string;
+  currentStreak: number;
+  photosThisWeek: number;
+  updatedAt: string;
+}
+
+interface HomeScreenProps {
+  photos: Photo[];
+  setPhotos: (photos: Photo[]) => void;
+  loading: boolean;
+  setLoading: (loading: boolean) => void;
+  navigation?: NavigationProp;
+}
 
 const { width: screenWidth } = Dimensions.get("window");
 const OPENAI_API_KEY = "your-api-key-here"; // Replace with your actual key
 
 // Helper Functions for Data Tracking
-const getCurrentStreak = (photos: any[]): number => {
+const getCurrentStreak = (photos: Photo[]): number => {
   if (photos.length === 0) return 0;
 
   let streak = 0;
@@ -45,7 +79,7 @@ const getCurrentStreak = (photos: any[]): number => {
   return streak;
 };
 
-const getPhotosThisWeek = (photos: any[]): number => {
+const getPhotosThisWeek = (photos: Photo[]): number => {
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
@@ -55,22 +89,18 @@ const getPhotosThisWeek = (photos: any[]): number => {
   }).length;
 };
 
-const hasPhotoOnDate = (photos: any[], targetDate: Date): boolean => {
+const hasPhotoOnDate = (photos: Photo[], targetDate: Date): boolean => {
   return photos.some((photo) => {
     const photoDate = new Date(photo.timestamp);
     return photoDate.toDateString() === targetDate.toDateString();
   });
 };
 
-const saveUserStats = async (photos: any[]): Promise<any> => {
-  const stats = {
+const saveUserStats = async (photos: Photo[]): Promise<UserStats | null> => {
+  const stats: UserStats = {
     totalPhotos: photos.length,
-    lastPhotoDate:
-      photos.length > 0 ? photos[photos.length - 1].timestamp : null,
-    startDate:
-      photos.length > 0
-        ? photos[0].timestamp
-        : new Date().toISOString(),
+    lastPhotoDate: photos.length > 0 ? photos[photos.length - 1].timestamp : null,
+    startDate: photos.length > 0 ? photos[0].timestamp : new Date().toISOString(),
     currentStreak: getCurrentStreak(photos),
     photosThisWeek: getPhotosThisWeek(photos),
     updatedAt: new Date().toISOString(),
@@ -85,7 +115,7 @@ const saveUserStats = async (photos: any[]): Promise<any> => {
   }
 };
 
-const loadUserStats = async (): Promise<any> => {
+const loadUserStats = async (): Promise<UserStats> => {
   try {
     const stats = await AsyncStorage.getItem("userStats");
     return stats
@@ -139,14 +169,6 @@ const extractProgressScore = (analysis: string | null): number | null => {
 };
 
 // Main Component
-interface HomeScreenProps {
-  photos: any[];
-  setPhotos: (photos: any[]) => void;
-  loading: boolean;
-  setLoading: (loading: boolean) => void;
-  navigation?: any;
-}
-
 export default function HomeScreen({
   photos,
   setPhotos,
@@ -157,23 +179,27 @@ export default function HomeScreen({
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [showWelcome, setShowWelcome] = useState<boolean>(true);
   const [currentDate] = useState<Date>(new Date());
-  const [userStats, setUserStats] = useState<{
-    totalPhotos: number;
-    currentStreak: number;
-    photosThisWeek: number;
-    lastPhotoDate: string | null;
-  }>({
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [generalNotifications, setGeneralNotifications] = useState<Notification[]>([]);
+  const [user, setUser] = useState<{ fullName: string; email: string } | null>(null);
+  const [userStats, setUserStats] = useState<UserStats>({
     totalPhotos: 0,
     currentStreak: 0,
     photosThisWeek: 0,
     lastPhotoDate: null,
+    startDate: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   });
 
-  useEffect(() => {
-    getCameraPermission();
-    checkWelcomeStatus();
-    loadUserStatsData();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      getCameraPermission();
+      checkWelcomeStatus();
+      loadUserStatsData();
+      loadGeneralNotificationsData();
+      loadUserData();
+    }, [])
+  );
 
   const updateUserStats = useCallback(async () => {
     const newStats = await saveUserStats(photos);
@@ -225,16 +251,15 @@ export default function HomeScreen({
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [3, 4],
       quality: 0.8,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets?.[0]) {
       await processNewPhoto(result.assets[0]);
     }
   };
 
-  const processNewPhoto = async (photo: any): Promise<void> => {
+  const processNewPhoto = async (photo: ImagePicker.ImagePickerAsset): Promise<void> => {
     setLoading(true);
     try {
       const fileName = `progress_photo_${Date.now()}.jpg`;
@@ -245,13 +270,13 @@ export default function HomeScreen({
         to: permanentUri,
       });
 
-      const newPhoto: any = {
+      const newPhoto: Photo = {
         id: Date.now().toString(),
         uri: permanentUri,
         timestamp: new Date().toISOString(),
-        analysis: null as string | null,
+        analysis: null,
         analyzed: false,
-        progressScore: null as number | null,
+        progressScore: null,
       };
 
       const previousPhoto = photos.length > 0 ? photos[photos.length - 1] : null;
@@ -262,8 +287,7 @@ export default function HomeScreen({
         newPhoto.analyzed = true;
         newPhoto.progressScore = extractProgressScore(analysis);
       } else {
-        newPhoto.analysis =
-          "Great start! This is your first progress photo. Keep going!";
+        newPhoto.analysis = "Great start! This is your first progress photo. Keep going!";
         newPhoto.analyzed = true;
         newPhoto.progressScore = 0.5;
       }
@@ -276,10 +300,12 @@ export default function HomeScreen({
       Alert.alert(
         "Photo Saved!",
         `Analysis complete! You now have ${updatedPhotos.length} progress photos.`,
-        [{
-          text: "View Analysis",
-          onPress: () => navigation?.navigate("Progress"),
-        }],
+        [
+          {
+            text: "View Analysis",
+            onPress: () => navigation?.navigate("progress"),
+          },
+        ],
       );
     } catch (error) {
       console.error("Error processing photo:", error);
@@ -289,59 +315,65 @@ export default function HomeScreen({
     }
   };
 
-  const getAIAnalysis = async (
-    previousPhotoUri: string,
-    currentPhotoUri: string,
-  ): Promise<string> => {
+  const getAIAnalysis = async (previousPhotoUri: string, currentPhotoUri: string): Promise<string> => {
     try {
       const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
       const previousBase64 = await uriToBase64(previousPhotoUri);
       const currentBase64 = await uriToBase64(currentPhotoUri);
+
+      if (!previousBase64 || !currentBase64) {
+        throw new Error("Failed to convert photos to base64");
+      }
 
       let goalContext = "";
       if (userGoal) {
         goalContext = `The user's fitness goal is: "${userGoal}". `;
       }
 
-      const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: `${goalContext}Compare these progress photos and provide encouraging feedback. Focus on specific changes you notice and provide motivation.`,
-                  },
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: `data:image/jpeg;base64,${previousBase64}`,
-                    },
-                  },
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: `data:image/jpeg;base64,${currentBase64}`,
-                    },
-                  },
-                ],
-              },
-            ],
-            max_tokens: 200,
-          }),
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
         },
-      );
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `${goalContext}Compare these progress photos and provide encouraging feedback. Focus on specific changes you notice and provide motivation.`,
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:image/jpeg;base64,${previousBase64}`,
+                  },
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:image/jpeg;base64,${currentBase64}`,
+                  },
+                },
+              ],
+            },
+          ],
+          max_tokens: 200,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
 
       const data = await response.json();
+      if (!data.choices?.[0]?.message?.content) {
+        throw new Error("Invalid API response structure");
+      }
+
       return data.choices[0].message.content;
     } catch (error) {
       console.error("AI Analysis Error:", error);
@@ -361,7 +393,68 @@ export default function HomeScreen({
     }
   };
 
-  const savePhotos = async (newPhotos: any[]): Promise<void> => {
+  const saveGeneralNotifications = async (newNotifications: Notification[]): Promise<void> => {
+    try {
+      await AsyncStorage.setItem("generalNotifications", JSON.stringify(newNotifications));
+    } catch (error) {
+      console.error("Error saving general notifications:", error);
+    }
+  };
+
+  const loadGeneralNotifications = async (): Promise<Notification[]> => {
+    try {
+      const storedNotifications = await AsyncStorage.getItem("generalNotifications");
+      return storedNotifications ? JSON.parse(storedNotifications) : [];
+    } catch (error) {
+      console.error("Error loading general notifications:", error);
+      return [];
+    }
+  };
+
+  const loadGeneralNotificationsData = async (): Promise<void> => {
+    const loadedNotifications = await loadGeneralNotifications();
+    setGeneralNotifications(loadedNotifications);
+    if (loadedNotifications.length === 0) {
+      // Add a welcome notification if no notifications exist
+      addGeneralNotification({
+        message: "Welcome to CaptureFit Progress! Start by taking your first progress photo.",
+        read: false,
+      });
+    }
+  };
+
+  const addGeneralNotification = async (notification: Omit<Notification, "id" | "timestamp">): Promise<void> => {
+    const newNotification: Notification = {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      ...notification,
+    };
+    const updatedNotifications = [...generalNotifications, newNotification];
+    setGeneralNotifications(updatedNotifications);
+    await saveGeneralNotifications(updatedNotifications);
+  };
+
+  const markGeneralNotificationAsRead = async (id: string): Promise<void> => {
+    const updatedNotifications = generalNotifications.map((notif) =>
+      notif.id === id ? { ...notif, read: true } : notif,
+    );
+    setGeneralNotifications(updatedNotifications);
+    await saveGeneralNotifications(updatedNotifications);
+  };
+
+
+  const loadUserData = async (): Promise<void> => {
+    try {
+      const userData = await AsyncStorage.getItem("user");
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+    } catch (error) {
+      console.error("Error loading user data:", error);
+    }
+  };
+
+  const savePhotos = async (newPhotos: Photo[]): Promise<void> => {
     try {
       await AsyncStorage.setItem("progressPhotos", JSON.stringify(newPhotos));
     } catch (error) {
@@ -369,7 +462,7 @@ export default function HomeScreen({
     }
   };
 
-  const generateWeekDays = (): any[] => {
+  const generateWeekDays = (): { day: string; date: number; isToday: boolean; fullDate: Date; hasPhoto: boolean }[] => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const today = new Date();
     const currentDay = today.getDay();
@@ -390,15 +483,54 @@ export default function HomeScreen({
 
   const weekDays = generateWeekDays();
 
+  const toggleModal = () => {
+    setModalVisible(!isModalVisible);
+  };
+
+  const NotificationModal = () => {
+    const unreadGeneralNotifications = generalNotifications.filter((notif) => !notif.read);
+
+    return (
+      <Modal animationType="slide" transparent={true} visible={isModalVisible} onRequestClose={toggleModal}>
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Notifications</Text>
+            <ScrollView style={styles.notificationScrollView}>
+              {generalNotifications.length === 0 ? (
+                <Text style={styles.noNotificationsText}>No notifications yet.</Text>
+              ) : (
+                generalNotifications.map((notif) => (
+                  <View key={notif.id} style={[styles.notificationItem, !notif.read && styles.unreadNotification]}>
+                    <View style={styles.notificationTextContent}>
+                      <Text style={styles.notificationMessage}>{notif.message}</Text>
+                      <Text style={styles.notificationTimestamp}>
+                        {new Date(notif.timestamp).toLocaleString()}
+                      </Text>
+                    </View>
+                    {!notif.read && (
+                      <TouchableOpacity onPress={() => markGeneralNotificationAsRead(notif.id)} style={styles.markReadButton}>
+                        <Feather name="check-circle" size={20} color="#10B981" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity onPress={toggleModal} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+    );
+  };
+
   // Welcome Screen
   if (showWelcome) {
     return (
       <View style={styles.welcomeContainer}>
         <StatusBar barStyle="dark-content" backgroundColor="white" />
-        <TouchableOpacity
-          style={styles.skipButton}
-          onPress={handleGetStarted}
-        >
+        <TouchableOpacity style={styles.skipButton} onPress={handleGetStarted}>
           <Text style={styles.skipText}>Skip</Text>
           <Feather name="chevron-right" size={18} color="#666" />
         </TouchableOpacity>
@@ -409,12 +541,9 @@ export default function HomeScreen({
           </View>
         </View>
         <View style={styles.welcomeContent}>
-          <Text style={styles.welcomeTitle}>
-            Track Your Fitness{"\n"}Journey with AI
-          </Text>
+          <Text style={styles.welcomeTitle}>Track Your Fitness{"\n"}Journey with AI</Text>
           <Text style={styles.welcomeSubtitle}>
-            Capture progress photos and get AI-powered insights to achieve your
-            fitness goals faster.
+            Capture progress photos and get AI-powered insights to achieve your fitness goals faster.
           </Text>
           <View style={styles.pageIndicators}>
             <View style={[styles.indicator, styles.indicatorActive]} />
@@ -422,11 +551,7 @@ export default function HomeScreen({
             <View style={styles.indicator} />
             <View style={styles.indicator} />
           </View>
-          <TouchableOpacity
-            style={styles.getStartedButton}
-            onPress={handleGetStarted}
-            activeOpacity={0.9}
-          >
+          <TouchableOpacity style={styles.getStartedButton} onPress={handleGetStarted} activeOpacity={0.9}>
             <Text style={styles.getStartedText}>Start Tracking</Text>
           </TouchableOpacity>
         </View>
@@ -436,41 +561,41 @@ export default function HomeScreen({
 
   // Main Home Screen
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
-
+      <NotificationModal />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.userProfile}>
             <View style={styles.profileImageContainer}>
-              <Feather name="user" size={24} color="#FF6B35" />
+              {user?.fullName ? (
+                <Text style={styles.avatarText}>{user.fullName.charAt(0).toUpperCase()}</Text>
+              ) : (
+                <Feather name="user" size={24} color="#FF6B35" />
+              )}
             </View>
             <View style={styles.greetingContainer}>
-              <Text style={styles.greeting}>CaptureFit Progress</Text>
+              <Text style={styles.greeting}>{user?.fullName || "CaptureFit Progress"}</Text>
               <Text style={styles.date}>
-                Today{" "}
-                {currentDate.toLocaleDateString("en-US", {
+                {user?.email || "Today "}
+                {user?.email ? "" : currentDate.toLocaleDateString("en-US", {
                   day: "numeric",
                   month: "short",
                 })}
               </Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.notificationButton}>
+          <TouchableOpacity style={styles.notificationButton} onPress={toggleModal}>
             <Feather name="bell" size={18} color="#1F2937" />
-            {userStats.photosThisWeek > 0 && (
+            {generalNotifications.filter((notif) => !notif.read).length > 0 && (
               <View style={styles.notificationDot} />
             )}
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* AI Analysis Challenge Card */}
         <View style={styles.challengeCard}>
           <LinearGradient
@@ -489,15 +614,11 @@ export default function HomeScreen({
 
               <View style={styles.progressIndicators}>
                 <View style={styles.progressItem}>
-                  <Text style={styles.progressNumber}>
-                    {userStats.totalPhotos}
-                  </Text>
+                  <Text style={styles.progressNumber}>{userStats.totalPhotos}</Text>
                   <Text style={styles.progressLabel}>Photos</Text>
                 </View>
                 <View style={styles.progressItem}>
-                  <Text style={styles.progressNumber}>
-                    {userStats.currentStreak}
-                  </Text>
+                  <Text style={styles.progressNumber}>{userStats.currentStreak}</Text>
                   <Text style={styles.progressLabel}>Day Streak</Text>
                 </View>
               </View>
@@ -506,11 +627,7 @@ export default function HomeScreen({
             {/* 3D Spheres with Icons */}
             <View style={styles.challengeDecorations}>
               <View style={[styles.sphere, styles.aiSphere]}>
-                <MaterialCommunityIcons
-                  name="brain"
-                  size={20}
-                  color="white"
-                />
+                <MaterialCommunityIcons name="brain" size={20} color="white" />
               </View>
               <View style={[styles.sphere, styles.cameraSphere]}>
                 <Feather name="camera" size={16} color="white" />
@@ -527,19 +644,9 @@ export default function HomeScreen({
           {weekDays.map((dayInfo, index) => (
             <TouchableOpacity
               key={index}
-              style={[
-                styles.dayButton,
-                dayInfo.isToday && styles.dayButtonActive,
-              ]}
+              style={[styles.dayButton, dayInfo.isToday && styles.dayButtonActive]}
             >
-              <Text
-                style={[
-                  styles.dayText,
-                  dayInfo.isToday && styles.dayTextActive,
-                ]}
-              >
-                {dayInfo.day}
-              </Text>
+              <Text style={[styles.dayText, dayInfo.isToday && styles.dayTextActive]}>{dayInfo.day}</Text>
               <View
                 style={[
                   styles.photoIndicator,
@@ -558,10 +665,7 @@ export default function HomeScreen({
 
         <View style={styles.planGrid}>
           {/* Capture Progress Card */}
-          <TouchableOpacity
-            style={[styles.planCard, styles.captureCard]}
-            onPress={takePhoto}
-          >
+          <TouchableOpacity style={[styles.planCard, styles.captureCard]} onPress={() => navigation?.navigate("aicoach")}>
             <View style={styles.planCardHeader}>
               <Feather name="camera" size={20} color="white" />
               <Text style={styles.planCardLabel}>Capture</Text>
@@ -569,9 +673,7 @@ export default function HomeScreen({
             <View style={styles.planCardBody}>
               <Text style={styles.planCardTitle}>Progress{"\n"}Photo</Text>
               <Text style={styles.planCardSubtitle}>
-                {userStats.totalPhotos === 0
-                  ? "Start your journey"
-                  : "Continue tracking"}
+                {userStats.totalPhotos === 0 ? "Start your journey" : "Continue tracking"}
               </Text>
               <Text style={styles.planCardDetail}>AI analysis included</Text>
             </View>
@@ -584,10 +686,7 @@ export default function HomeScreen({
           </TouchableOpacity>
 
           {/* View Analysis Card */}
-          <TouchableOpacity
-            style={[styles.planCard, styles.analysisCard]}
-            onPress={() => navigation?.navigate("Progress")}
-          >
+          <TouchableOpacity style={[styles.planCard, styles.analysisCard]} onPress={() => navigation?.navigate("progress")}>
             <View style={styles.planCardHeader}>
               <Feather name="trending-up" size={20} color="white" />
               <Text style={styles.planCardLabel}>Analysis</Text>
@@ -595,9 +694,7 @@ export default function HomeScreen({
             <View style={styles.planCardBody}>
               <Text style={styles.planCardTitle}>Progress{"\n"}Report</Text>
               <Text style={styles.planCardSubtitle}>
-                {userStats.totalPhotos === 0
-                  ? "No data yet"
-                  : `${userStats.totalPhotos} photos analyzed`}
+                {userStats.totalPhotos === 0 ? "No data yet" : `${userStats.totalPhotos} photos analyzed`}
               </Text>
               <Text style={styles.planCardDetail}>AI insights & trends</Text>
             </View>
@@ -605,24 +702,14 @@ export default function HomeScreen({
               <View style={styles.analysisIcon}>
                 <Feather name="bar-chart-2" size={12} color="#7986CB" />
               </View>
-              <Text style={styles.aiLabel}>
-                {userStats.totalPhotos === 0 ? "Waiting" : "View Report"}
-              </Text>
+              <Text style={styles.aiLabel}>{userStats.totalPhotos === 0 ? "Waiting" : "View Report"}</Text>
             </View>
 
             {userStats.totalPhotos > 0 && (
               <View style={styles.progressVisualization}>
                 <View style={styles.progressBar}>
                   <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: `${Math.min(
-                          userStats.totalPhotos * 10,
-                          100,
-                        )}%`,
-                      },
-                    ]}
+                    style={[styles.progressFill, { width: `${Math.min(userStats.totalPhotos * 10, 100)}%` }]}
                   />
                 </View>
               </View>
@@ -657,9 +744,7 @@ export default function HomeScreen({
           <View style={styles.recentSection}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Latest Analysis</Text>
-              <TouchableOpacity
-                onPress={() => navigation?.navigate("Progress")}
-              >
+              <TouchableOpacity onPress={() => navigation?.navigate("progress")}>
                 <Text style={styles.viewAllText}>View All</Text>
               </TouchableOpacity>
             </View>
@@ -670,9 +755,7 @@ export default function HomeScreen({
               <View style={styles.recentContent}>
                 <Text style={styles.recentTitle}>Latest Progress</Text>
                 <Text style={styles.recentDate}>
-                  {new Date(
-                    photos[photos.length - 1].timestamp,
-                  ).toLocaleDateString("en-US", {
+                  {new Date(photos[photos.length - 1].timestamp).toLocaleDateString("en-US", {
                     day: "numeric",
                     month: "short",
                   })}
@@ -681,10 +764,7 @@ export default function HomeScreen({
                   {photos[photos.length - 1].analysis || "Analysis complete!"}
                 </Text>
               </View>
-              <TouchableOpacity
-                style={styles.viewButton}
-                onPress={() => navigation?.navigate("Progress")}
-              >
+              <TouchableOpacity style={styles.viewButton} onPress={() => navigation?.navigate("progress")}>
                 <Feather name="chevron-right" size={16} color="#A855F7" />
               </TouchableOpacity>
             </View>
@@ -698,17 +778,15 @@ export default function HomeScreen({
           <View style={styles.loadingCard}>
             <ActivityIndicator size="large" color="#8B5FBF" />
             <Text style={styles.loadingTitle}>Analyzing Progress</Text>
-            <Text style={styles.loadingSubtext}>
-              AI is working its magic...
-            </Text>
+            <Text style={styles.loadingSubtext}>AI is working its magic...</Text>
           </View>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
   // Welcome Screen Styles
   welcomeContainer: {
     flex: 1,
@@ -808,8 +886,8 @@ const styles = {
   },
   header: {
     backgroundColor: "white",
-    paddingTop: 44,
-    paddingHorizontal: 20,
+    paddingRight: 55,
+    paddingLeft:15,
     paddingBottom: 16,
   },
   headerContent: {
@@ -844,13 +922,15 @@ const styles = {
     color: "#6B7280",
   },
   notificationButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight:10,
     backgroundColor: "#F3F4F6",
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
+    
   },
   notificationDot: {
     position: "absolute",
@@ -860,6 +940,9 @@ const styles = {
     height: 8,
     borderRadius: 4,
     backgroundColor: "#EF4444",
+  },
+  notBell:{
+marginRight: 20,
   },
   scrollView: {
     flex: 1,
@@ -1235,5 +1318,81 @@ const styles = {
     fontSize: 14,
     color: "#666",
   },
-};
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  closeButton: {
+    marginTop: 20,
+    backgroundColor: "#2196F3",
+    borderRadius: 20,
+    padding: 10,
+    elevation: 2,
+  },
+  closeButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  notificationScrollView: {
+    maxHeight: Dimensions.get("window").height * 0.5, // Limit height to prevent overflow
+    width: "100%",
+    paddingHorizontal: 10,
+  },
+  noNotificationsText: {
+    textAlign: "center",
+    color: "#6B7280",
+    marginTop: 20,
+  },
+  notificationItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  unreadNotification: {
+    backgroundColor: "#EEF2FF", // Light blue for unread
+    borderColor: "#C7D2FE",
+  },
+  notificationTextContent: {
+    flex: 1,
+  },
+  notificationMessage: {
+    fontSize: 14,
+    color: "#1F2937",
+    fontWeight: "500",
+  },
+  notificationTimestamp: {
+    fontSize: 10,
+    color: "#9CA3AF",
+    marginTop: 4,
+  },
+  markReadButton: {
+    marginLeft: 10,
+    padding: 5,
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "white",
+  },
+});
 

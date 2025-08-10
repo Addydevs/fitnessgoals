@@ -1,19 +1,20 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from "react";
-import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-    Dimensions,
-    Modal,
-    TextInput,
-} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Layout from './Layout';
 
 const screenWidth = Dimensions.get('window').width;
@@ -35,9 +36,19 @@ interface Stats {
   dailyCalories: number;
 }
 
+interface UserProfile {
+  name: string;
+  joinDate: string;
+  avatar: string | null;
+  totalPhotos: number;
+  weekStreak: number;
+  daysTracked: number;
+  recentPhotos: { id: number; date: string; week: string }[];
+}
+
 const CaptureFitProfile = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<Stats>({
     startWeight: 117,
     goalWeight: 110,
@@ -46,25 +57,21 @@ const CaptureFitProfile = () => {
   const [editField, setEditField] = useState<keyof Stats | null>(null);
   const [tempValue, setTempValue] = useState<string>('');
 
-  useEffect(() => {
-    fetchUserData();
-    loadStats();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUserData();
+      loadStats();
+    }, [])
+  );
 
   const fetchUserData = async (): Promise<void> => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/user', {
-        headers: {
-          Authorization: 'Bearer YOUR_API_TOKEN',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUserData(data);
+      const userDataFromStorage = await AsyncStorage.getItem('user');
+      if (userDataFromStorage) {
+        setUserData(JSON.parse(userDataFromStorage));
       } else {
+        // Fallback to default data if no user data in AsyncStorage
         setUserData({
           name: 'John Smith',
           joinDate: '2024-06-15',
@@ -79,8 +86,17 @@ const CaptureFitProfile = () => {
           ],
         });
       }
+
+      // In a real app, you might still try to sync with a backend after loading from storage
+      // const response = await fetch('/api/user', { ... });
+      // if (response.ok) {
+      //   const data = await response.json();
+      //   setUserData(data);
+      //   await AsyncStorage.setItem('user', JSON.stringify(data)); // Update local storage
+      // }
+
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.error('Error loading user data:', error);
       setUserData({
         name: 'User',
         joinDate: new Date().toISOString(),
@@ -116,6 +132,8 @@ const CaptureFitProfile = () => {
   };
 
   const saveStat = async (): Promise<void> => {
+    if (!editField) return; // Ensure editField is not null
+
     try {
       const value = parseFloat(tempValue);
       const newStats = { ...stats, [editField]: value };
@@ -134,19 +152,9 @@ const CaptureFitProfile = () => {
     dailyCalories: 'Daily Calories (kcal)',
   };
 
-  const startLbs =
-    stats.startWeight ??
-    (userData?.startWeightLbs ??
-      (userData?.startWeightKg != null
-        ? Math.round(userData.startWeightKg * 2.20462)
-        : 117));
-  const goalLbs =
-    stats.goalWeight ??
-    (userData?.goalWeightLbs ??
-      (userData?.goalWeightKg != null
-        ? Math.round(userData.goalWeightKg * 2.20462)
-        : 110));
-  const dailyCals = stats.dailyCalories ?? (userData?.dailyCalories ?? 2000);
+  const startLbs = stats.startWeight;
+  const goalLbs = stats.goalWeight;
+  const dailyCals = stats.dailyCalories;
 
   const renderStatCard = (
     { value, unit, label, colors, onPress }: any,
@@ -279,7 +287,7 @@ const CaptureFitProfile = () => {
               <Text style={styles.sectionAction}>View All</Text>
             </TouchableOpacity>
           </View>
-          {userData?.recentPhotos?.length > 0 ? (
+          {userData && userData.recentPhotos && userData.recentPhotos.length > 0 ? (
             userData.recentPhotos.slice(0, 3).map((photo) => (
               <View key={photo.id} style={styles.photoCard}>
                 <View style={styles.photoHeader}>
@@ -337,7 +345,7 @@ const CaptureFitProfile = () => {
       <Modal transparent visible={!!editField} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{fieldLabels[editField] || ''}</Text>
+            <Text style={styles.modalTitle}>{editField ? fieldLabels[editField] : ''}</Text>
             <TextInput
               style={styles.input}
               keyboardType="numeric"

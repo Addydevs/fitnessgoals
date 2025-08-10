@@ -1,6 +1,6 @@
+import { Feather } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -26,7 +26,7 @@ export function HelloWave() {
 
   return (
     <Animated.View style={animatedStyle}>
-      <Feather name="hand" size={28} color="#000" style={styles.icon} />
+      <Feather name="eye" size={28} color="#000" style={styles.icon} />
     </Animated.View>
   );
 }
