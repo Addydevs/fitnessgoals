@@ -6,7 +6,7 @@ import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import { Alert, Text, View } from "react-native";
 
-import Layout, { ModernHeader, EmptyState, ModernLoading, ModernCard } from "./Layout";
+import Layout, { EmptyState, ModernCard, ModernHeader, ModernLoading } from "./Layout";
 
 const OPENAI_API_KEY = "your-api-key-here"; // Replace with your actual key
 
@@ -62,7 +62,7 @@ export default function CameraScreen({
       const newPhoto: any = {
         id: Date.now().toString(),
         uri: permanentUri,
-        timestamp: new Date().toISOString(),
+        date: new Date().toISOString(), // Changed from timestamp to date
         analysis: null as string | null,
       };
 

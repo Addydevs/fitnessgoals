@@ -1,12 +1,36 @@
-import React, { createContext, useState, useEffect } from "react";
-import { Tabs } from "expo-router";
+import { Colors } from "@/constants/Colors";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system";
+import { Tabs } from "expo-router";
+import React, { createContext, useEffect, useState } from "react";
+import { useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { theme } from "@/constants/theme";
 
-export const PhotoContext = createContext({
+export type RootStackParamList = {
+  homepage: undefined;
+  camera: undefined;
+  aicoach: undefined;
+  progress: undefined;
+  profile: undefined;
+  settings: undefined;
+};
+
+export interface Photo {
+  id: string;
+  uri: string;
+  timestamp: string;
+  analysis: string | null;
+  analyzed: boolean;
+  progressScore: number | null;
+}
+
+export const PhotoContext = createContext<{
+  photos: Photo[];
+  setPhotos: React.Dispatch<React.SetStateAction<Photo[]>>;
+  loading: boolean;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}>({
   photos: [],
   setPhotos: () => {},
   loading: false,
@@ -14,9 +38,10 @@ export const PhotoContext = createContext({
 });
 
 export default function TabLayout() {
-  const [photos, setPhotos] = useState([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
 
   useEffect(() => {
     loadPhotos();
@@ -58,10 +83,10 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarShowLabel: false,
-          tabBarActiveTintColor: theme.colors.primary,
+          tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
           tabBarInactiveTintColor: "#9AA1B9",
           tabBarStyle: {
-            backgroundColor: "#fff",
+            backgroundColor: Colors[colorScheme ?? "light"].background,
             borderTopWidth: 0,
             elevation: 5,
             height: 60 + insets.bottom,
@@ -114,7 +139,17 @@ export default function TabLayout() {
             ),
           }}
         />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: "Settings",
+            tabBarIcon: ({ color, size }) => (
+              <Feather name="settings" size={size} color={color} />
+            ),
+          }}
+        />
       </Tabs>
     </PhotoContext.Provider>
   );
 }
+
