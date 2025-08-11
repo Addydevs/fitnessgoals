@@ -1,10 +1,9 @@
-import { Colors } from "@/constants/Colors";
+import { ThemeContext } from "@/app/_layout";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system";
 import { Tabs } from "expo-router";
-import React, { createContext, useEffect, useState } from "react";
-import { useColorScheme } from "react-native";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export type RootStackParamList = {
@@ -41,7 +40,8 @@ export default function TabLayout() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
+  const themeContext = useContext(ThemeContext);
+  const theme = themeContext?.theme!;
 
   useEffect(() => {
     loadPhotos();
@@ -83,10 +83,10 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarShowLabel: false,
-          tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
-          tabBarInactiveTintColor: "#9AA1B9",
+          tabBarActiveTintColor: theme.primary,
+          tabBarInactiveTintColor: theme.textSecondary,
           tabBarStyle: {
-            backgroundColor: Colors[colorScheme ?? "light"].background,
+            backgroundColor: theme.background,
             borderTopWidth: 0,
             elevation: 5,
             height: 60 + insets.bottom,

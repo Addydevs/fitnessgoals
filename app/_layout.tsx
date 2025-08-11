@@ -1,4 +1,3 @@
-import { Colors } from "@/constants/Colors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
@@ -9,7 +8,6 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { useColorScheme } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -19,9 +17,38 @@ export const AuthContext = createContext({
   signOut: async () => {},
 });
 
+const lightTheme = {
+  primary: "#A855F7",
+  primaryDark: "#7C3AED",
+  background: "#FFFFFF",
+  surface: "#F9FAFB",
+  card: "#FFFFFF",
+  text: "#1F2937",
+  textSecondary: "#6B7280",
+  textTertiary: "#9CA3AF",
+  border: "#E5E7EB",
+  error: "#EF4444",
+};
+
+const darkTheme = {
+  primary: "#A855F7",
+  primaryDark: "#7C3AED",
+  background: "#111827",
+  surface: "#1F2937",
+  card: "#374151",
+  text: "#F9FAFB",
+  textSecondary: "#D1D5DB",
+  textTertiary: "#9CA3AF",
+  border: "#4B5563",
+  error: "#EF4444",
+};
+
+type Theme = typeof lightTheme;
+
 interface ThemeContextType {
   isDarkMode: boolean;
-  toggleDarkMode: (value: boolean) => void;
+  theme: Theme;
+  toggleDarkMode: (next?: boolean) => void;
 }
 
 export const ThemeContext = createContext<ThemeContextType | undefined>(
@@ -34,8 +61,7 @@ export default function RootLayout() {
   });
   const [token, setToken] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
-  const systemColorScheme = useColorScheme();
-  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === "dark");
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -44,11 +70,7 @@ export default function RootLayout() {
         setToken(userToken);
 
         const storedDarkMode = await AsyncStorage.getItem("darkMode");
-        if (storedDarkMode !== null) {
-          setIsDarkMode(JSON.parse(storedDarkMode));
-        } else {
-          setIsDarkMode(systemColorScheme === "dark");
-        }
+        setIsDarkMode(storedDarkMode ? JSON.parse(storedDarkMode) : false);
       } catch (error) {
         console.error("Failed to load initial settings:", error);
       } finally {
@@ -56,7 +78,7 @@ export default function RootLayout() {
       }
     };
     loadSettings();
-  }, [systemColorScheme]);
+  }, []);
 
   const authContext = useMemo(
     () => ({
@@ -73,15 +95,19 @@ export default function RootLayout() {
     [token],
   );
 
+  const theme = useMemo(() => (isDarkMode ? darkTheme : lightTheme), [isDarkMode]);
+
   const themeContext = useMemo(
     () => ({
       isDarkMode,
-      toggleDarkMode: async (value: boolean) => {
+      theme,
+      toggleDarkMode: async (next?: boolean) => {
+        const value = typeof next === "boolean" ? next : !isDarkMode;
         setIsDarkMode(value);
         await AsyncStorage.setItem("darkMode", JSON.stringify(value));
       },
     }),
-    [isDarkMode],
+    [isDarkMode, theme],
   );
 
   if (!loaded || checking) {
@@ -92,46 +118,25 @@ export default function RootLayout() {
     <AuthContext.Provider value={authContext}>
       <ThemeContext.Provider value={themeContext}>
         <SafeAreaProvider>
-          <Stack>
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: theme.background },
+              headerTintColor: theme.text,
+              contentStyle: { backgroundColor: theme.background },
+            }}
+          >
             {token ? (
-              <Stack.Screen
-                name="(tabs)"
-                options={{
-                  headerShown: false,
-                  contentStyle: {
-                    backgroundColor: isDarkMode
-                      ? Colors.dark.background
-                      : Colors.light.background,
-                  },
-                }}
-              />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             ) : (
-              <Stack.Screen
-                name="(auth)"
-                options={{
-                  headerShown: false,
-                  contentStyle: {
-                    backgroundColor: isDarkMode
-                      ? Colors.dark.background
-                      : Colors.light.background,
-                  },
-                }}
-              />
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             )}
-            <Stack.Screen
-              name="(settings)"
-              options={{
-                headerShown: false,
-                contentStyle: {
-                  backgroundColor: isDarkMode
-                    ? Colors.dark.background
-                    : Colors.light.background,
-                },
-              }}
-            />
+            <Stack.Screen name="(settings)" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" />
           </Stack>
-          <StatusBar style={isDarkMode ? "light" : "dark"} />
+          <StatusBar
+            style={isDarkMode ? "light" : "dark"}
+            backgroundColor={theme.background}
+          />
         </SafeAreaProvider>
       </ThemeContext.Provider>
     </AuthContext.Provider>

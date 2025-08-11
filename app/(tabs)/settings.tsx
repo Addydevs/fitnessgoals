@@ -12,6 +12,7 @@ export default function SettingsScreen() {
   const themeContext = useContext(ThemeContext);
   const isDarkMode = themeContext?.isDarkMode ?? false;
   const toggleDarkMode = themeContext?.toggleDarkMode ?? (() => {});
+  const theme = themeContext?.theme;
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoSave, setAutoSave] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -131,31 +132,7 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const colors = isDarkMode
-    ? {
-        primary: '#A855F7',
-        primaryDark: '#7C3AED',
-        background: '#111827',
-        surface: '#1F2937',
-        card: '#374151',
-        text: '#F9FAFB',
-        textSecondary: '#D1D5DB',
-        textTertiary: '#9CA3AF',
-        border: '#4B5563',
-        error: '#EF4444',
-      }
-    : {
-        primary: '#A855F7',
-        primaryDark: '#7C3AED',
-        background: '#FFFFFF',
-        surface: '#F9FAFB',
-        card: '#FFFFFF',
-        text: '#1F2937',
-        textSecondary: '#6B7280',
-        textTertiary: '#9CA3AF',
-        border: '#E5E7EB',
-        error: '#EF4444',
-      };
+  const colors = theme!;
 
   const SettingsSection = ({ title, children }: { title: string, children: React.ReactNode }) => (
     <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
