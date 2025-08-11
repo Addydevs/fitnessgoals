@@ -1,13 +1,13 @@
 import React from "react";
 import {
-    ActivityIndicator,
-    Platform,
-    SafeAreaView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 export default function Layout({
@@ -19,6 +19,15 @@ export default function Layout({
   padding = 0,
   paddingHorizontal = 0,
   paddingVertical = 0,
+}: {
+  children: React.ReactNode;
+  backgroundColor?: string;
+  statusBarStyle?: "dark-content" | "light-content";
+  statusBarBackgroundColor?: string;
+  safeAreaBackground?: string;
+  padding?: number;
+  paddingHorizontal?: number;
+  paddingVertical?: number;
 }) {
   return (
     <>
@@ -58,6 +67,15 @@ export const ModernHeader = ({
   onRightPress,
   backgroundColor = "white",
   showBorder = true,
+}: {
+  title: string;
+  subtitle?: string;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
+  onLeftPress?: () => void;
+  onRightPress?: () => void;
+  backgroundColor?: string;
+  showBorder?: boolean;
 }) => {
   return (
     <View
@@ -112,6 +130,17 @@ export const ModernCard = ({
   borderRadius = 15,
   elevation = 3,
   onPress,
+}: {
+  children: React.ReactNode;
+  style?: any;
+  padding?: number;
+  margin?: number;
+  marginHorizontal?: number;
+  marginVertical?: number;
+  backgroundColor?: string;
+  borderRadius?: number;
+  elevation?: number;
+  onPress?: () => void;
 }) => {
   const cardStyle = [
     styles.modernCard,
@@ -150,6 +179,12 @@ export const SectionHeader = ({
   rightElement,
   marginBottom = 16,
   marginTop = 0,
+}: {
+  title: string;
+  subtitle?: string;
+  rightElement?: React.ReactNode;
+  marginBottom?: number;
+  marginTop?: number;
 }) => {
   return (
     <View style={[styles.sectionHeader, { marginBottom, marginTop }]}>
@@ -194,6 +229,13 @@ export const EmptyState = ({
   buttonText,
   onButtonPress,
   iconSize = 60,
+}: {
+  icon?: React.ReactNode;
+  title: string;
+  subtitle: string;
+  buttonText?: string;
+  onButtonPress?: () => void;
+  iconSize?: number;
 }) => {
   return (
     <View style={styles.emptyStateContainer}>

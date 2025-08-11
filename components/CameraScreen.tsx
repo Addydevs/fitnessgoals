@@ -6,23 +6,35 @@ import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import { Alert, Text, View } from "react-native";
 
-import Layout, { ModernHeader, EmptyState, ModernLoading, ModernCard } from "./Layout";
+import Layout, { EmptyState, ModernCard, ModernHeader, ModernLoading } from "./Layout";
 
 const OPENAI_API_KEY = "your-api-key-here"; // Replace with your actual key
 
-export default function CameraScreen({ photos, setPhotos, loading, setLoading }) {
-  const [cameraPermission, setCameraPermission] = useState(null);
+interface CameraScreenProps {
+  photos: any[];
+  setPhotos: (photos: any[]) => void;
+  loading: boolean;
+  setLoading: (loading: boolean) => void;
+}
+
+export default function CameraScreen({
+  photos,
+  setPhotos,
+  loading,
+  setLoading,
+}: CameraScreenProps) {
+  const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
 
   useEffect(() => {
     getCameraPermission();
   }, []);
 
-  const getCameraPermission = async () => {
+  const getCameraPermission = async (): Promise<void> => {
     const { status } = await Camera.requestCameraPermissionsAsync();
     setCameraPermission(status === "granted");
   };
 
-  const takePhoto = async () => {
+  const takePhoto = async (): Promise<void> => {
     if (!cameraPermission) {
       Alert.alert("Camera permission required");
       return;
@@ -40,18 +52,18 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
     }
   };
 
-  const processNewPhoto = async (photo) => {
+  const processNewPhoto = async (photo: any): Promise<void> => {
     setLoading(true);
     try {
       const fileName = `progress_photo_${Date.now()}.jpg`;
       const permanentUri = FileSystem.documentDirectory + fileName;
       await FileSystem.copyAsync({ from: photo.uri, to: permanentUri });
 
-      const newPhoto = {
+      const newPhoto: any = {
         id: Date.now().toString(),
         uri: permanentUri,
-        timestamp: new Date().toISOString(),
-        analysis: null,
+        date: new Date().toISOString(), // Changed from timestamp to date
+        analysis: null as string | null,
       };
 
       const previousPhoto = photos.length > 0 ? photos[photos.length - 1] : null;
@@ -74,7 +86,10 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
     }
   };
 
-  const getAIAnalysis = async (previousPhotoUri, currentPhotoUri) => {
+  const getAIAnalysis = async (
+    previousPhotoUri: string,
+    currentPhotoUri: string,
+  ): Promise<string> => {
     try {
       const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
       const previousBase64 = await uriToBase64(previousPhotoUri);
@@ -127,7 +142,7 @@ export default function CameraScreen({ photos, setPhotos, loading, setLoading })
     }
   };
 
-  const uriToBase64 = async (uri) => {
+  const uriToBase64 = async (uri: string): Promise<string | null> => {
     try {
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
