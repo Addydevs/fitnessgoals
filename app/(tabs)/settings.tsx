@@ -171,7 +171,7 @@ export default function SettingsScreen() {
       disabled={!onPress}
     >
       <View style={styles.settingsItemLeft}>
-        <View style={[styles.iconContainer, { backgroundColor: colors.surface }]}>
+        <View style={[styles.iconContainer, { backgroundColor: colors.surface }]}> 
           <Ionicons name={icon} size={20} color={colors.primary} />
         </View>
         <View style={styles.settingsItemTextContainer}>
@@ -182,6 +182,7 @@ export default function SettingsScreen() {
       {rightElement || (onPress && <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />)}
     </TouchableOpacity>
   );
+  const insets = useSafeAreaInsets();
 
   if (loading) {
     return (
@@ -190,8 +191,6 @@ export default function SettingsScreen() {
       </View>
     );
   }
-
-  const insets = useSafeAreaInsets();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>

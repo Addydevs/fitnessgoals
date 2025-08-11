@@ -228,6 +228,8 @@ export const EmptyState = ({
   subtitle,
   buttonText,
   onButtonPress,
+  secondaryButtonText,
+  onSecondaryButtonPress,
   iconSize = 60,
 }: {
   icon?: React.ReactNode;
@@ -235,6 +237,8 @@ export const EmptyState = ({
   subtitle: string;
   buttonText?: string;
   onButtonPress?: () => void;
+  secondaryButtonText?: string;
+  onSecondaryButtonPress?: () => void;
   iconSize?: number;
 }) => {
   return (
@@ -252,6 +256,22 @@ export const EmptyState = ({
             activeOpacity={0.8}
           >
             <Text style={styles.emptyStateButtonText}>{buttonText}</Text>
+          </TouchableOpacity>
+        )}
+        {secondaryButtonText && onSecondaryButtonPress && (
+          <TouchableOpacity
+            style={[styles.emptyStateButton, styles.emptyStateSecondaryButton]}
+            onPress={onSecondaryButtonPress}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.emptyStateButtonText,
+                styles.emptyStateSecondaryButtonText,
+              ]}
+            >
+              {secondaryButtonText}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -422,5 +442,16 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+  emptyStateSecondaryButton: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginTop: 12,
+    boxShadow: "none",
+    elevation: 0,
+  },
+  emptyStateSecondaryButtonText: {
+    color: "#0F172A",
   },
 });
