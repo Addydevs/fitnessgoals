@@ -1,13 +1,14 @@
 import { Colors } from "@/constants/Colors";
+import { CustomThemeProvider } from "@/contexts/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, {
-  createContext,
-  useEffect,
-  useMemo,
-  useState,
+    createContext,
+    useEffect,
+    useMemo,
+    useState,
 } from "react";
 import { useColorScheme } from "react-native";
 import "react-native-reanimated";
@@ -84,13 +85,13 @@ export default function RootLayout() {
     [isDarkMode],
   );
 
-  if (!loaded || checking) {
+  if (!loaded) {
     return null;
   }
 
   return (
-    <AuthContext.Provider value={authContext}>
-      <ThemeContext.Provider value={themeContext}>
+    <CustomThemeProvider>
+      <AuthContext.Provider value={authContext}>
         <SafeAreaProvider>
           <Stack>
             {token ? (
@@ -110,6 +111,7 @@ export default function RootLayout() {
                 name="(auth)"
                 options={{
                   headerShown: false,
+                  title: "",
                   contentStyle: {
                     backgroundColor: isDarkMode
                       ? Colors.dark.background
@@ -129,11 +131,11 @@ export default function RootLayout() {
                 },
               }}
             />
-            <Stack.Screen name="+not-found" />
+            <Stack.Screen name="+not-found" options={{ headerShown: false }} />
           </Stack>
           <StatusBar style={isDarkMode ? "light" : "dark"} />
         </SafeAreaProvider>
-      </ThemeContext.Provider>
-    </AuthContext.Provider>
+      </AuthContext.Provider>
+    </CustomThemeProvider>
   );
 }

@@ -1,4 +1,5 @@
 import { ThemeContext } from '@/app/_layout';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, router } from 'expo-router';
@@ -12,6 +13,7 @@ export default function EditProfileScreen() {
   const [loading, setLoading] = useState(true);
   const themeContext = useContext(ThemeContext);
   const isDarkMode = themeContext?.isDarkMode ?? false;
+  const { theme } = useTheme();
 
   useEffect(() => {
     loadUserProfile();
@@ -50,29 +52,29 @@ export default function EditProfileScreen() {
     }
   };
 
+  // Use a direct fallback value for 'surface'
   const colors = isDarkMode
     ? {
-        primary: '#A855F7',
-        primaryDark: '#7C3AED',
-        background: '#111827',
+        primary: theme.colors.primary,
+        background: theme.colors.background,
+        card: theme.colors.card,
+        text: theme.colors.text,
+        border: theme.colors.border,
+        notification: theme.colors.notification,
         surface: '#1F2937',
-        card: '#374151',
-        text: '#F9FAFB',
-        textSecondary: '#D1D5DB',
-        textTertiary: '#9CA3AF',
-        border: '#4B5563',
+        textSecondary: theme.colors.text || '#D1D5DB',
+        textTertiary: theme.colors.text || '#9CA3AF',
         error: '#EF4444',
       }
     : {
-        primary: '#A855F7',
-        primaryDark: '#7C3AED',
-        background: '#FFFFFF',
-        surface: '#F9FAFB',
-        card: '#FFFFFF',
-        text: '#1F2937',
-        textSecondary: '#6B7280',
-        textTertiary: '#9CA3AF',
-        border: '#E5E7EB',
+        primary: theme.colors.primary,
+        background: theme.colors.background,
+        surface: '#0c0b0bff',
+        card: theme.colors.card || '#FFFFFF',
+        text: theme.colors.text || '#1d1d1eff',
+        textSecondary: theme.colors.text || '#0e0e0eff',
+        textTertiary: theme.colors.text || '#000000ff',
+        border: theme.colors.border || '#E5E7EB',
         error: '#EF4444',
       };
 
@@ -108,7 +110,7 @@ export default function EditProfileScreen() {
           value={fullName}
           onChangeText={setFullName}
           placeholder="Enter your full name"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={isDarkMode ? '#161616ff' : colors.textSecondary || '#191919ff'}
         />
 
         <Text style={[styles.label, { color: colors.text, marginTop: 20 }]}>Email</Text>
@@ -117,7 +119,7 @@ export default function EditProfileScreen() {
           value={email}
           onChangeText={setEmail}
           placeholder="Enter your email"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={isDarkMode ? '#000000ff' : colors.textSecondary || '#000000ff'}
           keyboardType="email-address"
           autoCapitalize="none"
         />

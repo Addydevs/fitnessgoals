@@ -1,17 +1,14 @@
-import { ThemeContext } from '@/app/_layout';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, Stack } from 'expo-router';
-import React, { useContext, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
 export default function SettingsScreen() {
   const [user, setUser] = useState({ fullName: 'User', email: 'user@example.com' });
-  const themeContext = useContext(ThemeContext);
-  const isDarkMode = themeContext?.isDarkMode ?? false;
-  const toggleDarkMode = themeContext?.toggleDarkMode ?? (() => {});
+  const { isDarkMode, toggleDarkMode, theme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoSave, setAutoSave] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -52,10 +49,8 @@ export default function SettingsScreen() {
         setAutoSave(autoSaveValue);
         console.log('📸 Set auto save to:', autoSaveValue);
       }
-
-      console.log('✅ All settings loaded successfully');
     } catch (error) {
-      console.log('❌ Error loading settings:', error);
+      console.error('Error loading settings:', error);
     } finally {
       setLoading(false);
     }
@@ -131,17 +126,46 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Remove all user-related data from AsyncStorage
+              await AsyncStorage.multiRemove(['user', 'darkMode', 'notifications', 'autoSave']);
+              // TODO: If you have a backend, call the API to delete the account here
+              // Example: await api.deleteAccount(user.id);
+              Alert.alert('Account Deleted', 'Your account has been deleted.');
+              router.replace('/(auth)');
+            } catch (error) {
+              console.log('❌ Error deleting account:', error);
+              Alert.alert('Error', 'Failed to delete account. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Replace missing theme properties with fallback values
   const colors = isDarkMode
     ? {
-        primary: '#A855F7',
+        primary: theme.colors.primary,
+        background: theme.colors.background,
+        card: theme.colors.card,
+        text: theme.colors.text,
+        border: theme.colors.border,
+        notification: theme.colors.notification,
         primaryDark: '#7C3AED',
-        background: '#111827',
         surface: '#1F2937',
-        card: '#374151',
-        text: '#F9FAFB',
         textSecondary: '#D1D5DB',
         textTertiary: '#9CA3AF',
-        border: '#4B5563',
         error: '#EF4444',
       }
     : {
@@ -197,6 +221,18 @@ export default function SettingsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       {/* User Profile Section - No redundant header, works with existing navigation */}
       <View style={[styles.userSection, { backgroundColor: colors.primary, paddingTop: insets.top + 20 }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right:16,
+            zIndex: 1,
+            padding: 2,
+          }}
+        >
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
         <View style={styles.userContent}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{user?.fullName?.charAt(0)?.toUpperCase() || 'U'}</Text>
@@ -222,6 +258,12 @@ export default function SettingsScreen() {
             title="Change Password"
             subtitle="Update your password"
             onPress={() => router.push('/(settings)/change-password')}
+          />
+          <SettingsItem
+            icon="trash-outline"
+            title="Delete Account"
+            subtitle="Permanently remove your account"
+            onPress={handleDeleteAccount}
           />
           <SettingsItem
             icon="shield-checkmark-outline"
@@ -253,7 +295,8 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
-        {/* App Settings - NO LANGUAGE OPTION */}
+      {/* App Settings - NO LANGUAGE OPTION */}
+  
         <SettingsSection title="APP SETTINGS">
           <SettingsItem
             icon="notifications-outline"
@@ -289,17 +332,39 @@ export default function SettingsScreen() {
             isLast
           />
         </SettingsSection>
-
         {/* Support */}
         <SettingsSection title="SUPPORT">
           <SettingsItem
             icon="help-circle-outline"
             title="Help & Support"
-            subtitle="Get help and contact support"
-            onPress={() => Alert.alert('Help & Support', 'Support coming soon!')}
+            subtitle="Contact us at capturefit1@gmail.com"
+            onPress={() => {
+              Alert.alert(
+                'Contact Support',
+                'For help, email us at capturefit1@gmail.com',
+                [
+                  { text: 'Copy Email', onPress: () => {
+                    // Copy email to clipboard
+                    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                      navigator.clipboard.writeText('capturefit1@gmail.com');
+                      Alert.alert('Copied!', 'Email address copied to clipboard.');
+                    }
+                  }},
+                  { text: 'OK' }
+                ]
+              );
+            }}
           />
-          <SettingsItem icon="document-text-outline" title="Terms of Service" onPress={() => Alert.alert('Terms of Service', 'Terms coming soon!')} />
-          <SettingsItem icon="shield-outline" title="Privacy Policy" onPress={() => Alert.alert('Privacy Policy', 'Privacy policy coming soon!')} />
+          <SettingsItem
+            icon="document-text-outline"
+            title="Terms of Service"
+            onPress={() => Alert.alert('Terms of Service', 'Terms coming soon!')}
+          />
+          <SettingsItem
+            icon="shield-outline"
+            title="Privacy Policy"
+            onPress={() => Alert.alert('Privacy Policy', 'Privacy policy coming soon!')}
+          />
           <SettingsItem
             icon="information-circle-outline"
             title="About"
@@ -308,7 +373,6 @@ export default function SettingsScreen() {
             isLast
           />
         </SettingsSection>
-
         {/* Logout */}
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TouchableOpacity
@@ -322,12 +386,14 @@ export default function SettingsScreen() {
             <Text style={[styles.logoutText, { color: colors.error }]}>Logout</Text>
           </TouchableOpacity>
         </View>
-
         <View style={styles.bottomSpacing} />
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+
+
 
 const styles = StyleSheet.create({
   container: {

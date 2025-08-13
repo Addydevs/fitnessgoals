@@ -1,3 +1,5 @@
+import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
 import { Dimensions, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Photo } from '../app/(tabs)/_layout'; // Assuming Photo interface is exported from _layout.tsx
@@ -10,6 +12,13 @@ interface ProgressScreenProps {
 const { width } = Dimensions.get('window');
 
 export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
+  const { isDarkMode, theme } = useTheme();
+  const palette = isDarkMode ? Colors.dark : Colors.light;
+  const primary = palette.primary;
+  const text = theme.colors.text;
+  const sub = palette.textSecondary;
+  const border = theme.colors.border;
+  const card = theme.colors.card;
   const totalPhotos = photos.length;
   const maxBarHeight = 80; // Max height for the bars
 
@@ -50,6 +59,8 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
   };
 
   const weeklyData = getWeeklyPhotoCounts(photos);
+  const maxVal = Math.max(1, ...weeklyData.map(d => d.value));
+  const photosThisWeek = weeklyData.reduce((acc, d) => acc + d.value, 0);
 
   return (
     <Layout>
@@ -57,20 +68,35 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
 
       <SectionHeader title="Photo Stats" />
       <ModernCard style={styles.statCard}>
-        <Text style={styles.statNumber}>{totalPhotos}</Text>
-        <Text style={styles.statLabel}>Photos Taken</Text>
+        <Text style={[styles.statNumber, { color: primary }]}>{totalPhotos}</Text>
+        <Text style={[styles.statLabel, { color: sub }]}>Photos Taken</Text>
+        <Text style={{ marginTop: 4, color: sub, fontSize: 12 }}>
+          {photosThisWeek} this week
+        </Text>
       </ModernCard>
 
       <SectionHeader title="Weekly Progress" />
       <ModernCard style={styles.chartCard}>
-        <View style={styles.chartContainer}>
-          {weeklyData.map((data, i) => (
-            <View key={i} style={styles.barWrapper}>
-              <View style={[styles.bar, { height: (data.value / Math.max(...weeklyData.map(d => d.value || 1))) * maxBarHeight }]} />
-              <Text style={styles.barLabel}>{data.day}</Text>
-            </View>
-          ))}
-        </View>
+        {maxVal === 1 && photosThisWeek === 0 ? (
+          <Text style={{ textAlign: 'center', color: sub }}>No photos this week yet.</Text>
+        ) : (
+          <View style={styles.chartContainer}>
+            {weeklyData.map((data, i) => (
+              <View key={i} style={styles.barWrapper}>
+                <View
+                  style={{
+                    width: 25,
+                    height: (data.value / maxVal) * maxBarHeight,
+                    backgroundColor: primary,
+                    borderRadius: 8,
+                    marginBottom: 5,
+                  }}
+                />
+                <Text style={[styles.barLabel, { color: sub }]}>{data.day}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </ModernCard>
 
       <SectionHeader title="Recent Photos" />
@@ -78,11 +104,15 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
         {photos.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoScrollContainer}>
             {photos.map((photo, index) => (
-              <Image key={index} source={{ uri: photo.uri }} style={styles.recentPhoto} />
+              <Image
+                key={index}
+                source={{ uri: photo.uri }}
+                style={[styles.recentPhoto, { borderColor: border, borderWidth: 1 }]}
+              />
             ))}
           </ScrollView>
         ) : (
-          <Text style={styles.noPhotosText}>No photos taken yet. Capture your first progress photo!</Text>
+          <Text style={[styles.noPhotosText, { color: sub }]}>No photos taken yet. Capture your first progress photo!</Text>
         )}
       </ModernCard>
     </Layout>
@@ -99,11 +129,11 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 38,
     fontWeight: '800',
-    color: '#6A057F', // A deeper, more vibrant purple
+  color: '#6A057F', // overridden by theme
   },
   statLabel: {
     fontSize: 18,
-    color: '#555',
+  color: '#555', // overridden by theme
     marginTop: 5,
   },
   chartCard: {
@@ -124,13 +154,13 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: 25, // Slightly wider bars
-    backgroundColor: '#4CAF50', // A pleasant green
+  backgroundColor: '#4CAF50', // overridden by theme
     borderRadius: 8,
     marginBottom: 5,
   },
   barLabel: {
     fontSize: 12,
-    color: '#777',
+  color: '#777', // overridden by theme
   },
   recentPhotosCard: {
     marginHorizontal: 20,
@@ -149,7 +179,7 @@ const styles = StyleSheet.create({
   },
   noPhotosText: {
     textAlign: 'center',
-    color: '#888',
+  color: '#888', // overridden by theme
     fontStyle: 'italic',
     paddingVertical: 20,
   },

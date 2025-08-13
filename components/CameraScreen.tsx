@@ -1,3 +1,5 @@
+import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Camera } from "expo-camera";
@@ -7,13 +9,14 @@ import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
-  Text,
-  View,
-  Modal,
-  Pressable,
   Animated,
   Easing,
+  Linking,
+  Modal,
   Platform,
+  Pressable,
+  Text,
+  View,
 } from "react-native";
 
 import Layout, {
@@ -40,6 +43,13 @@ export default function CameraScreen({
   loading,
   setLoading,
 }: CameraScreenProps) {
+  const { isDarkMode, theme } = useTheme();
+  const palette = isDarkMode ? Colors.dark : Colors.light;
+  const primary = palette.primary;
+  const text = theme.colors.text;
+  const textSecondary = palette.textSecondary;
+  const card = theme.colors.card;
+  const border = theme.colors.border;
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [showTips, setShowTips] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
@@ -49,8 +59,41 @@ export default function CameraScreen({
   const countdownAnim = useRef(new Animated.Value(0)).current;
   const intervalRef = useRef<any>(null);
 
+  const requestCameraPermissionWithPrompt = async () => {
+    Alert.alert(
+      'Camera Access Required',
+      'To take progress photos, the app needs access to your camera. Please grant permission.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Allow',
+          onPress: async () => {
+            const { status } = await Camera.requestCameraPermissionsAsync();
+            setCameraPermission(status === 'granted');
+            if (status !== 'granted') {
+              Alert.alert(
+                'Permission Denied',
+                'Camera access is required to take progress photos. You can enable it in your device settings.',
+                [
+                  {
+                    text: 'Open Settings',
+                    onPress: () => Linking.openSettings(),
+                  },
+                  { text: 'OK' },
+                ]
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   useEffect(() => {
-    getCameraPermission();
+    requestCameraPermissionWithPrompt();
     initTipsFlag();
     checkApiKey();
   }, []);
@@ -65,11 +108,6 @@ export default function CameraScreen({
     const seen = await AsyncStorage.getItem(TIPS_SEEN_KEY);
     // Show tips if user hasn't dismissed them yet
     if (!seen) setShowTips(true);
-  };
-
-  const getCameraPermission = async (): Promise<void> => {
-    const { status } = await Camera.requestCameraPermissionsAsync();
-    setCameraPermission(status === "granted");
   };
 
   const openCameraFlow = async () => {
@@ -252,38 +290,50 @@ export default function CameraScreen({
         alignItems: "flex-start",
       }}
     >
-      <Feather name="check-circle" size={18} color="#10B981" style={{ marginTop: 2 }} />
+      <Feather name="check-circle" size={18} color={palette.success} style={{ marginTop: 2 }} />
       <View style={{ flex: 1 }}>
-        <Text style={{ fontWeight: "700", color: "#0F172A" }}>{title}</Text>
-        <Text style={{ color: "#334155", marginTop: 2 }}>{body}</Text>
+        <Text style={{ fontWeight: "700", color: text }}>{title}</Text>
+        <Text style={{ color: textSecondary, marginTop: 2 }}>{body}</Text>
       </View>
     </View>
   );
 
   const TipsModal = () => (
-    <Modal visible={showTips} transparent animationType="fade" onRequestClose={() => setShowTips(false)}>
+  <Modal visible={showTips} transparent animationType="fade" onRequestClose={() => setShowTips(false)}>
       <View
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.35)",
+          backgroundColor: isDarkMode ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.35)",
           justifyContent: "flex-end",
         }}
       >
         <View
           style={{
-            backgroundColor: "#FFFFFF",
-            borderTopLeftRadius: 16,
-            borderTopRightRadius: 16,
-            padding: 18,
-            paddingBottom: Platform.OS === "ios" ? 28 : 18,
+              backgroundColor: card,
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              padding: 18,
+              paddingBottom: Platform.OS === "ios" ? 28 : 18,
           }}
         >
+          {/* Grab handle */}
           <View style={{ alignItems: "center", marginBottom: 8 }}>
-            <Feather name="camera" size={24} color="#0EA5E9" />
-            <Text style={{ marginTop: 8, fontSize: 18, fontWeight: "800", color: "#0F172A" }}>
+            <View
+              style={{
+                width: 42,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: textSecondary,
+                opacity: 0.5,
+              }}
+            />
+          </View>
+          <View style={{ alignItems: "center", marginBottom: 8 }}>
+      <Feather name="camera" size={24} color={primary} />
+      <Text style={{ marginTop: 8, fontSize: 18, fontWeight: "800", color: text }}>
               Nail Consistency Every Time
             </Text>
-            <Text style={{ color: "#475569", marginTop: 4 }}>
+      <Text style={{ color: textSecondary, marginTop: 4 }}>
               Consistent photos = accurate AI comparisons.
             </Text>
           </View>
@@ -324,9 +374,9 @@ export default function CameraScreen({
               <Feather
                 name={dontShowAgain ? "check-square" : "square"}
                 size={18}
-                color={dontShowAgain ? "#0EA5E9" : "#94A3B8"}
+                color={dontShowAgain ? primary : textSecondary}
               />
-              <Text style={{ marginLeft: 8, color: "#475569" }}>Don&apos;t show again</Text>
+              <Text style={{ marginLeft: 8, color: textSecondary }}>Don&apos;t show again</Text>
             </Pressable>
           </View>
 
@@ -338,12 +388,14 @@ export default function CameraScreen({
                 paddingVertical: 12,
                 borderRadius: 12,
                 borderWidth: 1,
-                borderColor: "#E2E8F0",
+                borderColor: border,
                 alignItems: "center",
                 opacity: pressed ? 0.8 : 1,
               })}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel tips"
             >
-              <Text style={{ color: "#0F172A", fontWeight: "600" }}>Cancel</Text>
+              <Text style={{ color: text, fontWeight: "600" }}>Cancel</Text>
             </Pressable>
 
             <Pressable
@@ -356,14 +408,17 @@ export default function CameraScreen({
                 flex: 1,
                 paddingVertical: 12,
                 borderRadius: 12,
-                backgroundColor: "#0EA5E9",
+                backgroundColor: primary,
                 alignItems: "center",
                 opacity: pressed ? 0.8 : 1,
-                shadowColor: "#0EA5E9",
-                shadowOpacity: 0.25,
-                shadowRadius: 8,
-                shadowOffset: { width: 0, height: 4 },
+                // Light mode shadow for emphasis
+                shadowColor: isDarkMode ? "transparent" : primary,
+                shadowOpacity: isDarkMode ? 0 : 0.25,
+                shadowRadius: isDarkMode ? 0 : 8,
+                shadowOffset: { width: 0, height: isDarkMode ? 0 : 4 },
               })}
+              accessibilityRole="button"
+              accessibilityLabel="Open camera"
             >
               <Text style={{ color: "white", fontWeight: "700" }}>Open Camera</Text>
             </Pressable>
@@ -429,8 +484,39 @@ export default function CameraScreen({
     );
   }
 
+  // Camera permission notification UI
+  const CameraPermissionBanner = () =>
+    cameraPermission === false ? (
+      <View style={{
+        backgroundColor: '#F87171',
+        padding: 16,
+        borderRadius: 12,
+        margin: 16,
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 12,
+      }}>
+        <Feather name="alert-triangle" size={24} color="#fff" />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+            Camera access is required
+          </Text>
+          <Text style={{ color: '#fff', marginTop: 4 }}>
+            Please enable camera permission in your device settings to take progress photos.
+          </Text>
+        </View>
+        <Pressable
+          style={{ backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}
+          onPress={() => Linking.openSettings()}
+        >
+          <Text style={{ color: '#F87171', fontWeight: 'bold' }}>Open Settings</Text>
+        </Pressable>
+      </View>
+    ) : null;
+
   return (
     <Layout>
+      <CameraPermissionBanner />
       <ModernHeader title="Progress" subtitle="Your fitness journey" />
       <View
         style={{
@@ -446,11 +532,22 @@ export default function CameraScreen({
           padding={30}
           style={{ alignItems: "center", justifyContent: "center" }}
         >
-          <Feather name="camera" size={32} color="#0EA5E9" />
-          <Text style={{ marginTop: 12, fontSize: 16, fontWeight: "700", color: "#0EA5E9" }}>
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: palette.surface,
+            }}
+          >
+            <Feather name="camera" size={28} color={primary} />
+          </View>
+          <Text style={{ marginTop: 12, fontSize: 16, fontWeight: "700", color: primary }}>
             Take Photo
           </Text>
-          <Text style={{ marginTop: 6, fontSize: 12, color: "#64748B", textAlign: "center" }}>
+          <Text style={{ marginTop: 6, fontSize: 12, color: textSecondary, textAlign: "center" }}>
             Same pose • Same distance • Same lighting
           </Text>
         </ModernCard>
@@ -460,8 +557,19 @@ export default function CameraScreen({
           padding={18}
           style={{ alignItems: "center", justifyContent: "center" }}
         >
-          <Feather name="image" size={22} color="#64748B" />
-          <Text style={{ marginTop: 8, fontSize: 14, fontWeight: "600", color: "#334155" }}>
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: palette.surface,
+            }}
+          >
+            <Feather name="image" size={20} color={textSecondary} />
+          </View>
+          <Text style={{ marginTop: 8, fontSize: 14, fontWeight: "600", color: text }}>
             Import from Library
           </Text>
         </ModernCard>
