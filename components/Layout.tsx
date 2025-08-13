@@ -1,3 +1,4 @@
+import { useTheme } from "@/contexts/ThemeContext";
 import React from "react";
 import {
   ActivityIndicator,
@@ -12,10 +13,10 @@ import {
 
 export default function Layout({
   children,
-  backgroundColor = "#FAFAFA",
-  statusBarStyle = "dark-content",
-  statusBarBackgroundColor = "white",
-  safeAreaBackground = "white",
+  backgroundColor,
+  statusBarStyle,
+  statusBarBackgroundColor,
+  safeAreaBackground,
   padding = 0,
   paddingHorizontal = 0,
   paddingVertical = 0,
@@ -29,21 +30,28 @@ export default function Layout({
   paddingHorizontal?: number;
   paddingVertical?: number;
 }) {
+  const { isDarkMode, theme } = useTheme();
+  const themeBg = backgroundColor || theme.colors.background;
+  const themeSafeArea = safeAreaBackground || theme.colors.background;
+  const barStyle = statusBarStyle || (isDarkMode ? "light-content" : "dark-content");
   return (
     <>
       <StatusBar
-        barStyle={statusBarStyle}
-        backgroundColor={statusBarBackgroundColor}
+        barStyle={barStyle}
+        backgroundColor={statusBarBackgroundColor || themeSafeArea}
         translucent={false}
       />
       <SafeAreaView
-        style={[styles.safeArea, { backgroundColor: safeAreaBackground }]}
+        style={[
+          styles.safeArea,
+          { backgroundColor: themeSafeArea },
+        ]}
       >
         <View
           style={[
             styles.container,
             {
-              backgroundColor,
+              backgroundColor: themeBg,
               padding,
               paddingHorizontal,
               paddingVertical,
@@ -65,7 +73,7 @@ export const ModernHeader = ({
   rightIcon,
   onLeftPress,
   onRightPress,
-  backgroundColor = "white",
+  backgroundColor,
   showBorder = true,
 }: {
   title: string;
@@ -77,19 +85,23 @@ export const ModernHeader = ({
   backgroundColor?: string;
   showBorder?: boolean;
 }) => {
+  const { theme } = useTheme();
+  const bg = backgroundColor || theme.colors.background;
+  const borderColor = theme.colors.border;
+  const textColor = theme.colors.text;
   return (
     <View
       style={[
         styles.modernHeader,
-        { backgroundColor },
-        showBorder && styles.modernHeaderBorder,
+        { backgroundColor: bg },
+        showBorder && { borderBottomWidth: 1, borderBottomColor: borderColor },
       ]}
     >
       <View style={styles.headerContent}>
         {/* Left Icon/Button */}
         {leftIcon && (
           <TouchableOpacity
-            style={styles.headerButton}
+            style={[styles.headerButton, { backgroundColor: theme.colors.card }]}
             onPress={onLeftPress}
             activeOpacity={0.7}
           >
@@ -99,14 +111,16 @@ export const ModernHeader = ({
 
         {/* Title Section */}
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>{title}</Text>
-          {subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
+          <Text style={[styles.headerTitle, { color: textColor }]}>{title}</Text>
+          {subtitle && (
+            <Text style={[styles.headerSubtitle, { color: textColor }]}>{subtitle}</Text>
+          )}
         </View>
 
         {/* Right Icon/Button */}
         {rightIcon && (
           <TouchableOpacity
-            style={styles.headerButton}
+            style={[styles.headerButton, { backgroundColor: theme.colors.card }]}
             onPress={onRightPress}
             activeOpacity={0.7}
           >
@@ -126,7 +140,7 @@ export const ModernCard = ({
   margin = 0,
   marginHorizontal = 0,
   marginVertical = 0,
-  backgroundColor = "white",
+  backgroundColor,
   borderRadius = 15,
   elevation = 3,
   onPress,
@@ -142,6 +156,8 @@ export const ModernCard = ({
   elevation?: number;
   onPress?: () => void;
 }) => {
+  const { theme } = useTheme();
+  const bg = backgroundColor || theme.colors.card;
   const cardStyle = [
     styles.modernCard,
     {
@@ -149,9 +165,8 @@ export const ModernCard = ({
       margin,
       marginHorizontal,
       marginVertical,
-      backgroundColor,
+      backgroundColor: bg,
       borderRadius,
-      boxShadow: "0px 2px 10px rgba(0,0,0,0.05)",
       elevation,
     },
     style,
@@ -186,11 +201,14 @@ export const SectionHeader = ({
   marginBottom?: number;
   marginTop?: number;
 }) => {
+  const { theme } = useTheme();
   return (
     <View style={[styles.sectionHeader, { marginBottom, marginTop }]}>
       <View style={styles.sectionTitleContainer}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{title}</Text>
+        {subtitle && (
+          <Text style={[styles.sectionSubtitle, { color: theme.colors.text }]}>{subtitle}</Text>
+        )}
       </View>
       {rightElement && (
         <View style={styles.sectionRightElement}>{rightElement}</View>
@@ -203,19 +221,21 @@ export const SectionHeader = ({
 export const ModernLoading = ({
   title = "Loading...",
   subtitle = "Please wait",
-  color = "#8B5FBF",
+  color,
   overlay = true,
-}) => {
+}: { title?: string; subtitle?: string; color?: string; overlay?: boolean }) => {
+  const { theme } = useTheme();
+  const spinner = color || theme.colors.notification;
   const containerStyle = overlay
     ? styles.loadingOverlay
     : styles.loadingContainer;
 
   return (
     <View style={containerStyle}>
-      <View style={styles.loadingCard}>
-        <ActivityIndicator size="large" color={color} />
-        <Text style={styles.loadingTitle}>{title}</Text>
-        <Text style={styles.loadingSubtext}>{subtitle}</Text>
+      <View style={[styles.loadingCard, { backgroundColor: theme.colors.card }]}>
+        <ActivityIndicator size="large" color={spinner} />
+        <Text style={[styles.loadingTitle, { color: theme.colors.text }]}>{title}</Text>
+        <Text style={[styles.loadingSubtext, { color: theme.colors.text }]}>{subtitle}</Text>
       </View>
     </View>
   );
@@ -228,6 +248,8 @@ export const EmptyState = ({
   subtitle,
   buttonText,
   onButtonPress,
+  secondaryButtonText,
+  onSecondaryButtonPress,
   iconSize = 60,
 }: {
   icon?: React.ReactNode;
@@ -235,23 +257,42 @@ export const EmptyState = ({
   subtitle: string;
   buttonText?: string;
   onButtonPress?: () => void;
+  secondaryButtonText?: string;
+  onSecondaryButtonPress?: () => void;
   iconSize?: number;
 }) => {
+  const { theme } = useTheme();
   return (
     <View style={styles.emptyStateContainer}>
-      <View style={styles.emptyStateCard}>
+      <View style={[styles.emptyStateCard, { backgroundColor: theme.colors.card }]}>
         <Text style={[styles.emptyStateIcon, { fontSize: iconSize }]}>
           {icon}
         </Text>
-        <Text style={styles.emptyStateTitle}>{title}</Text>
-        <Text style={styles.emptyStateSubtitle}>{subtitle}</Text>
+        <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>{title}</Text>
+        <Text style={[styles.emptyStateSubtitle, { color: theme.colors.text }]}>{subtitle}</Text>
         {buttonText && onButtonPress && (
           <TouchableOpacity
-            style={styles.emptyStateButton}
+            style={[styles.emptyStateButton, { backgroundColor: theme.colors.notification }]}
             onPress={onButtonPress}
             activeOpacity={0.8}
           >
-            <Text style={styles.emptyStateButtonText}>{buttonText}</Text>
+            <Text style={[styles.emptyStateButtonText, { color: 'white' }]}>{buttonText}</Text>
+          </TouchableOpacity>
+        )}
+        {secondaryButtonText && onSecondaryButtonPress && (
+          <TouchableOpacity
+            style={[styles.emptyStateButton, styles.emptyStateSecondaryButton, { borderColor: theme.colors.border }]}
+            onPress={onSecondaryButtonPress}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.emptyStateButtonText,
+                styles.emptyStateSecondaryButtonText,
+              ]}
+            >
+              {secondaryButtonText}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -274,8 +315,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   modernHeaderBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+  borderBottomWidth: 1,
+  borderBottomColor: "#F0F0F0",
   },
   headerContent: {
     flexDirection: "row",
@@ -286,7 +327,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F5F5F5",
+  backgroundColor: "#F5F5F5",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -298,12 +339,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#000",
+  color: "#000",
     textAlign: "center",
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#666",
+  color: "#666",
     textAlign: "center",
     marginTop: 2,
   },
@@ -355,7 +396,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingCard: {
-    backgroundColor: "white",
+  backgroundColor: "white",
     borderRadius: 20,
     padding: 30,
     alignItems: "center",
@@ -366,13 +407,13 @@ const styles = StyleSheet.create({
   loadingTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#000",
+  color: "#000",
     marginTop: 16,
     marginBottom: 8,
   },
   loadingSubtext: {
     fontSize: 14,
-    color: "#666",
+  color: "#666",
     textAlign: "center",
   },
 
@@ -384,7 +425,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyStateCard: {
-    backgroundColor: "white",
+  backgroundColor: "white",
     borderRadius: 20,
     padding: 40,
     alignItems: "center",
@@ -399,19 +440,19 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#000",
+  color: "#000",
     textAlign: "center",
     marginBottom: 8,
   },
   emptyStateSubtitle: {
     fontSize: 16,
-    color: "#666",
+  color: "#666",
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 24,
   },
   emptyStateButton: {
-    backgroundColor: "#8B5FBF",
+  backgroundColor: "#8B5FBF",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 25,
@@ -419,8 +460,19 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   emptyStateButtonText: {
-    color: "white",
+  color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+  emptyStateSecondaryButton: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+  borderColor: "#E2E8F0",
+    marginTop: 12,
+    boxShadow: "none",
+    elevation: 0,
+  },
+  emptyStateSecondaryButtonText: {
+  color: "#0F172A",
   },
 });
