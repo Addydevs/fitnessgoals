@@ -1,10 +1,10 @@
 import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system";
 import { Tabs } from "expo-router";
 import React, { createContext, useEffect, useState } from "react";
-import { useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export type RootStackParamList = {
@@ -41,7 +41,11 @@ export default function TabLayout() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
+  const { isDarkMode, theme } = useTheme();
+  const themeColors = isDarkMode ? Colors.dark : Colors.light;
+  const bg = theme.colors.background;
+  const activeTint = isDarkMode ? theme.colors.text : themeColors.tabIconSelected;
+  const inactiveTint = isDarkMode ? Colors.dark.icon : Colors.light.tabIconDefault;
 
   useEffect(() => {
     loadPhotos();
@@ -52,7 +56,7 @@ export default function TabLayout() {
       const savedPhotos = await AsyncStorage.getItem("progressPhotos");
       if (savedPhotos) {
         const parsedPhotos = JSON.parse(savedPhotos);
-        const validPhotos = [];
+        const validPhotos: Photo[] = [];
         for (const photo of parsedPhotos) {
           try {
             const fileInfo = await FileSystem.getInfoAsync(photo.uri);
@@ -83,12 +87,13 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarShowLabel: false,
-          tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
-          tabBarInactiveTintColor: "#9AA1B9",
+          tabBarActiveTintColor: activeTint,
+          tabBarInactiveTintColor: inactiveTint,
           tabBarStyle: {
-            backgroundColor: Colors[colorScheme ?? "light"].background,
+            backgroundColor: bg,
             borderTopWidth: 0,
-            elevation: 5,
+            elevation: isDarkMode ? 0 : 5,
+            shadowColor: isDarkMode ? "transparent" : undefined,
             height: 60 + insets.bottom,
             paddingBottom: insets.bottom,
           },
@@ -139,15 +144,7 @@ export default function TabLayout() {
             ),
           }}
         />
-        <Tabs.Screen
-          name="settings"
-          options={{
-            title: "Settings",
-            tabBarIcon: ({ color, size }) => (
-              <Feather name="settings" size={size} color={color} />
-            ),
-          }}
-        />
+  {/* Settings tab removed. Now accessible from Profile tab only. */}
       </Tabs>
     </PhotoContext.Provider>
   );

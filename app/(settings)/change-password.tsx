@@ -1,4 +1,5 @@
 import { ThemeContext } from '@/app/_layout';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
 import React, { useContext, useState } from 'react';
@@ -10,6 +11,7 @@ export default function ChangePasswordScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const themeContext = useContext(ThemeContext);
+  const { theme } = useTheme();
   const isDarkMode = themeContext?.isDarkMode ?? false;
 
   const handleChangePassword = async () => {
@@ -37,29 +39,28 @@ export default function ChangePasswordScreen() {
     }
   };
 
+  // Update dark mode colors to match HomeScreen
   const colors = isDarkMode
     ? {
-        primary: '#A855F7',
-        primaryDark: '#7C3AED',
-        background: '#111827',
-        surface: '#1F2937',
-        card: '#374151',
-        text: '#F9FAFB',
-        textSecondary: '#D1D5DB',
-        textTertiary: '#9CA3AF',
-        border: '#4B5563',
+        primary: theme.colors.primary,
+        background: theme.colors.background,
+        surface: theme.colors.card || '#000000ff',
+        card: theme.colors.card,
+        text: theme.colors.text,
+        textSecondary: theme.colors.text || '#000000ff',
+        textTertiary: theme.colors.text || '#010101ff',
+        border: theme.colors.border,
         error: '#EF4444',
       }
     : {
-        primary: '#A855F7',
-        primaryDark: '#7C3AED',
-        background: '#FFFFFF',
-        surface: '#F9FAFB',
-        card: '#FFFFFF',
-        text: '#1F2937',
-        textSecondary: '#6B7280',
-        textTertiary: '#9CA3AF',
-        border: '#E5E7EB',
+        primary: theme.colors.primary,
+        background: theme.colors.background,
+        surface: '#010101ff',
+        card: theme.colors.card || '#000000ff',
+        text: theme.colors.text || '#1F2937',
+        textSecondary: theme.colors.text || '#6B7280',
+        textTertiary: theme.colors.text || '#9CA3AF',
+        border: theme.colors.border || '#E5E7EB',
         error: '#EF4444',
       };
 

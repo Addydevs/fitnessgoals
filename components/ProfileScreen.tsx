@@ -1,12 +1,16 @@
+import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -15,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Layout from './Layout';
 
 const screenWidth = Dimensions.get('window').width;
@@ -47,6 +52,14 @@ interface UserProfile {
 }
 
 const CaptureFitProfile = () => {
+  const { isDarkMode, theme } = useTheme();
+  const palette = isDarkMode ? Colors.dark : Colors.light;
+  const primary = palette.primary;
+  const text = theme.colors.text;
+  const sub = palette.textSecondary;
+  const card = theme.colors.card;
+  const border = theme.colors.border;
+  const surface = palette.surface;
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [userData, setUserData] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<Stats>({
@@ -146,6 +159,49 @@ const CaptureFitProfile = () => {
     }
   };
 
+  const handleAvatarPress = async () => {
+    // Request permission to access the camera roll
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permissionResult.granted) {
+      // Launch the image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        // Image selection was not canceled
+        const selectedImage = result.assets[0].uri;
+
+        // Update the user data with the new avatar
+        // Ensure joinDate is always a string
+        // Ensure totalPhotos is always a number
+        // Ensure weekStreak is always a number
+        // Ensure daysTracked is always a number
+        // Ensure recentPhotos is always an array
+        const updatedUserData: UserProfile = {
+          ...userData,
+          avatar: selectedImage,
+          name: userData?.name || 'User',
+          joinDate: userData?.joinDate || new Date().toISOString(),
+          totalPhotos: userData?.totalPhotos || 0,
+          weekStreak: userData?.weekStreak || 0,
+          daysTracked: userData?.daysTracked || 0,
+          recentPhotos: userData?.recentPhotos || [],
+        };
+        setUserData(updatedUserData);
+
+        // Save the new avatar to AsyncStorage
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUserData));
+      }
+    } else {
+      // Permission to access camera roll was denied
+      console.log('Camera roll permission denied');
+    }
+  };
+
   const fieldLabels: Record<keyof Stats, string> = {
     startWeight: 'Start Weight (lbs)',
     goalWeight: 'Goal Weight (lbs)',
@@ -202,46 +258,69 @@ const CaptureFitProfile = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={styles.loadingText}>Loading profile...</Text>
+  <ActivityIndicator size="large" color={primary} />
+  <Text style={[styles.loadingText, { color: sub }]}>Loading profile...</Text>
       </View>
     );
   }
 
   return (
     <Layout>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <SafeAreaView>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Feather name="arrow-left" size={20} color="#6B7280" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
+          
+          <Text style={[styles.headerTitle, { color: text }]}>Profile</Text>
           <TouchableOpacity
-            style={styles.headerButton}
+            style={[
+              styles.headerButton,
+              {
+                backgroundColor: card,
+                borderColor: border,
+                borderWidth: 1,
+                shadowColor: isDarkMode ? 'transparent' : '#000',
+                shadowOpacity: isDarkMode ? 0 : 0.05,
+              },
+            ]}
             onPress={() => {
               console.log('⚙️ Gear icon pressed - navigating to settings');
               router.push('/settings');
             }}
           >
-            <Ionicons name="settings" size={20} color="#6B7280" />
+            <Ionicons name="settings" size={20} color={sub} />
           </TouchableOpacity>
         </View>
+      </SafeAreaView>
+      <ScrollView showsVerticalScrollIndicator={false}>
 
-        <View style={styles.profileCard}>
+        <View style={[
+          styles.profileCard,
+          {
+            backgroundColor: card,
+            borderColor: border,
+            shadowColor: isDarkMode ? 'transparent' : '#000',
+            shadowOpacity: isDarkMode ? 0 : 0.05,
+          },
+        ]}>
           <View style={styles.profileRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarInitial}>
-                {userData?.name?.charAt(0) || 'U'}
-              </Text>
-            </View>
+            <TouchableOpacity onPress={handleAvatarPress} style={styles.avatarContainer}>
+              {userData?.avatar ? (
+                <Image source={{ uri: userData.avatar }} style={styles.avatarImage} />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: primary }]}>
+                  <Text style={styles.avatarInitial}>
+                    {userData?.name?.charAt(0) || 'U'}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
             <View style={styles.profileInfo}>
               <View style={styles.nameRow}>
-                <Text style={styles.name}>{userData?.name || 'User'}</Text>
-                <TouchableOpacity>
-                  <Feather name="edit-3" size={16} color="#9CA3AF" />
+                <Text style={[styles.name, { color: text }]}>{userData?.name || 'User'}</Text>
+                <TouchableOpacity onPress={handleAvatarPress}>
+                  <Feather name="edit-3" size={16} color={sub} />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.joined}>
+              <Text style={[styles.joined, { color: sub }]}>
                 Joined {formatDate(userData?.joinDate || new Date().toISOString())}
               </Text>
             </View>
@@ -282,42 +361,50 @@ const CaptureFitProfile = () => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Photos</Text>
+            <Text style={[styles.sectionTitle, { color: text }]}>Recent Photos</Text>
             <TouchableOpacity>
-              <Text style={styles.sectionAction}>View All</Text>
+              <Text style={[styles.sectionAction, { color: primary }]}>View All</Text>
             </TouchableOpacity>
           </View>
           {userData && userData.recentPhotos && userData.recentPhotos.length > 0 ? (
             userData.recentPhotos.slice(0, 3).map((photo) => (
-              <View key={photo.id} style={styles.photoCard}>
+              <View key={photo.id} style={[
+                styles.photoCard,
+                {
+                  backgroundColor: card,
+                  borderColor: border,
+                  shadowColor: isDarkMode ? 'transparent' : '#000',
+                  shadowOpacity: isDarkMode ? 0 : 0.05,
+                },
+              ]}>
                 <View style={styles.photoHeader}>
                   <View>
-                    <Text style={styles.photoWeek}>{photo.week}</Text>
-                    <Text style={styles.photoDate}>{formatDate(photo.date)}</Text>
+                    <Text style={[styles.photoWeek, { color: text }]}>{photo.week}</Text>
+                    <Text style={[styles.photoDate, { color: sub }]}>{formatDate(photo.date)}</Text>
                   </View>
                   <View style={styles.photoActions}>
-                    <TouchableOpacity style={styles.iconCircle}>
-                      <Feather name="eye" size={16} color="#4B5563" />
+                    <TouchableOpacity style={[styles.iconCircle, { backgroundColor: surface }]}>
+                      <Feather name="eye" size={16} color={sub} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconCircle}>
-                      <Feather name="share-2" size={16} color="#4B5563" />
+                    <TouchableOpacity style={[styles.iconCircle, { backgroundColor: surface }]}>
+                      <Feather name="share-2" size={16} color={sub} />
                     </TouchableOpacity>
                   </View>
                 </View>
-                <View style={styles.photoPlaceholder}>
-                  <Feather name="camera" size={32} color="#9CA3AF" />
-                  <Text style={styles.photoPlaceholderText}>Progress Photo</Text>
+                <View style={[styles.photoPlaceholder, { backgroundColor: surface }]}>
+                  <Feather name="camera" size={32} color={sub} />
+                  <Text style={[styles.photoPlaceholderText, { color: sub }]}>Progress Photo</Text>
                 </View>
               </View>
             ))
           ) : (
-            <View style={styles.emptyState}>
-              <Feather name="camera" size={48} color="#D1D5DB" />
-              <Text style={styles.emptyTitle}>No photos yet</Text>
-              <Text style={styles.emptyText}>
+            <View style={[styles.emptyState, { backgroundColor: card, borderColor: border, shadowColor: isDarkMode ? 'transparent' : '#000', shadowOpacity: isDarkMode ? 0 : 0.05 }]}>
+              <Feather name="camera" size={48} color={sub} />
+              <Text style={[styles.emptyTitle, { color: text }]}>No photos yet</Text>
+              <Text style={[styles.emptyText, { color: sub }]}>
                 Start your progress journey by taking your first photo
               </Text>
-              <TouchableOpacity style={styles.primaryButton}>
+              <TouchableOpacity style={[styles.primaryButton, { backgroundColor: primary }]}>
                 <Text style={styles.primaryButtonText}>Take First Photo</Text>
               </TouchableOpacity>
             </View>
@@ -325,7 +412,7 @@ const CaptureFitProfile = () => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { color: text }]}>Quick Actions</Text>
           <View style={styles.actionsRow}>
             <TouchableOpacity style={[styles.actionCard, styles.cameraAction]}>
               <Feather name="camera" size={24} color="white" />
@@ -344,20 +431,20 @@ const CaptureFitProfile = () => {
       </ScrollView>
       <Modal transparent visible={!!editField} animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editField ? fieldLabels[editField] : ''}</Text>
+          <View style={[styles.modalContent, { backgroundColor: card }]}>
+            <Text style={[styles.modalTitle, { color: text }]}>{editField ? fieldLabels[editField] : ''}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: border, color: text }]}
               keyboardType="numeric"
               value={tempValue}
               onChangeText={setTempValue}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalButton} onPress={() => setEditField(null)}>
-                <Text style={styles.modalButtonText}>Cancel</Text>
+                <Text style={[styles.modalButtonText, { color: sub }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalButton} onPress={saveStat}>
-                <Text style={styles.modalButtonText}>Save</Text>
+                <Text style={[styles.modalButtonText, { color: primary }]}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -420,13 +507,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  avatar: {
+  avatarContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
+    overflow: 'hidden',
+    marginRight: 16,
+  },
+  avatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
     backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
   },
   avatarInitial: {
     color: '#fff',
@@ -435,7 +534,6 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
-    marginLeft: 16,
   },
   nameRow: {
     flexDirection: 'row',
