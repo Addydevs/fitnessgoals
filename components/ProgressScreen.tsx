@@ -1,7 +1,9 @@
+import { AuthContext } from '@/app/_layout';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/contexts/ThemeContext';
-import React from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useContext } from 'react';
+import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Photo } from '../app/(tabs)/_layout'; // Assuming Photo interface is exported from _layout.tsx
 import Layout, { ModernCard, ModernHeader, SectionHeader } from './Layout';
 
@@ -12,50 +14,78 @@ interface ProgressScreenProps {
 const { width } = Dimensions.get('window');
 
 export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
+  // (Removed duplicate declarations)
   const { isDarkMode, theme } = useTheme();
   const palette = isDarkMode ? Colors.dark : Colors.light;
   const primary = palette.primary;
-  const text = theme.colors.text;
   const sub = palette.textSecondary;
   const border = theme.colors.border;
-  const card = theme.colors.card;
   const totalPhotos = photos.length;
   const maxBarHeight = 80; // Max height for the bars
+  const auth = useContext(AuthContext);
+  const resetProgress = auth?.resetProgress;
+  const [localPhotos, setLocalPhotos] = React.useState<Photo[]>(photos);
 
+  // Calculate current streak (consecutive days with photos)
+  const getCurrentStreak = (photoList: Photo[]): number => {
+    if (photoList.length === 0) return 0;
+    let streak = 0;
+    const today = new Date();
+    for (let i = 0; i < 365; i++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(today.getDate() - i);
+      const hasPhotoOnDate = photoList.some((photo) => {
+        const photoDate = new Date(photo.timestamp);
+        return photoDate.toDateString() === checkDate.toDateString();
+      });
+      if (hasPhotoOnDate) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  };
+
+  // Calculate days tracked (unique days with photos)
+  const getDaysTracked = (photoList: Photo[]): number => {
+    const uniqueDays = new Set<string>();
+    photoList.forEach((photo) => {
+      const photoDate = new Date(photo.timestamp).toDateString();
+      uniqueDays.add(photoDate);
+    });
+    return uniqueDays.size;
+  };
+
+  const currentStreak = getCurrentStreak(localPhotos);
+  const daysTracked = getDaysTracked(localPhotos);
+
+  // Sync localPhotos with prop changes
+  React.useEffect(() => {
+    setLocalPhotos(photos);
+  }, [photos]);
+
+  // Show last 7 days (rolling window)
   const getWeeklyPhotoCounts = (photoList: Photo[]) => {
     const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    // Initialize counts for the last 7 days
-    const weeklyCounts: { [key: number]: number } = {}; // Use timestamp as key
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - dayOfWeek); // Set to Sunday of the current week
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(startOfWeek);
-      date.setDate(startOfWeek.getDate() + i);
-      weeklyCounts[date.getTime()] = 0; // Use timestamp as key
+    today.setHours(0, 0, 0, 0);
+    const days = [];
+    const counts: { day: string; value: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      days.push(date);
     }
-
-    photoList.forEach(photo => {
-      const photoDate = new Date(photo.timestamp);
-      photoDate.setHours(0, 0, 0, 0); // Normalize photoDate to start of day
-      if (weeklyCounts.hasOwnProperty(photoDate.getTime())) {
-        weeklyCounts[photoDate.getTime()]++;
-      }
+    days.forEach(date => {
+      const dayName = date.toLocaleDateString(undefined, { weekday: 'short' });
+      const count = photoList.filter(photo => {
+        const photoDate = new Date(photo.timestamp);
+        photoDate.setHours(0, 0, 0, 0);
+        return photoDate.getTime() === date.getTime();
+      }).length;
+      counts.push({ day: dayName, value: count });
     });
-
-    // Map to the desired format, ensuring correct order
-    return days.map((dayName, index) => {
-      const date = new Date(startOfWeek);
-      date.setDate(startOfWeek.getDate() + index);
-      return {
-        day: dayName,
-        value: weeklyCounts[date.getTime()] || 0,
-      };
-    });
+    return counts;
   };
 
   const weeklyData = getWeeklyPhotoCounts(photos);
@@ -64,57 +94,85 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
 
   return (
     <Layout>
-      <ModernHeader title="Your Progress" subtitle="Analytics & Insights" />
-
-      <SectionHeader title="Photo Stats" />
-      <ModernCard style={styles.statCard}>
-        <Text style={[styles.statNumber, { color: primary }]}>{totalPhotos}</Text>
-        <Text style={[styles.statLabel, { color: sub }]}>Photos Taken</Text>
-        <Text style={{ marginTop: 4, color: sub, fontSize: 12 }}>
-          {photosThisWeek} this week
-        </Text>
-      </ModernCard>
-
-      <SectionHeader title="Weekly Progress" />
-      <ModernCard style={styles.chartCard}>
-        {maxVal === 1 && photosThisWeek === 0 ? (
-          <Text style={{ textAlign: 'center', color: sub }}>No photos this week yet.</Text>
-        ) : (
-          <View style={styles.chartContainer}>
-            {weeklyData.map((data, i) => (
-              <View key={i} style={styles.barWrapper}>
-                <View
-                  style={{
-                    width: 25,
-                    height: (data.value / maxVal) * maxBarHeight,
-                    backgroundColor: primary,
-                    borderRadius: 8,
-                    marginBottom: 5,
-                  }}
-                />
-                <Text style={[styles.barLabel, { color: sub }]}>{data.day}</Text>
-              </View>
-            ))}
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <ModernHeader title="Your Progress" subtitle="Analytics & Insights" />
+        <SectionHeader title="Actions" />
+        <ModernCard style={{ marginHorizontal: 20, marginBottom: 20 }}>
+          <TouchableOpacity
+            style={{ backgroundColor: palette.primary, padding: 12, borderRadius: 12, alignItems: 'center' }}
+            onPress={async () => {
+              if (resetProgress) {
+                await resetProgress();
+                // Reload photos from AsyncStorage
+                const updated = JSON.parse(await AsyncStorage.getItem('progressPhotos') || '[]');
+                setLocalPhotos(updated);
+                Alert.alert('Progress Reset', 'All progress photos have been cleared.');
+              } else {
+                Alert.alert('Error', 'Reset progress function not available.');
+              }
+            }}
+          >
+            <Text style={{ color: 'white', fontWeight: '600' }}>Reset Progress</Text>
+          </TouchableOpacity>
+        </ModernCard>
+        <SectionHeader title="Photo Stats" />
+        <ModernCard style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: primary }]}>{totalPhotos}</Text>
+          <Text style={[styles.statLabel, { color: sub }]}>Photos Taken</Text>
+          <Text style={{ marginTop: 4, color: sub, fontSize: 12 }}>
+            {photosThisWeek} this week
+          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: primary }}>{currentStreak}</Text>
+              <Text style={{ fontSize: 12, color: sub }}>Current Streak</Text>
+            </View>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: primary }}>{daysTracked}</Text>
+              <Text style={{ fontSize: 12, color: sub }}>Days Tracked</Text>
+            </View>
           </View>
-        )}
-      </ModernCard>
-
-      <SectionHeader title="Recent Photos" />
-      <ModernCard style={styles.recentPhotosCard}>
-        {photos.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoScrollContainer}>
-            {photos.map((photo, index) => (
-              <Image
-                key={index}
-                source={{ uri: photo.uri }}
-                style={[styles.recentPhoto, { borderColor: border, borderWidth: 1 }]}
-              />
-            ))}
-          </ScrollView>
-        ) : (
-          <Text style={[styles.noPhotosText, { color: sub }]}>No photos taken yet. Capture your first progress photo!</Text>
-        )}
-      </ModernCard>
+        </ModernCard>
+        <SectionHeader title="Weekly Progress" />
+        <ModernCard style={styles.chartCard}>
+          {maxVal === 1 && photosThisWeek === 0 ? (
+            <Text style={{ textAlign: 'center', color: sub }}>No photos this week yet.</Text>
+          ) : (
+            <View style={styles.chartContainer}>
+              {weeklyData.map((data, i) => (
+                <View key={i} style={styles.barWrapper}>
+                  <View
+                    style={{
+                      width: 25,
+                      height: (data.value / maxVal) * maxBarHeight,
+                      backgroundColor: primary,
+                      borderRadius: 8,
+                      marginBottom: 5,
+                    }}
+                  />
+                  <Text style={[styles.barLabel, { color: sub }]}>{data.day}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </ModernCard>
+        <SectionHeader title="Recent Photos" />
+        <ModernCard style={styles.recentPhotosCard}>
+          {localPhotos.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoScrollContainer}>
+              {localPhotos.map((photo, index) => (
+                <Image
+                  key={index}
+                  source={{ uri: photo.uri }}
+                  style={[styles.recentPhoto, { borderColor: border, borderWidth: 1 }]}
+                />
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={[styles.noPhotosText, { color: sub }]}>No photos taken yet. Capture your first progress photo!</Text>
+          )}
+        </ModernCard>
+      </ScrollView>
     </Layout>
   );
 }

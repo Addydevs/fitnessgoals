@@ -6,6 +6,8 @@ import { Stack, router } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { apiRequest } from '../../utils/api';
+import { emitUserChange } from '../../utils/userEvents';
 
 export default function EditProfileScreen() {
   const [fullName, setFullName] = useState('');
@@ -40,15 +42,26 @@ export default function EditProfileScreen() {
       Alert.alert('Error', 'Full Name and Email cannot be empty.');
       return;
     }
-
     try {
-      const updatedUser = { fullName, email };
-      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      const data = await apiRequest('/auth/update-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fullName, email }),
+      });
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      // Notify other parts of the app that the user profile changed
+      try {
+        emitUserChange({ fullName: data.user.fullName || data.user.name || fullName, email: data.user.email || email, avatar: data.user.avatar || null });
+      } catch (e) {
+        console.warn('emitUserChange failed:', e);
+      }
       Alert.alert('Success', 'Profile updated successfully!');
       router.back();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save user profile:', error);
-      Alert.alert('Error', 'Failed to save profile.');
+      Alert.alert('Error', error.message || 'Failed to save profile.');
     }
   };
 
@@ -78,7 +91,7 @@ export default function EditProfileScreen() {
         error: '#EF4444',
       };
 
-  const insets = useSafeAreaInsets();
+  useSafeAreaInsets();
 
   if (loading) {
     return (

@@ -30,11 +30,13 @@ export const PhotoContext = createContext<{
   setPhotos: React.Dispatch<React.SetStateAction<Photo[]>>;
   loading: boolean;
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  reloadPhotos: () => Promise<void>;
 }>({
   photos: [],
   setPhotos: () => {},
   loading: false,
   setLoading: () => {},
+  reloadPhotos: async () => {},
 });
 
 export default function TabLayout() {
@@ -46,6 +48,12 @@ export default function TabLayout() {
   const bg = theme.colors.background;
   const activeTint = isDarkMode ? theme.colors.text : themeColors.tabIconSelected;
   const inactiveTint = isDarkMode ? Colors.dark.icon : Colors.light.tabIconDefault;
+
+
+  // Expose reloadPhotos for other components
+  const reloadPhotos = async () => {
+    await loadPhotos();
+  };
 
   useEffect(() => {
     loadPhotos();
@@ -81,7 +89,7 @@ export default function TabLayout() {
   };
 
   return (
-    <PhotoContext.Provider value={{ photos, setPhotos, loading, setLoading }}>
+    <PhotoContext.Provider value={{ photos, setPhotos, loading, setLoading, reloadPhotos }}>
       <Tabs
         initialRouteName="homepage"
         screenOptions={{
