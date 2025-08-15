@@ -1,10 +1,12 @@
 import { ThemeContext } from '@/app/_layout';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, router } from 'expo-router';
 import React, { useContext, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { apiRequest } from '../../utils/api';
 
 export default function ChangePasswordScreen() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -19,23 +21,25 @@ export default function ChangePasswordScreen() {
       Alert.alert('Error', 'All fields are required.');
       return;
     }
-
     if (newPassword !== confirmNewPassword) {
       Alert.alert('Error', 'New password and confirm new password do not match.');
       return;
     }
-
-    // In a real application, you would send this to your backend for validation and update
-    // For this example, we'll simulate a successful change
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
+      const userData = await AsyncStorage.getItem('user');
+      const email = userData ? JSON.parse(userData).email : '';
+      await apiRequest('/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, currentPassword, newPassword }),
+      });
       Alert.alert('Success', 'Password changed successfully!');
       router.back();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to change password:', error);
-      Alert.alert('Error', 'Failed to change password. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to change password. Please try again.');
     }
   };
 

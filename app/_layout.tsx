@@ -5,20 +5,23 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, {
-    createContext,
-    useEffect,
-    useMemo,
-    useState,
+  createContext,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
 import { useColorScheme } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-export const AuthContext = createContext({
-  token: null as string | null,
-  signIn: async (_t: string) => {},
-  signOut: async () => {},
-});
+export interface AuthContextType {
+  token: string | null;
+  signIn: (t: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  resetProgress: () => Promise<void>;
+}
+
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface ThemeContextType {
   isDarkMode: boolean;
@@ -67,8 +70,14 @@ export default function RootLayout() {
         setToken(newToken);
       },
       signOut: async () => {
-        await AsyncStorage.removeItem("userToken");
-        setToken(null);
+  await AsyncStorage.removeItem("userToken");
+  await AsyncStorage.removeItem("user");
+  // Do NOT remove progressPhotos so progress persists after logout
+  // If you want to clear other keys, do so here, but never clear progressPhotos
+  setToken(null);
+      },
+      resetProgress: async () => {
+  await AsyncStorage.removeItem("progressPhotos");
       },
     }),
     [token],
@@ -93,7 +102,7 @@ export default function RootLayout() {
     <CustomThemeProvider>
       <AuthContext.Provider value={authContext}>
         <SafeAreaProvider>
-          <Stack>
+          <Stack screenOptions={{ headerShown: false }}>
             {token ? (
               <Stack.Screen
                 name="(tabs)"

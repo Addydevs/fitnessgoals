@@ -3,14 +3,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Camera } from "expo-camera";
-import * as FileSystem from "expo-file-system";
-import * as ImagePicker from "expo-image-picker";
+// FileSystem not used in HomeScreen
+// ImagePicker not used directly in HomeScreen
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
+  Image,
   Modal,
   ScrollView,
   StatusBar,
@@ -23,6 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from '@/contexts/ThemeContext';
 import { Photo, RootStackParamList } from "../app/(tabs)/_layout"; // Import Photo and RootStackParamList from _layout.tsx
+import { onUserChange } from '../utils/userEvents';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -51,8 +52,15 @@ interface HomeScreenProps {
   navigation?: NavigationProp;
 }
 
+// UserType interface
+interface UserType {
+  fullName: string;
+  email: string;
+  avatar?: string | null;
+}
+
 const { width: screenWidth } = Dimensions.get("window");
-const OPENAI_API_KEY = "your-api-key-here"; // Replace with your actual key
+// OPENAI_API_KEY not used in HomeScreen
 
 // Helper Functions for Data Tracking
 const getCurrentStreak = (photos: Photo[]): number => {
@@ -142,32 +150,7 @@ const loadUserStats = async (): Promise<UserStats> => {
   }
 };
 
-const extractProgressScore = (analysis: string | null): number | null => {
-  if (!analysis) return null;
-
-  const positiveWords = [
-    "improvement",
-    "progress",
-    "better",
-    "stronger",
-    "leaner",
-    "definition",
-  ];
-  const negativeWords = ["decline", "loss", "worse", "weaker"];
-
-  let score = 0.5;
-  const lowerAnalysis = analysis.toLowerCase();
-
-  positiveWords.forEach((word) => {
-    if (lowerAnalysis.includes(word)) score += 0.1;
-  });
-
-  negativeWords.forEach((word) => {
-    if (lowerAnalysis.includes(word)) score -= 0.1;
-  });
-
-  return Math.max(0, Math.min(1, score));
-};
+// extractProgressScore removed (not used in this file)
 
 // Main Component
 export default function HomeScreen({
@@ -178,16 +161,16 @@ export default function HomeScreen({
   navigation,
 }: HomeScreenProps) {
   const { isDarkMode, theme } = useTheme();
-  const styles = getStyles(isDarkMode, theme);
+  const styles = getStyles(isDarkMode, theme) as any;
   const barStyle = isDarkMode ? ("light-content" as const) : ("dark-content" as const);
   const barBg = isDarkMode ? theme.colors.background : "white";
 
-  const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
+  // cameraPermission state removed (not needed in HomeScreen)
   const [showWelcome, setShowWelcome] = useState<boolean>(true);
   const [currentDate] = useState<Date>(new Date());
   const [isModalVisible, setModalVisible] = useState(false);
   const [generalNotifications, setGeneralNotifications] = useState<Notification[]>([]);
-  const [user, setUser] = useState<{ fullName: string; email: string } | null>(null);
+  const [user, setUser] = useState<UserType | null>(null);
   const [userStats, setUserStats] = useState<UserStats>({
     totalPhotos: 0,
     currentStreak: 0,
@@ -197,15 +180,80 @@ export default function HomeScreen({
     updatedAt: new Date().toISOString(),
   });
 
-  useFocusEffect(
-    React.useCallback(() => {
-      getCameraPermission();
-      checkWelcomeStatus();
-      loadUserStatsData();
-      loadGeneralNotificationsData();
-      loadUserData();
-    }, [])
-  );
+  useFocusEffect(() => {
+    getCameraPermission();
+    checkWelcomeStatus();
+    loadUserStatsData();
+    loadGeneralNotificationsData();
+    loadUserData();
+  });
+
+  // Subscribe to external user updates (from ProfileScreen)
+  // loadUserData needs to be stable for effects; define above as useCallback
+  const loadUserData = React.useCallback(async (): Promise<void> => {
+    try {
+      const userData = await AsyncStorage.getItem("user");
+      if (userData) {
+        const parsed = JSON.parse(userData);
+        const nextUser = {
+          fullName: parsed.name || parsed.fullName || "User",
+          email: parsed.email || "",
+          avatar: normalizeAvatarUri(parsed.avatar) || null,
+        };
+        // Avoid unnecessary state updates
+        setUser((prev) => {
+          if (!prev) return nextUser;
+          if (prev.fullName === nextUser.fullName && prev.email === nextUser.email && prev.avatar === nextUser.avatar) return prev;
+          return nextUser;
+        });
+      }
+    } catch (error) {
+      console.error("Error loading user data:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsub = onUserChange((u) => {
+      try {
+        // Support multiple possible payload shapes: { fullName, name, email, avatar, uri }
+        const fullName = (u as any).fullName || (u as any).name || null;
+        const email = (u as any).email || null;
+        const avatarRaw = (u as any).avatar || (u as any).uri || (u as any).avatarUri || null;
+        const avatar = normalizeAvatarUri(avatarRaw) || null;
+        // If the payload contains at least one user field, update state directly and skip async reload
+        if (fullName || email || avatar) {
+          setUser((prev) => {
+            const next = { ...(prev || { fullName: fullName || 'User', email: email || '' }), avatar: avatar || prev?.avatar || null, fullName: fullName || prev?.fullName } as any;
+            if (prev && prev.fullName === next.fullName && prev.email === next.email && prev.avatar === next.avatar) return prev;
+            return next;
+          });
+
+          // If a weekStreak is provided by the profile, update userStats.currentStreak only if different
+          const weekStreak = (u as any).weekStreak;
+          if (typeof weekStreak === 'number') {
+            setUserStats((s) => {
+              if (s && s.currentStreak === weekStreak) return s;
+              return { ...(s || {}), currentStreak: weekStreak };
+            });
+          }
+        } else {
+          // Fallback: if payload is empty/unknown, reload stored user
+          loadUserData();
+        }
+      } catch (err) {
+        console.error('Error handling onUserChange:', err);
+      }
+    });
+    return () => unsub();
+  }, [loadUserData]);
+
+  const normalizeAvatarUri = (uri: string | null | undefined): string | null => {
+    if (!uri) return null;
+    const s = String(uri);
+    if (s.startsWith('http') || s.startsWith('data:') || s.startsWith('file:') || s.startsWith('content:')) return s;
+    if (s.startsWith('/')) return `file://${s}`;
+    return s;
+  };
 
   const updateUserStats = useCallback(async () => {
     const newStats = await saveUserStats(photos);
@@ -244,160 +292,18 @@ export default function HomeScreen({
   };
 
   const getCameraPermission = async (): Promise<void> => {
-    const { status } = await Camera.requestCameraPermissionsAsync();
-    setCameraPermission(status === "granted");
-  };
-
-  const takePhoto = async (): Promise<void> => {
-    if (!cameraPermission) {
-      Alert.alert("Camera permission required");
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets?.[0]) {
-      await processNewPhoto(result.assets[0]);
-    }
-  };
-
-  const processNewPhoto = async (photo: ImagePicker.ImagePickerAsset): Promise<void> => {
-    setLoading(true);
     try {
-      const fileName = `progress_photo_${Date.now()}.jpg`;
-      const permanentUri = FileSystem.documentDirectory + fileName;
-
-      await FileSystem.copyAsync({
-        from: photo.uri,
-        to: permanentUri,
-      });
-
-      const newPhoto: Photo = {
-        id: Date.now().toString(),
-        uri: permanentUri,
-        timestamp: new Date().toISOString(),
-        analysis: null,
-        analyzed: false,
-        progressScore: null,
-      };
-
-      const previousPhoto = photos.length > 0 ? photos[photos.length - 1] : null;
-
-      if (previousPhoto) {
-        const analysis = await getAIAnalysis(previousPhoto.uri, permanentUri);
-        newPhoto.analysis = analysis;
-        newPhoto.analyzed = true;
-        newPhoto.progressScore = extractProgressScore(analysis);
-      } else {
-        newPhoto.analysis = "Great start! This is your first progress photo. Keep going!";
-        newPhoto.analyzed = true;
-        newPhoto.progressScore = 0.5;
-      }
-
-      const updatedPhotos = [...photos, newPhoto];
-      await savePhotos(updatedPhotos);
-      await saveUserStats(updatedPhotos);
-      setPhotos(updatedPhotos);
-
-      Alert.alert(
-        "Photo Saved!",
-        `Analysis complete! You now have ${updatedPhotos.length} progress photos.`,
-        [
-          {
-            text: "View Analysis",
-            onPress: () => navigation?.navigate("progress"),
-          },
-        ],
-      );
-    } catch (error) {
-      console.error("Error processing photo:", error);
-      Alert.alert("Error", "Failed to save photo. Please try again.");
-    } finally {
-      setLoading(false);
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      console.log('camera permission status:', status);
+    } catch (err) {
+      console.error('Error requesting camera permission:', err);
     }
   };
 
-  const getAIAnalysis = async (previousPhotoUri: string, currentPhotoUri: string): Promise<string> => {
-    try {
-      const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
-      const previousBase64 = await uriToBase64(previousPhotoUri);
-      const currentBase64 = await uriToBase64(currentPhotoUri);
+  // Camera/photo processing is handled in CameraScreen; Home no longer defines processNewPhoto.
 
-      if (!previousBase64 || !currentBase64) {
-        throw new Error("Failed to convert photos to base64");
-      }
 
-      let goalContext = "";
-      if (userGoal) {
-        goalContext = `The user's fitness goal is: "${userGoal}". `;
-      }
-
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: `${goalContext}Compare these progress photos and provide encouraging feedback. Focus on specific changes you notice and provide motivation.`,
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:image/jpeg;base64,${previousBase64}`,
-                  },
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:image/jpeg;base64,${currentBase64}`,
-                  },
-                },
-              ],
-            },
-          ],
-          max_tokens: 200,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (!data.choices?.[0]?.message?.content) {
-        throw new Error("Invalid API response structure");
-      }
-
-      return data.choices[0].message.content;
-    } catch (error) {
-      console.error("AI Analysis Error:", error);
-      return "Progress photo saved! Keep up the great work!";
-    }
-  };
-
-  const uriToBase64 = async (uri: string): Promise<string | null> => {
-    try {
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      return base64;
-    } catch (error) {
-      console.error("Error converting to base64:", error);
-      return null;
-    }
-  };
+  // uriToBase64 moved to CameraScreen where needed
 
   const saveGeneralNotifications = async (newNotifications: Notification[]): Promise<void> => {
     try {
@@ -449,24 +355,9 @@ export default function HomeScreen({
   };
 
 
-  const loadUserData = async (): Promise<void> => {
-    try {
-      const userData = await AsyncStorage.getItem("user");
-      if (userData) {
-        setUser(JSON.parse(userData));
-      }
-    } catch (error) {
-      console.error("Error loading user data:", error);
-    }
-  };
+  // duplicate loadUserData removed; using the stable useCallback version defined earlier
 
-  const savePhotos = async (newPhotos: Photo[]): Promise<void> => {
-    try {
-      await AsyncStorage.setItem("progressPhotos", JSON.stringify(newPhotos));
-    } catch (error) {
-      console.error("Error saving photos:", error);
-    }
-  };
+  // savePhotos removed from HomeScreen; CameraScreen owns photo persistence
 
   const generateWeekDays = (): { day: string; date: number; isToday: boolean; fullDate: Date; hasPhoto: boolean }[] => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -494,7 +385,6 @@ export default function HomeScreen({
   };
 
   const NotificationModal = () => {
-    const unreadGeneralNotifications = generalNotifications.filter((notif) => !notif.read);
 
     return (
       <Modal animationType="slide" transparent={true} visible={isModalVisible} onRequestClose={toggleModal}>
@@ -575,11 +465,16 @@ export default function HomeScreen({
         <View style={styles.headerContent}>
           <View style={styles.userProfile}>
             <View style={styles.profileImageContainer}>
-              {user?.fullName ? (
-                <Text style={styles.avatarText}>{user.fullName.charAt(0).toUpperCase()}</Text>
-              ) : (
-                <Feather name="user" size={24} color="#FF6B35" />
-              )}
+              {user?.avatar ? (
+  <Image source={{ uri: normalizeAvatarUri(user.avatar) || undefined }} style={styles.avatarImage}
+    onLoad={() => console.log('Header avatar loaded:', user?.avatar)}
+    onError={(e) => console.error('Header avatar failed to load', e.nativeEvent || e)}
+  />
+) : user?.fullName ? (
+  <Text style={styles.avatarText}>{user.fullName.charAt(0).toUpperCase()}</Text>
+) : (
+  <Feather name="user" size={24} color="#FF6B35" />
+)}
             </View>
             <View style={styles.greetingContainer}>
               <Text style={styles.greeting}>{user?.fullName || "CaptureFit Progress"}</Text>
@@ -797,7 +692,7 @@ export default function HomeScreen({
   );
 }
 
-function getStyles(isDarkMode: boolean, theme: any) {
+function getStyles(isDarkMode: boolean, theme: any): any {
   if (!isDarkMode) {
     // Exact LIGHT mode styles as provided
     return StyleSheet.create({
@@ -921,6 +816,15 @@ function getStyles(isDarkMode: boolean, theme: any) {
         justifyContent: "center",
         alignItems: "center",
         marginRight: 12,
+      },
+      avatarImage: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        resizeMode: 'cover',
+        borderWidth: 2,
+        borderColor: '#F3F4F6',
+        backgroundColor: '#F3F4F6',
       },
       greetingContainer: {
         flex: 1,

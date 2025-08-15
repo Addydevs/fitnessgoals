@@ -20,7 +20,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { generateGeminiContent } from "../utils/geminiApi";
+
+
+import { PhotoContext } from "../app/(tabs)/_layout";
+import { apiRequest } from "../utils/api";
 // import * as Haptics from "expo-haptics"; // optional
 
 /**
@@ -43,6 +46,7 @@ type Message = {
   type: Sender;
   text: string;
   ts: number;
+  imageUri?: string;
 };
 
 const SUGGESTIONS_BASE = [
@@ -55,6 +59,8 @@ const SUGGESTIONS_BASE = [
 const AICoachScreen: React.FC = () => {
   const { isDarkMode: isDark, theme: navTheme } = useTheme();
   const palette = isDark ? Colors.dark : Colors.light;
+  // Add PhotoContext for progress tracking
+  const { setPhotos } = React.useContext(PhotoContext);
 
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -95,39 +101,55 @@ const AICoachScreen: React.FC = () => {
     [isDark, navTheme, palette]
   );
 
+
   const addMessage = useCallback((text: string, type: Sender) => {
     const msg: Message = { id: `${Date.now()}-${Math.random()}`, type, text, ts: Date.now() };
     setMessages((prev) => [msg, ...prev]); // inverted list (newest on top)
   }, []);
 
-  // Replace fakeAIReply with Gemini API integration
-  const aiReply = useCallback(
-    async (userText: string) => {
-      setIsTyping(true);
-      try {
-        const reply = await generateGeminiContent(userText);
-        if (reply && reply.trim().length > 0) {
-          addMessage(reply, "ai");
-        } else {
-          addMessage("Sorry, the AI service did not return a response. Please try again or check your API key.", "ai");
-        }
-      } catch {
-        addMessage("Sorry, there was an error connecting to the AI service. Please check your internet connection and API key.", "ai");
-      }
+  // Helper to send a prompt to backend and display AI response
+  const sendPromptToBackend = useCallback(async (prompt: string) => {
+    addMessage(prompt, "user");
+    setIsTyping(true);
+    try {
+      const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
+      const data = await apiRequest('/auth/ai-coach/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: prompt, goal: userGoal })
+      });
       setIsTyping(false);
-    },
-    [addMessage]
-  );
+      if (!data.feedback || typeof data.feedback !== "string" || data.feedback.trim().length === 0) {
+        addMessage("AI Coach could not answer your question. Please try again.", "ai");
+      } else {
+        addMessage(data.feedback, "ai");
+      }
+    } catch {
+      setIsTyping(false);
+      addMessage("Error connecting to AI Coach. Please try again.", "ai");
+    }
+  }, [addMessage]);
+
+  // Add image message
+  const addImageMessage = useCallback((imageUri: string, type: Sender, text = "") => {
+    const msg: Message = { id: `${Date.now()}-${Math.random()}`, type, text, ts: Date.now(), imageUri };
+    console.log('Adding image message:', msg);
+    setMessages((prev) => [msg, ...prev]);
+    setTimeout(() => {
+      console.log('Messages after image upload:', messages);
+    }, 500);
+  }, []);
+
+
+
 
   const handleSend = useCallback(() => {
     const value = input.trim();
     if (!value) return;
-    // Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    addMessage(value, "user");
+    sendPromptToBackend(value);
     setInput("");
     bumpSend();
-    aiReply(value);
-  }, [input, addMessage, aiReply, bumpSend]);
+  }, [input, sendPromptToBackend, bumpSend]);
 
   const onLongPressBubble = useCallback((text: string) => {
     Alert.alert("Message", text, [
@@ -145,7 +167,37 @@ const AICoachScreen: React.FC = () => {
 
   const renderItem = useCallback(
     ({ item }: { item: Message }) => (
-      <ChatBubble item={item} theme={ui} onLongPress={onLongPressBubble} />
+      <View style={{ marginBottom: 12 }}>
+        {item.imageUri ? (
+          <View style={{ alignItems: item.type === "user" ? "flex-end" : "flex-start" }}>
+            <View style={{
+              borderRadius: 12,
+              overflow: "hidden",
+              borderWidth: 2,
+              borderColor: item.type === "user" ? ui.primary : ui.stroke,
+              marginBottom: 4,
+              maxWidth: 220,
+            }}>
+              <Animated.Image
+                source={{ uri: item.imageUri }}
+                style={{ width: 120, height: 160, resizeMode: "cover" }}
+                onError={() => {
+                  console.log('Image failed to load:', item.imageUri);
+                }}
+              />
+              {/* Fallback if imageUri is invalid */}
+              {!item.imageUri && (
+                <View style={{ width: 120, height: 160, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: '#888' }}>Image not available</Text>
+                </View>
+              )}
+            </View>
+            {item.text ? <Text style={{ color: ui.text, fontSize: 12 }}>{item.text}</Text> : null}
+          </View>
+        ) : (
+          <ChatBubble item={item} theme={ui} onLongPress={onLongPressBubble} />
+        )}
+      </View>
     ),
     [ui, onLongPressBubble]
   );
@@ -156,10 +208,34 @@ const AICoachScreen: React.FC = () => {
     []
   );
 
+  const analyzePhotoWithBackend = async (previousPhotoBase64: string, currentPhotoBase64: string, goal?: string) => {
+    try {
+      const data = await apiRequest('/auth/ai-coach/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ previousPhoto: previousPhotoBase64, currentPhoto: currentPhotoBase64, goal }),
+      });
+      return data.feedback;
+    } catch (error: any) {
+      return error.message || 'Error connecting to AI Coach backend.';
+    }
+  };
+
+  const uriToBase64 = async (uri: string) => {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      return base64;
+    } catch {
+      return "";
+    }
+  };
+
   const uploadAndAnalyzePhoto = async () => {
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  mediaTypes: 'images',
         allowsEditing: true,
         aspect: [3, 4],
         quality: 0.9,
@@ -169,22 +245,81 @@ const AICoachScreen: React.FC = () => {
         const fileName = `aicoach_photo_${Date.now()}.jpg`;
         const permanentUri = FileSystem.documentDirectory + fileName;
         await FileSystem.copyAsync({ from: photo.uri, to: permanentUri });
-        // Save photo to AsyncStorage (optional)
-        const savedPhotos = JSON.parse(await AsyncStorage.getItem("aicoachPhotos") || "[]");
-        savedPhotos.push({ uri: permanentUri, date: new Date().toISOString() });
-        await AsyncStorage.setItem("aicoachPhotos", JSON.stringify(savedPhotos));
-        // Show photo in chat
-        addMessage("[Photo uploaded]", "user");
-        // Optionally, send photo to Gemini for analysis (if supported)
-        addMessage("Analyzing photo...", "ai");
-        // You can call your AI analysis function here if you want to analyze the photo
-        // Example: const analysis = await analyzePhoto(permanentUri);
-        // addMessage(analysis, "ai");
+        // Save photo to AsyncStorage and update context
+        const savedPhotos = JSON.parse(await AsyncStorage.getItem("progressPhotos") || "[]");
+        const newPhoto = {
+          id: `${Date.now()}-${Math.random()}`,
+          uri: permanentUri,
+          timestamp: new Date().toISOString(),
+          analysis: null,
+          analyzed: false,
+          progressScore: null,
+        };
+        savedPhotos.push(newPhoto);
+        await AsyncStorage.setItem("progressPhotos", JSON.stringify(savedPhotos));
+        setPhotos(savedPhotos);
+  addImageMessage(permanentUri, "user", "[Photo uploaded]");
+  setIsTyping(true);
+  addMessage("Analyzing photo...", "ai");
+  // Automatically call backend for analysis
+  const previousPhoto = savedPhotos.length > 1 ? savedPhotos[savedPhotos.length - 2].uri : "";
+  const previousBase64 = previousPhoto ? await uriToBase64(previousPhoto) : "";
+  const currentBase64 = await uriToBase64(permanentUri);
+  const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
+  const feedback = await analyzePhotoWithBackend(previousBase64, currentBase64, userGoal);
+        setIsTyping(false);
+        if (!feedback || typeof feedback !== "string" || feedback.trim().length === 0 || feedback.toLowerCase().includes("error")) {
+          addMessage(feedback || "AI Coach could not analyze your photo. Please try again or use a different image.", "ai");
+        } else {
+          addMessage(feedback, "ai");
+        }
       }
-    } catch (error) {
-      addMessage("Error uploading photo. Please try again.", "ai");
+    } catch {
+      addMessage("Error uploading or analyzing photo. Please try again.", "ai");
     }
   };
+
+  const handleUploadPhoto = useCallback(async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+  mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [3, 4],
+        quality: 0.9,
+      });
+      if (!result.canceled) {
+        const photo = result.assets[0];
+        // Get extension from asset or fallback to .img
+        const extMatch = photo.uri.match(/\.([a-zA-Z0-9]+)$/);
+        const ext = extMatch ? extMatch[1] : "img";
+        const fileName = `aicoach_photo_${Date.now()}.${ext}`;
+        const permanentUri = FileSystem.documentDirectory + fileName;
+        // Copy the file and wait for completion
+        await FileSystem.copyAsync({ from: photo.uri, to: permanentUri });
+        // Ensure the file exists before preview
+        const fileInfo = await FileSystem.getInfoAsync(permanentUri);
+        if (fileInfo.exists) {
+          addImageMessage(permanentUri, "user", "[Photo uploaded]");
+        } else {
+          addImageMessage(photo.uri, "user", "[Photo uploaded]");
+        }
+        // Save photo to AsyncStorage (optional)
+  const savedPhotos = JSON.parse(await AsyncStorage.getItem("progressPhotos") || "[]");
+        savedPhotos.push({ uri: permanentUri, date: new Date().toISOString() });
+  await AsyncStorage.setItem("progressPhotos", JSON.stringify(savedPhotos));
+        addMessage("Analyzing photo...", "ai");
+        // Automatically call backend for analysis
+        const previousPhoto = savedPhotos.length > 1 ? savedPhotos[savedPhotos.length - 2].uri : "";
+        const previousBase64 = previousPhoto ? await uriToBase64(previousPhoto) : "";
+        const currentBase64 = await uriToBase64(permanentUri);
+        const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
+        const feedback = await analyzePhotoWithBackend(previousBase64, currentBase64, userGoal);
+        addMessage(feedback, "ai");
+      }
+    } catch {
+      addMessage("Error attaching photo. Please try again.", "ai");
+    }
+  }, [addMessage, addImageMessage]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: ui.bg }]} edges={["top", "left", "right"]}>
@@ -212,9 +347,9 @@ const AICoachScreen: React.FC = () => {
         {/* Quick Actions */}
         <View style={styles.quickRow}>
           <QuickAction ui={ui} label="Upload Photo" icon="cloud-upload" onPress={uploadAndAnalyzePhoto} />
-          <QuickAction ui={ui} label="Compare" icon="compare" onPress={() => addMessage("Compare my latest two photos", "user")} />
-          <QuickAction ui={ui} label="Plan" icon="calendar-check" onPress={() => addMessage("What’s my plan for this week?", "user")} />
-          <QuickAction ui={ui} label="Nutrition" icon="food-apple-outline" onPress={() => addMessage("Give me a nutrition tip", "user")} />
+          <QuickAction ui={ui} label="Compare" icon="compare" onPress={() => sendPromptToBackend("Compare my latest two photos")} />
+          <QuickAction ui={ui} label="Plan" icon="calendar-check" onPress={() => sendPromptToBackend("What’s my plan for this week?")} />
+          <QuickAction ui={ui} label="Nutrition" icon="food-apple-outline" onPress={() => sendPromptToBackend("Give me a nutrition tip")} />
         </View>
       </LinearGradient>
 
@@ -254,7 +389,7 @@ const AICoachScreen: React.FC = () => {
             onPress={async () => {
               try {
                 const result = await ImagePicker.launchImageLibraryAsync({
-                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  mediaTypes: 'images',
                   allowsEditing: true,
                   aspect: [3, 4],
                   quality: 0.9,
@@ -265,12 +400,18 @@ const AICoachScreen: React.FC = () => {
                   const permanentUri = FileSystem.documentDirectory + fileName;
                   await FileSystem.copyAsync({ from: photo.uri, to: permanentUri });
                   // Save photo to AsyncStorage (optional)
-                  const savedPhotos = JSON.parse(await AsyncStorage.getItem("aicoachPhotos") || "[]");
+                  const savedPhotos = JSON.parse(await AsyncStorage.getItem("progressPhotos") || "[]");
                   savedPhotos.push({ uri: permanentUri, date: new Date().toISOString() });
-                  await AsyncStorage.setItem("aicoachPhotos", JSON.stringify(savedPhotos));
-                  addMessage("[Photo attached]", "user");
+                  await AsyncStorage.setItem("progressPhotos", JSON.stringify(savedPhotos));
+                  addImageMessage(permanentUri, "user", "[Photo attached]");
                   addMessage("Analyzing photo...", "ai");
-                  // Optionally, call your AI analysis function here
+                  // Automatically call backend for analysis
+                  const previousPhoto = savedPhotos.length > 1 ? savedPhotos[savedPhotos.length - 2].uri : "";
+                  const previousBase64 = previousPhoto ? await uriToBase64(previousPhoto) : "";
+                  const currentBase64 = await uriToBase64(permanentUri);
+                  const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
+                  const feedback = await analyzePhotoWithBackend(previousBase64, currentBase64, userGoal);
+                  addMessage(feedback, "ai");
                 }
               } catch {
                 addMessage("Error attaching photo. Please try again.", "ai");

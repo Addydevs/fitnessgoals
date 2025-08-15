@@ -37,24 +37,34 @@ export default function IntroScreen() {
   const router = useRouter();
   const slide = slides[index];
 
-  const next = () => {
+  const next = async () => {
+    console.log("Next button pressed", index);
     if (index < slides.length - 1) {
       setIndex(index + 1);
     } else {
-      AsyncStorage.setItem("onboarded", "true").then(() => {
+      try {
+        await AsyncStorage.setItem("onboarded", "true");
         router.replace("/(auth)/login");
-      });
+      } catch (e) {
+        console.log("Error onboarding, fallback to login", e);
+        router.replace("/(auth)/login");
+      }
     }
   };
 
   return (
     <LinearGradient colors={slide.colors} style={styles.container}>
       <Pressable
-        onPress={() =>
-          AsyncStorage.setItem("onboarded", "true").then(() =>
-            router.replace("/(auth)/login")
-          )
-        }
+        onPress={async () => {
+          console.log("Skip button pressed");
+          try {
+            await AsyncStorage.setItem("onboarded", "true");
+            console.log("Onboarded flag set");
+          } catch (e) {
+            console.log("Error setting onboarded flag", e);
+          }
+          router.replace("/(auth)/login");
+        }}
         style={styles.skip}
       >
         <Text style={styles.skipText}>Skip</Text>

@@ -1,39 +1,45 @@
 import { AuthContext } from "@/app/_layout";
 import { theme } from "@/constants/theme";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useContext, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Pressable, StyleSheet, Text, TextInput, useColorScheme, View } from "react-native";
+import { apiRequest } from "../../utils/api";
+import { emitUserChange } from '../../utils/userEvents';
 
 export default function LoginScreen() {
-  const { signIn } = useContext(AuthContext);
+  const auth = useContext(AuthContext);
+  const signIn = auth?.signIn;
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const extractNameFromEmail = (addr: string) => {
-    const username = addr.split("@")[0];
-    return username
-      .split(/[._-]/)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-      .join(" ");
-  };
+  const [feedback, setFeedback] = useState("");
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const inputTextColor = isDark ? "#F3F4F6" : theme.colors.text;
+  const inputBgColor = isDark ? "#1F2937" : "#fff";
+  const placeholderColor = isDark ? "#9CA3AF" : "#6B7280";
 
   const handleLogin = async () => {
+    setFeedback("");
     try {
-      const userData = {
-        fullName: extractNameFromEmail(email),
-        email,
-      };
-      console.log("💾 Saving user data from login:", userData);
-      await AsyncStorage.setItem("user", JSON.stringify(userData));
-      console.log("✅ User data saved successfully");
-    } catch (error) {
-      console.log("❌ Login error:", error);
+      const data = await apiRequest('/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+  try { emitUserChange({ fullName: data.user.fullName || data.user.name, email: data.user.email, avatar: data.user.avatar || null }); } catch (e) { console.warn('emitUserChange failed:', e); }
+  if (!signIn) throw new Error('Auth context not available');
+  await signIn(data.token);
+      setFeedback('Login successful!');
+      router.replace('/(tabs)/homepage');
+    } catch (error: any) {
+      setFeedback(error.message || 'Network error. Please try again.');
+      console.log('❌ Login error:', error);
     }
-
-    await signIn("token");
-    router.replace("/(tabs)/homepage");
   };
 
   return (
@@ -44,7 +50,8 @@ export default function LoginScreen() {
           placeholder="Email"
           value={email}
           onChangeText={setEmail}
-          style={styles.input}
+          style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
+          placeholderTextColor={placeholderColor}
           keyboardType="email-address"
           autoCapitalize="none"
         />
@@ -52,7 +59,8 @@ export default function LoginScreen() {
           placeholder="Password"
           value={password}
           onChangeText={setPassword}
-          style={styles.input}
+          style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
+          placeholderTextColor={placeholderColor}
           secureTextEntry
         />
         <Pressable style={styles.button} onPress={handleLogin}>
@@ -63,6 +71,7 @@ export default function LoginScreen() {
             Don{'\''}t have an account? <Text style={styles.link}>Sign Up</Text>
           </Text>
         </Pressable>
+        <Text style={{ color: feedback.includes('successful') ? 'green' : 'red', textAlign: 'center', marginBottom: 10 }}>{feedback}</Text>
       </View>
     </View>
   );
