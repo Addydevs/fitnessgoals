@@ -4,10 +4,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, Stack } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { onUserChange } from '../../utils/userEvents';
+
+const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+
 export default function SettingsScreen() {
-  const [user, setUser] = useState({ fullName: 'User', email: 'user@example.com' });
+  const [user, setUser] = useState<{ fullName: string; email: string; avatar?: string | null }>({ fullName: 'User', email: 'user@example.com' });
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoSave, setAutoSave] = useState(true);
@@ -18,6 +22,21 @@ export default function SettingsScreen() {
       loadAllSettings();
     }, [])
   );
+
+  React.useEffect(() => {
+    const unsub = onUserChange((u) => {
+      try {
+        // Accept multiple shapes (fullName/name)
+        const fullName = (u as any).fullName || (u as any).name || null;
+        const email = (u as any).email || null;
+        const avatar = (u as any).avatar || null;
+        setUser((prev) => ({ ...(prev || {}), fullName: fullName || prev.fullName, email: email || prev.email, avatar: avatar || prev.avatar }));
+      } catch (err) {
+        console.warn('Error in settings onUserChange:', err);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const loadAllSettings = async () => {
     try {
@@ -49,8 +68,8 @@ export default function SettingsScreen() {
         setAutoSave(autoSaveValue);
         console.log('📸 Set auto save to:', autoSaveValue);
       }
-    } catch (error) {
-      console.error('Error loading settings:', error);
+    } catch {
+      console.error('Error loading settings');
     } finally {
       setLoading(false);
     }
@@ -104,53 +123,38 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout? This will clear all your data.', [
+  const handleLogout = async () => {
+    await AsyncStorage.clear();
+    router.replace('/(auth)/login');
+  };
+
+  const handleDeleteAccount = async () => {
+    Alert.alert('Delete Account', 'Are you sure you want to delete your account? This action cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Logout',
+        text: 'Delete',
         style: 'destructive',
         onPress: async () => {
           try {
-            console.log('🚪 Logging out...');
-            await AsyncStorage.multiRemove(['user', 'darkMode', 'notifications', 'autoSave']);
-            console.log('🗑️ All data cleared from AsyncStorage');
-            // Navigate back to auth - adjust this path as needed for your routing
-            router.replace('/(auth)');
-          } catch (error) {
-            console.log('❌ Error logging out:', error);
-            Alert.alert('Error', 'Failed to logout. Please try again.');
+            const response = await fetch(`${API_URL}/auth/delete-account`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: user.email }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+              Alert.alert('Error', data.error || 'Failed to delete account.');
+              return;
+            }
+            await AsyncStorage.clear();
+            Alert.alert('Account Deleted', 'Your account has been deleted.');
+            router.replace('/(auth)/login');
+          } catch {
+            Alert.alert('Error', 'Failed to delete account.');
           }
         },
       },
     ]);
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Remove all user-related data from AsyncStorage
-              await AsyncStorage.multiRemove(['user', 'darkMode', 'notifications', 'autoSave']);
-              // TODO: If you have a backend, call the API to delete the account here
-              // Example: await api.deleteAccount(user.id);
-              Alert.alert('Account Deleted', 'Your account has been deleted.');
-              router.replace('/(auth)');
-            } catch (error) {
-              console.log('❌ Error deleting account:', error);
-              Alert.alert('Error', 'Failed to delete account. Please try again.');
-            }
-          },
-        },
-      ]
-    );
   };
 
   // Replace missing theme properties with fallback values

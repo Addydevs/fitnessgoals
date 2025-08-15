@@ -93,7 +93,15 @@ export default function CameraScreen({
   };
 
   useEffect(() => {
-    requestCameraPermissionWithPrompt();
+    const checkAndRequestPermission = async () => {
+      const { status } = await Camera.getCameraPermissionsAsync();
+      if (status !== 'granted') {
+        await requestCameraPermissionWithPrompt();
+      } else {
+        setCameraPermission(true);
+      }
+    };
+    checkAndRequestPermission();
     initTipsFlag();
     checkApiKey();
   }, []);
