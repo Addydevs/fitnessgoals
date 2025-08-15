@@ -1,10 +1,11 @@
 import vision from '@google-cloud/vision';
 import { Request, Response } from 'express';
-import path from 'path';
 import { generateGeminiContent } from '../utils/geminiApi';
 
 const client = new vision.ImageAnnotatorClient({
-  keyFilename: path.join(__dirname, '../../feisty-mason-459712-s0-b42f10485dac.json'),
+  credentials: process.env.VISION_SERVICE_ACCOUNT_BASE64
+    ? JSON.parse(Buffer.from(process.env.VISION_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8'))
+    : undefined,
 });
 
 export const analyzeProgress = async (req: Request, res: Response) => {
