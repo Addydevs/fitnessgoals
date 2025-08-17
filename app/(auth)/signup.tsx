@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useContext, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, useColorScheme, View } from "react-native";
-import { apiRequest } from "../../utils/api";
+import { supabase } from '../../utils/supabase';
 import { emitUserChange } from '../../utils/userEvents';
 
 export default function SignupScreen() {
@@ -24,19 +24,51 @@ export default function SignupScreen() {
   const handleSignup = async () => {
     setFeedback("");
     try {
-      const data = await apiRequest('/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ fullName: name, email, password }),
-      });
-      await AsyncStorage.setItem('user', JSON.stringify(data.user));
-  try { emitUserChange({ fullName: data.user.fullName || data.user.name, email: data.user.email, avatar: data.user.avatar || null }); } catch (e) { console.warn('emitUserChange failed:', e); }
-  if (!signIn) throw new Error('Auth context not available');
-  await signIn(data.token);
-      setFeedback('Signup successful!');
-      router.replace('/(tabs)/homepage');
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { fullName: name } } });
+      if (error) throw error;
+
+      // signUp may not return a session if your Supabase project requires email confirmation.
+      let user = (data as any)?.user ?? null;
+      let session = (data as any)?.session ?? null;
+
+      // If no session, try signing in (works if confirmation is not required)
+      if (!session) {
+        try {
+          const signInRes = await supabase.auth.signInWithPassword({ email, password });
+          if (!signInRes.error) {
+            session = signInRes.data.session ?? null;
+            user = signInRes.data.user ?? user;
+          }
+        } catch (inner) {
+          console.warn('signInWithPassword after signUp failed:', inner);
+        }
+      }
+
+      // Only upsert profile if we have an authenticated session (required by RLS)
+      if (user?.id && session?.access_token) {
+        try {
+          await supabase.from('profiles').upsert({ id: user.id, full_name: name });
+        } catch (upsertErr) {
+          console.warn('Failed to upsert profile immediately after signup:', upsertErr);
+        }
+      } else {
+        // No session: skip server-side profile write to avoid AuthSessionMissingError
+        console.log('No session available after signup; profile upsert skipped. User may need to confirm email.');
+      }
+
+      // Persist lightweight local user info and notify UI
+      await AsyncStorage.setItem('user', JSON.stringify({ fullName: name, email }));
+      try { emitUserChange({ fullName: name, email, avatar: null }); } catch (e) { console.warn('emitUserChange failed:', e); }
+
+      if (session?.access_token) {
+        if (!signIn) throw new Error('Auth context not available');
+        await signIn(session.access_token);
+        setFeedback('Signup successful!');
+        router.replace('/(tabs)/homepage');
+      } else {
+        setFeedback('Check your email to confirm your account before logging in.');
+        router.replace('/(auth)/login');
+      }
     } catch (error: any) {
       setFeedback(error.message || 'Network error. Please try again.');
       console.log('❌ Signup error:', error);

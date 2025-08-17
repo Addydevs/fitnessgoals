@@ -13,6 +13,7 @@ import React, {
 import { useColorScheme } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { setAccessToken, supabase } from '../utils/supabase';
 
 export interface AuthContextType {
   token: string | null;
@@ -37,7 +38,7 @@ export default function RootLayout() {
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
   const [token, setToken] = useState<string | null>(null);
-  const [checking, setChecking] = useState(true);
+  const [, setChecking] = useState(true);
   const systemColorScheme = useColorScheme();
   const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === "dark");
 
@@ -46,6 +47,15 @@ export default function RootLayout() {
       try {
         const userToken = await AsyncStorage.getItem("userToken");
         setToken(userToken);
+        // If we have a stored token, configure the Supabase client to use it so
+        // server-side auth calls (updateUser, profiles upsert) succeed.
+        if (userToken) {
+          try {
+            await setAccessToken(userToken);
+          } catch (err) {
+            console.warn('Failed to set supabase auth from stored token', err);
+          }
+        }
 
         const storedDarkMode = await AsyncStorage.getItem("darkMode");
         if (storedDarkMode !== null) {
@@ -53,11 +63,11 @@ export default function RootLayout() {
         } else {
           setIsDarkMode(systemColorScheme === "dark");
         }
-      } catch (error) {
-        console.error("Failed to load initial settings:", error);
-      } finally {
-        setChecking(false);
-      }
+        } catch {
+          console.error("Failed to load initial settings:");
+        } finally {
+          setChecking(false);
+        }
     };
     loadSettings();
   }, [systemColorScheme]);
@@ -68,12 +78,23 @@ export default function RootLayout() {
       signIn: async (newToken: string) => {
         await AsyncStorage.setItem("userToken", newToken);
         setToken(newToken);
+        try {
+          await setAccessToken(newToken);
+        } catch (err) {
+          console.warn('Failed to set supabase auth on signIn', err);
+        }
       },
       signOut: async () => {
   await AsyncStorage.removeItem("userToken");
   await AsyncStorage.removeItem("user");
   // Do NOT remove progressPhotos so progress persists after logout
   // If you want to clear other keys, do so here, but never clear progressPhotos
+  try {
+    // clear auth on the Supabase client
+    (supabase.auth as any).setAuth('');
+  } catch {
+    // ignore any errors while clearing client auth
+  }
   setToken(null);
       },
       resetProgress: async () => {
@@ -83,16 +104,17 @@ export default function RootLayout() {
     [token],
   );
 
-  const themeContext = useMemo(
-    () => ({
+  // theme state persisted in AsyncStorage and applied to contentStyle
+  useMemo(() => {
+    // keep memoization to avoid unnecessary updates in children
+    return {
       isDarkMode,
       toggleDarkMode: async (value: boolean) => {
         setIsDarkMode(value);
-        await AsyncStorage.setItem("darkMode", JSON.stringify(value));
+        await AsyncStorage.setItem('darkMode', JSON.stringify(value));
       },
-    }),
-    [isDarkMode],
-  );
+    };
+  }, [isDarkMode]);
 
   if (!loaded) {
     return null;

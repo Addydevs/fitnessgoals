@@ -1,9 +1,10 @@
 import { AuthContext } from '@/app/_layout';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useBreakpoint } from '@/utils/responsive';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useContext } from 'react';
-import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Photo } from '../app/(tabs)/_layout'; // Assuming Photo interface is exported from _layout.tsx
 import Layout, { ModernCard, ModernHeader, SectionHeader } from './Layout';
 
@@ -57,6 +58,8 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
     return uniqueDays.size;
   };
 
+  useBreakpoint();
+  useWindowDimensions(); // re-render on orientation/size changes
   const currentStreak = getCurrentStreak(localPhotos);
   const daysTracked = getDaysTracked(localPhotos);
 
@@ -208,7 +211,8 @@ const styles = StyleSheet.create({
   },
   barWrapper: {
     alignItems: 'center',
-    width: (width - 80) / 7, // Distribute bars evenly
+    // width will be overridden dynamically inline using available width
+    width: (width - 80) / 7,
   },
   bar: {
     width: 25, // Slightly wider bars
@@ -229,8 +233,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   recentPhoto: {
-    width: 100,
-    height: 100,
+    width: 90,
+    height: 90,
     borderRadius: 10,
     marginHorizontal: 5,
     resizeMode: 'cover',

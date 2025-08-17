@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useContext, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, useColorScheme, View } from "react-native";
-import { apiRequest } from "../../utils/api";
+import { supabase } from '../../utils/supabase';
 import { emitUserChange } from '../../utils/userEvents';
 
 export default function LoginScreen() {
@@ -23,17 +23,14 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     setFeedback("");
     try {
-      const data = await apiRequest('/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-      await AsyncStorage.setItem('user', JSON.stringify(data.user));
-  try { emitUserChange({ fullName: data.user.fullName || data.user.name, email: data.user.email, avatar: data.user.avatar || null }); } catch (e) { console.warn('emitUserChange failed:', e); }
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  const session = data.session;
+  const user = data.user;
+  await AsyncStorage.setItem('user', JSON.stringify({ fullName: user?.user_metadata?.fullName || user?.user_metadata?.full_name || '', email: user?.email }));
+  try { emitUserChange({ fullName: user?.user_metadata?.fullName || user?.user_metadata?.full_name || '', email: user?.email, avatar: null }); } catch (e) { console.warn('emitUserChange failed:', e); }
   if (!signIn) throw new Error('Auth context not available');
-  await signIn(data.token);
+  await signIn(session?.access_token ?? '');
       setFeedback('Login successful!');
       router.replace('/(tabs)/homepage');
     } catch (error: any) {
