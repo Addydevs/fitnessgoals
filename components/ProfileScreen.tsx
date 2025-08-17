@@ -10,7 +10,7 @@ import { router } from 'expo-router';
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
+  FlatList,
   Image,
   Modal,
   ScrollView,
@@ -20,23 +20,15 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { emitUserChange } from '../utils/userEvents';
 import Layout from './Layout';
 
-const screenWidth = Dimensions.get('window').width;
 const PROFILE_CARD_MARGIN = 24;
 const PROFILE_CARD_PADDING = 24;
 const H_PADDING = 24;
-const GAP = 16;
-const cardWidth =
-  (screenWidth -
-    2 * PROFILE_CARD_MARGIN -
-    2 * PROFILE_CARD_PADDING -
-    2 * H_PADDING -
-    2 * GAP) /
-  3;
 
 interface Stats {
   startWeight: number;
@@ -58,6 +50,12 @@ interface UserProfile {
 
 const CaptureFitProfile = () => {
   const { isDarkMode, theme } = useTheme();
+  const { width } = useWindowDimensions();
+  const isSmall = width < 360;
+  const isTablet = width >= 768;
+  // make preview larger so the card shows more of the photo
+  const recentPhotoSize = isTablet ? 220 : isSmall ? 140 : 180;
+  const modalPhotoSize = isTablet ? Math.floor((width - 64) / 3) : width - 32;
   const palette = isDarkMode ? Colors.dark : Colors.light;
   const primary = palette.primary;
   const text = theme.colors.text;
@@ -78,6 +76,9 @@ const CaptureFitProfile = () => {
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [nameTemp, setNameTemp] = useState<string>('');
   const [showAllPhotos, setShowAllPhotos] = useState<boolean>(false);
+  const [recentAspect, setRecentAspect] = useState<number | null>(null);
+  const [photoInnerWidth, setPhotoInnerWidth] = useState<number | null>(null);
+  const recentUri = userData?.recentPhotos && userData.recentPhotos[0]?.uri;
 
   // make data loaders stable so focus effect can depend on them
 
@@ -241,11 +242,67 @@ const CaptureFitProfile = () => {
         await Share.share({ message: 'Check out my progress on CaptureFit!' });
         return;
       }
-      await Share.share({ url: uri, message: 'My progress photo' });
+
+      let shareUri = uri;
+
+      // If the URI is remote (http/https), download to cache first so sharing shares the file
+      if (uri.startsWith('http://') || uri.startsWith('https://')) {
+        try {
+          const filename = `share_${Date.now()}.jpg`;
+          const dest = FileSystem.cacheDirectory + filename;
+          const { uri: downloadedUri } = await FileSystem.downloadAsync(uri, dest);
+          shareUri = downloadedUri;
+        } catch (dlErr) {
+          console.warn('Failed to download remote image for sharing, falling back to original URI', dlErr);
+          // continue with original uri; some platforms can share remote URLs
+          shareUri = uri;
+        }
+      }
+
+      // Ensure local file URIs on Android have the file:// prefix
+      const sUri = String(shareUri || '');
+      if (sUri && !sUri.startsWith('file://') && (sUri.startsWith('/') || sUri.includes(String(FileSystem.documentDirectory)) || sUri.includes(String(FileSystem.cacheDirectory)))) {
+        shareUri = 'file://' + sUri.replace(/^\/*/, '');
+      }
+
+      // Share the local file URI (fallback if specialized sharing module is not available)
+      if (shareUri) {
+        try {
+          await Share.share({ url: shareUri, message: 'My progress photo' });
+          return;
+        } catch (shareErr) {
+          console.warn('Share.share failed, falling back to text-only share', shareErr);
+        }
+      }
+
+      // As a last resort, share a text message
+      await Share.share({ message: 'Check out my progress on CaptureFit!' });
     } catch (err) {
       console.error('Error sharing photo:', err);
+      try {
+        await Share.share({ message: 'Check out my progress on CaptureFit!' });
+      } catch {
+        // ignore
+      }
     }
   };
+
+  // Compute aspect ratio for the most recent photo so the preview can show the full image
+  // measure recent image natural size so we can render a top-aligned crop
+  React.useEffect(() => {
+    if (recentUri) {
+      Image.getSize(
+        recentUri,
+        (w, h) => {
+          if (w && h) setRecentAspect(w / h);
+          else setRecentAspect(null);
+        },
+        () => setRecentAspect(null)
+      );
+    } else {
+      setRecentAspect(null);
+    }
+  }, [recentUri]);
 
   const loadStats = React.useCallback(async (): Promise<void> => {
     try {
@@ -377,38 +434,46 @@ const CaptureFitProfile = () => {
   const renderStatCard = (
     { value, unit, label, colors, onPress }: any,
     index: number
-  ) => (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      style={{ width: cardWidth, marginRight: index < 2 ? GAP : 0 }}
-      onPress={onPress}
-    >
-      <LinearGradient
-  colors={colors}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 1 }}
-  style={styles.statCard}
+  ) => {
+    const cardHeight = isTablet ? 96 : isSmall ? 68 : 80;
+    const valueFont = isTablet ? 26 : isSmall ? 18 : 22;
+    const labelFont = isSmall ? 9 : 11;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[
+          styles.statCardWrapper,
+          { marginRight: index < 2 ? 12 : 0 },
+        ]}
+        onPress={onPress}
       >
-        <Feather
-          name="edit-3"
-          size={14}
-          color="rgba(255,255,255,0.95)"
-          style={styles.statEditIcon}
-        />
-        <Text style={styles.statValue} numberOfLines={1}>
-          {value}
-        </Text>
-        {unit && (
-          <Text style={styles.statUnit} numberOfLines={1}>
-            {unit}
+        <LinearGradient
+          colors={colors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.statCard, { height: cardHeight, paddingVertical: isSmall ? 8 : 12 }]}
+        >
+          <Feather
+            name="edit-3"
+            size={14}
+            color="rgba(255,255,255,0.95)"
+            style={styles.statEditIcon}
+          />
+          <Text style={[styles.statValue, { fontSize: valueFont }]} numberOfLines={1}>
+            {value}
           </Text>
-        )}
-        <Text style={styles.statLabel} numberOfLines={1}>
-          {label}
-        </Text>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
+          {unit && (
+            <Text style={[styles.statUnit, { fontSize: labelFont }]} numberOfLines={1}>
+              {unit}
+            </Text>
+          )}
+          <Text style={[styles.statLabel, { fontSize: labelFont }]} numberOfLines={1}>
+            {label}
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString('en-US', {
@@ -531,7 +596,7 @@ const CaptureFitProfile = () => {
           {userData && userData.recentPhotos && userData.recentPhotos.length > 0 ? (
             (() => {
               const photo = userData.recentPhotos[0]; // show only the most recent
-              return (
+                return ( 
                 <TouchableOpacity onPress={() => setShowAllPhotos(true)} activeOpacity={0.9}>
                   <View style={[
                     styles.photoCard,
@@ -556,14 +621,45 @@ const CaptureFitProfile = () => {
                         </TouchableOpacity>
                       </View>
                     </View>
-                    {photo.uri ? (
-                      <Image source={{ uri: photo.uri }} style={[styles.recentThumbnail]} />
-                    ) : (
-                      <View style={[styles.photoPlaceholder, { backgroundColor: surface }]}> 
-                        <Feather name="camera" size={32} color={sub} />
-                        <Text style={[styles.photoPlaceholderText, { color: sub }]}>Progress Photo</Text>
-                      </View>
-                    )}
+                      {photo.uri ? (
+                        <View onLayout={(e) => setPhotoInnerWidth(e.nativeEvent.layout.width)} style={{ height: recentPhotoSize }}>
+                          <View style={{ overflow: 'hidden', borderRadius: 12, height: '100%' }}>
+                            {photo.uri ? (
+                              <Image
+                                source={{ uri: photo.uri }}
+                                style={{
+                                  width: photoInnerWidth || '100%',
+                                  // natural image height (based on aspect) or fallback
+                                  height: photoInnerWidth && recentAspect ? Math.round((photoInnerWidth) / recentAspect) : recentPhotoSize,
+                                  // shift image up slightly to reveal more of the lower portion (cap to 30px)
+                                  transform: [
+                                    {
+                                      translateY:
+                                        -(photoInnerWidth && recentAspect
+                                          ? Math.min(
+                                              Math.max(0, Math.round((photoInnerWidth) / recentAspect) - recentPhotoSize),
+                                              30
+                                            )
+                                          : 0),
+                                    },
+                                  ],
+                                  resizeMode: 'cover',
+                                }}
+                              />
+                            ) : (
+                              <View style={[styles.photoPlaceholder, { backgroundColor: surface, height: recentPhotoSize }]}> 
+                                <Feather name="camera" size={32} color={sub} />
+                                <Text style={[styles.photoPlaceholderText, { color: sub }]}>Progress Photo</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      ) : (
+                        <View style={[styles.photoPlaceholder, { backgroundColor: surface, height: recentPhotoSize }]}> 
+                          <Feather name="camera" size={32} color={sub} />
+                          <Text style={[styles.photoPlaceholderText, { color: sub }]}>Progress Photo</Text>
+                        </View>
+                      )}
                   </View>
                 </TouchableOpacity>
               );
@@ -590,14 +686,18 @@ const CaptureFitProfile = () => {
                 <Text style={[styles.modalTitle, { color: text }]}>All Progress Photos</Text>
                 <View style={{ width: 24 }} />
               </View>
-              <ScrollView contentContainerStyle={styles.modalGalleryContent}>
-                {userData && userData.recentPhotos && userData.recentPhotos.length > 0 ? (
-                  userData.recentPhotos.map((p) => (
-                    <View key={p.id} style={[styles.modalPhotoCard, { backgroundColor: card, borderColor: border }]}> 
+              {isTablet ? (
+                <FlatList
+                  data={userData?.recentPhotos || []}
+                  keyExtractor={p => String(p.id)}
+                  numColumns={3}
+                  contentContainerStyle={styles.modalGalleryContent}
+                  renderItem={({ item: p }) => (
+                    <View style={[styles.modalPhotoCard, { backgroundColor: card, borderColor: border, width: modalPhotoSize }]}> 
                       {p.uri ? (
-                        <Image source={{ uri: p.uri }} style={styles.modalPhoto} />
+                        <Image source={{ uri: p.uri }} style={[styles.modalPhoto, { width: modalPhotoSize, height: modalPhotoSize }]} />
                       ) : (
-                        <View style={[styles.photoPlaceholder, { backgroundColor: surface }]}> 
+                        <View style={[styles.photoPlaceholder, { backgroundColor: surface, width: modalPhotoSize, height: modalPhotoSize }]}> 
                           <Feather name="camera" size={32} color={sub} />
                           <Text style={[styles.photoPlaceholderText, { color: sub }]}>Progress Photo</Text>
                         </View>
@@ -607,13 +707,35 @@ const CaptureFitProfile = () => {
                         <Text style={[styles.photoDate, { color: sub }]}>{formatDate(p.date)}</Text>
                       </View>
                     </View>
-                  ))
-                ) : (
-                  <View style={styles.emptyState}>
-                    <Text style={{ color: sub }}>No progress photos available.</Text>
-                  </View>
-                )}
-              </ScrollView>
+                  )}
+                  ListEmptyComponent={<View style={styles.emptyState}><Text style={{ color: sub }}>No progress photos available.</Text></View>}
+                />
+              ) : (
+                <ScrollView contentContainerStyle={styles.modalGalleryContent}>
+                  {userData && userData.recentPhotos && userData.recentPhotos.length > 0 ? (
+                    userData.recentPhotos.map((p) => (
+                      <View key={p.id} style={[styles.modalPhotoCard, { backgroundColor: card, borderColor: border }]}> 
+                        {p.uri ? (
+                          <Image source={{ uri: p.uri }} style={[styles.modalPhoto, { width: modalPhotoSize, height: modalPhotoSize }]} />
+                        ) : (
+                          <View style={[styles.photoPlaceholder, { backgroundColor: surface, width: modalPhotoSize, height: modalPhotoSize }]}> 
+                            <Feather name="camera" size={32} color={sub} />
+                            <Text style={[styles.photoPlaceholderText, { color: sub }]}>Progress Photo</Text>
+                          </View>
+                        )}
+                        <View style={styles.modalPhotoMeta}>
+                          <Text style={[styles.photoWeek, { color: text }]}>{p.week}</Text>
+                          <Text style={[styles.photoDate, { color: sub }]}>{formatDate(p.date)}</Text>
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.emptyState}>
+                      <Text style={{ color: sub }}>No progress photos available.</Text>
+                    </View>
+                  )}
+                </ScrollView>
+              )}
             </SafeAreaView>
           </Modal>
         </View>
@@ -780,39 +902,43 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     marginTop: 12,
     marginBottom: 8,
+    // Allow wrapping on ultra small widths (e.g., split screen)
+    flexWrap: 'nowrap',
+  },
+  statCardWrapper: {
+    flex: 1,
+    minWidth: 0, // allow text to shrink instead of forcing overflow
   },
   statCard: {
-    height: 72,
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: 12,
-    paddingVertical: 10,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 6,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
   },
   statValue: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     textAlign: 'center',
   },
   statUnit: {
     color: 'rgba(255,255,255,0.95)',
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 2,
     textAlign: 'center',
   },
   statLabel: {
     color: 'rgba(255,255,255,0.95)',
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 2,
     textAlign: 'center',
     fontWeight: '500',

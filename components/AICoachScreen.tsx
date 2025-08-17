@@ -23,7 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 
 import { PhotoContext } from "../app/(tabs)/_layout";
-import { apiRequest } from "../utils/api";
+import { supabase } from '../utils/supabase';
 // import * as Haptics from "expo-haptics"; // optional
 
 /**
@@ -113,20 +113,24 @@ const AICoachScreen: React.FC = () => {
     setIsTyping(true);
     try {
       const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
-      const data = await apiRequest('/auth/ai-coach/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: prompt, goal: userGoal })
-      });
+      const payload = { text: prompt, goal: userGoal };
+      const res = await supabase.functions.invoke('aicoach', { body: JSON.stringify(payload) });
       setIsTyping(false);
-      if (!data.feedback || typeof data.feedback !== "string" || data.feedback.trim().length === 0) {
-        addMessage("AI Coach could not answer your question. Please try again.", "ai");
+      if (res.error) {
+        console.warn('aicoach function error:', res.error);
+        addMessage('AI Coach could not answer your question. Please try again.', 'ai');
       } else {
-        addMessage(data.feedback, "ai");
+        const data = res.data as any;
+        if (!data?.feedback || typeof data.feedback !== 'string' || data.feedback.trim().length === 0) {
+          addMessage('AI Coach could not answer your question. Please try again.', 'ai');
+        } else {
+          addMessage(data.feedback, 'ai');
+        }
       }
-    } catch {
+    } catch (err) {
       setIsTyping(false);
-      addMessage("Error connecting to AI Coach. Please try again.", "ai");
+      console.warn('sendPromptToBackend failed', err);
+      addMessage('Error connecting to AI Coach. Please try again.', 'ai');
     }
   }, [addMessage]);
 
@@ -135,9 +139,7 @@ const AICoachScreen: React.FC = () => {
     const msg: Message = { id: `${Date.now()}-${Math.random()}`, type, text, ts: Date.now(), imageUri };
     console.log('Adding image message:', msg);
     setMessages((prev) => [msg, ...prev]);
-    setTimeout(() => {
-      console.log('Messages after image upload:', messages);
-    }, 500);
+  // avoid referencing stale `messages` state inside timeout
   }, []);
 
 
@@ -209,14 +211,18 @@ const AICoachScreen: React.FC = () => {
   );
 
   const analyzePhotoWithBackend = async (previousPhotoBase64: string, currentPhotoBase64: string, goal?: string) => {
+    // Currently this Edge Function supports text prompts. For photo analysis enable Vision API or extend the function.
     try {
-      const data = await apiRequest('/auth/ai-coach/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ previousPhoto: previousPhotoBase64, currentPhoto: currentPhotoBase64, goal }),
-      });
+      const payload = { previousPhoto: previousPhotoBase64, currentPhoto: currentPhotoBase64, goal };
+      const res = await supabase.functions.invoke('aicoach', { body: JSON.stringify(payload) });
+      if (res.error) {
+        console.warn('aicoach function error:', res.error);
+        return 'Image analysis is not enabled on Supabase. Please enable Vision or use text prompts.';
+      }
+      const data = res.data as any;
       return data.feedback;
     } catch (error: any) {
+      console.warn('analyzePhotoWithBackend failed', error);
       return error.message || 'Error connecting to AI Coach backend.';
     }
   };
@@ -385,40 +391,7 @@ const AICoachScreen: React.FC = () => {
 
         {/* Input */}
         <View style={[styles.inputRow, { borderTopColor: ui.stroke, backgroundColor: ui.card }]}>
-          <Pressable
-            onPress={async () => {
-              try {
-                const result = await ImagePicker.launchImageLibraryAsync({
-                  mediaTypes: 'images',
-                  allowsEditing: true,
-                  aspect: [3, 4],
-                  quality: 0.9,
-                });
-                if (!result.canceled) {
-                  const photo = result.assets[0];
-                  const fileName = `aicoach_photo_${Date.now()}.jpg`;
-                  const permanentUri = FileSystem.documentDirectory + fileName;
-                  await FileSystem.copyAsync({ from: photo.uri, to: permanentUri });
-                  // Save photo to AsyncStorage (optional)
-                  const savedPhotos = JSON.parse(await AsyncStorage.getItem("progressPhotos") || "[]");
-                  savedPhotos.push({ uri: permanentUri, date: new Date().toISOString() });
-                  await AsyncStorage.setItem("progressPhotos", JSON.stringify(savedPhotos));
-                  addImageMessage(permanentUri, "user", "[Photo attached]");
-                  addMessage("Analyzing photo...", "ai");
-                  // Automatically call backend for analysis
-                  const previousPhoto = savedPhotos.length > 1 ? savedPhotos[savedPhotos.length - 2].uri : "";
-                  const previousBase64 = previousPhoto ? await uriToBase64(previousPhoto) : "";
-                  const currentBase64 = await uriToBase64(permanentUri);
-                  const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
-                  const feedback = await analyzePhotoWithBackend(previousBase64, currentBase64, userGoal);
-                  addMessage(feedback, "ai");
-                }
-              } catch {
-                addMessage("Error attaching photo. Please try again.", "ai");
-              }
-            }}
-            style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.6 : 1 }]}
-          >
+          <Pressable onPress={handleUploadPhoto} style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.6 : 1 }]}> 
             <MaterialCommunityIcons name="paperclip" size={20} color={isDark ? "#9FB0C3" : "#64748B"} />
           </Pressable>
 

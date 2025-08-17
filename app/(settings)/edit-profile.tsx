@@ -6,13 +6,14 @@ import { Stack, router } from 'expo-router';
 import React, { useContext, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiRequest } from '../../utils/api';
+import { supabase } from '../../utils/supabase';
 import { emitUserChange } from '../../utils/userEvents';
 
 export default function EditProfileScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const themeContext = useContext(ThemeContext);
   const isDarkMode = themeContext?.isDarkMode ?? false;
   const { theme } = useTheme();
@@ -23,11 +24,42 @@ export default function EditProfileScreen() {
 
   const loadUserProfile = async () => {
     try {
-      const userData = await AsyncStorage.getItem('user');
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        setFullName(parsedUser.fullName || '');
-        setEmail(parsedUser.email || '');
+      // Prefer loading fresh data from Supabase when possible
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) {
+        console.warn('supabase.auth.getUser error', userErr);
+      }
+
+      if (userData?.user) {
+        const user = userData.user;
+        setEmail(user.email ?? '');
+
+        // fetch profile row
+        const { data: profile, error: profileErr } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+
+        if (profileErr) {
+          console.warn('Failed to load profile from DB, falling back to cache', profileErr);
+          const cached = await AsyncStorage.getItem('user');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            setFullName(parsed.fullName || '');
+          }
+        } else {
+          setFullName(profile?.full_name || '');
+          await AsyncStorage.setItem('user', JSON.stringify({ fullName: profile?.full_name || '', email: user.email || '' }));
+        }
+      } else {
+        // no active session: fall back to AsyncStorage cache
+        const userCache = await AsyncStorage.getItem('user');
+        if (userCache) {
+          const parsed = JSON.parse(userCache);
+          setFullName(parsed.fullName || '');
+          setEmail(parsed.email || '');
+        }
       }
     } catch (error) {
       console.error('Failed to load user profile:', error);
@@ -43,25 +75,38 @@ export default function EditProfileScreen() {
       return;
     }
     try {
-      const data = await apiRequest('/auth/update-profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ fullName, email }),
-      });
-      await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      // Notify other parts of the app that the user profile changed
-      try {
-        emitUserChange({ fullName: data.user.fullName || data.user.name || fullName, email: data.user.email || email, avatar: data.user.avatar || null });
-      } catch (e) {
-        console.warn('emitUserChange failed:', e);
+      setSaving(true);
+      // Ensure we have a valid authenticated user
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      const user = userData?.user;
+      if (!user) {
+        Alert.alert('Session required', 'Please sign in again to update your profile.');
+        return;
       }
+
+      // If email changed, update auth email
+      if (email !== user.email) {
+        const { error: emailErr } = await supabase.auth.updateUser({ email });
+        if (emailErr) throw emailErr;
+      }
+
+      // Upsert profiles table with new full name
+      const { error: dbErr } = await supabase.from('profiles').upsert({ id: user.id, full_name: fullName });
+      if (dbErr) throw dbErr;
+
+      // Update local cache and notify listeners
+      await AsyncStorage.setItem('user', JSON.stringify({ fullName, email }));
+      try { emitUserChange({ fullName, email, avatar: null }); } catch (e) { console.warn('emitUserChange failed:', e); }
+
       Alert.alert('Success', 'Profile updated successfully!');
       router.back();
     } catch (error: any) {
       console.error('Failed to save user profile:', error);
       Alert.alert('Error', error.message || 'Failed to save profile.');
+    }
+    finally {
+      setSaving(false);
     }
   };
 
@@ -137,8 +182,16 @@ export default function EditProfileScreen() {
           autoCapitalize="none"
         />
 
-        <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={handleSaveProfile}>
-          <Text style={styles.saveButtonText}>Save Changes</Text>
+        <TouchableOpacity
+          style={[styles.saveButton, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}
+          onPress={handleSaveProfile}
+          disabled={saving}
+        >
+          {saving ? (
+            <Text style={styles.saveButtonText}>Saving...</Text>
+          ) : (
+            <Text style={styles.saveButtonText}>Save Changes</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

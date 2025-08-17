@@ -5,8 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, router } from 'expo-router';
 import React, { useContext, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiRequest } from '../../utils/api';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../utils/supabase';
 
 export default function ChangePasswordScreen() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -28,13 +28,11 @@ export default function ChangePasswordScreen() {
     try {
       const userData = await AsyncStorage.getItem('user');
       const email = userData ? JSON.parse(userData).email : '';
-      await apiRequest('/auth/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, currentPassword, newPassword }),
-      });
+      // re-authenticate by signing in with current password
+      const { error: signInError } = (await supabase.auth.signInWithPassword({ email, password: currentPassword }));
+      if (signInError) throw signInError;
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) throw updateErr;
       Alert.alert('Success', 'Password changed successfully!');
       router.back();
     } catch (error: any) {
@@ -68,7 +66,7 @@ export default function ChangePasswordScreen() {
         error: '#EF4444',
       };
 
-  const insets = useSafeAreaInsets();
+  // no insets used here
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>

@@ -3,31 +3,31 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Camera } from "expo-camera";
-import Constants from 'expo-constants';
+
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  Animated,
-  Easing,
-  Linking,
-  Modal,
-  Platform,
-  Pressable,
-  Text,
-  View,
+    Alert,
+    Animated,
+    Easing,
+    Linking,
+    Modal,
+    Platform,
+    Pressable,
+    Text,
+    View,
 } from "react-native";
+import { supabase } from '../utils/supabase';
 
 import Layout, {
-  EmptyState,
-  ModernCard,
-  ModernHeader,
-  ModernLoading,
+    EmptyState,
+    ModernCard,
+    ModernHeader,
+    ModernLoading,
 } from "./Layout";
 
-// Get API key from environment variables
-const OPENAI_API_KEY = Constants.expoConfig?.extra?.openaiApiKey || process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+// No client-side OpenAI key; Edge Function will call OpenAI.
 const TIPS_SEEN_KEY = "cf_tips_seen";
 
 interface CameraScreenProps {
@@ -103,14 +103,8 @@ export default function CameraScreen({
     };
     checkAndRequestPermission();
     initTipsFlag();
-    checkApiKey();
+    // OpenAI is handled on the server (Edge Function);
   }, []);
-
-  const checkApiKey = () => {
-    if (!OPENAI_API_KEY) {
-      console.warn('OpenAI API key not found. AI analysis will be disabled.');
-    }
-  };
 
   const initTipsFlag = async () => {
     const seen = await AsyncStorage.getItem(TIPS_SEEN_KEY);
@@ -203,11 +197,9 @@ export default function CameraScreen({
       };
 
       const previousPhoto = photos.length > 0 ? photos[photos.length - 1] : null;
-      if (previousPhoto && OPENAI_API_KEY) {
+      if (previousPhoto) {
         const analysis = await getAIAnalysis(previousPhoto.uri, permanentUri);
         newPhoto.analysis = analysis;
-      } else if (!OPENAI_API_KEY) {
-        newPhoto.analysis = "Photo saved! AI analysis is currently unavailable.";
       } else {
         newPhoto.analysis = "Great start! This is your first progress photo. Keep going!";
       }
@@ -227,53 +219,19 @@ export default function CameraScreen({
     previousPhotoUri: string,
     currentPhotoUri: string
   ): Promise<string> => {
-    if (!OPENAI_API_KEY) {
-      console.warn('OpenAI API key not available');
-      return "Photo saved! AI analysis is currently unavailable.";
-    }
-
     try {
       const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
       const previousBase64 = await uriToBase64(previousPhotoUri);
       const currentBase64 = await uriToBase64(currentPhotoUri);
 
-      const goalContext = userGoal
-        ? `The user's fitness goal is: "${userGoal}". `
-        : "";
-
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text:
-                    goalContext +
-                    "Compare these two progress photos and provide encouraging, specific feedback.",
-                },
-                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${previousBase64}` } },
-                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${currentBase64}` } },
-              ],
-            },
-          ],
-          max_tokens: 200,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+      const payload = { previousPhoto: previousBase64, currentPhoto: currentBase64, goal: userGoal };
+      const res = await supabase.functions.invoke('aicoach', { body: JSON.stringify(payload) });
+      if (res.error) {
+        console.warn('aicoach function error:', res.error);
+        return 'AI analysis failed. Please try again later.';
       }
-
-      const data = await response.json();
-      return data?.choices?.[0]?.message?.content ?? "Progress photo saved! Keep up the great work!";
+      const data = res.data as any;
+      return data?.feedback ?? 'Progress photo saved! Keep up the great work!';
     } catch (error) {
       console.error("AI Analysis Error:", error);
       return "Progress photo saved! Keep up the great work!";

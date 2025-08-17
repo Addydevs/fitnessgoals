@@ -26,7 +26,7 @@ export const signup = async (req: Request, res: Response) => {
     const user = new User({ fullName, email, password: hashedPassword });
     await user.save();
     return res.json({ token: 'token', user: { fullName, email } });
-  } catch (err) {
+  } catch {
     return res.status(500).json({ error: 'Server error.' });
   }
 };
@@ -49,7 +49,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
     return res.json({ token: 'token', user: { fullName: user.fullName, email: user.email } });
-  } catch (err) {
+  } catch {
     return res.status(500).json({ error: 'Server error.' });
   }
 };
@@ -74,7 +74,7 @@ export const updateProfile = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found.' });
     }
     return res.json({ user: { fullName: user.fullName, email: user.email } });
-  } catch (err) {
+  } catch {
     return res.status(500).json({ error: 'Server error.' });
   }
 };
@@ -99,7 +99,7 @@ export const changePassword = async (req: Request, res: Response) => {
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
     return res.json({ message: 'Password changed successfully.' });
-  } catch (err) {
+  } catch {
     return res.status(500).json({ error: 'Server error.' });
   }
 };
@@ -115,7 +115,7 @@ export const deleteAccount = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found.' });
     }
     return res.json({ message: 'Account deleted successfully.' });
-  } catch (err) {
+  } catch {
     return res.status(500).json({ error: 'Server error.' });
   }
 };

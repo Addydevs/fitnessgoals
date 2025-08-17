@@ -8,20 +8,21 @@ import { Camera } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  Modal,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Image,
+    Modal,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from '@/contexts/ThemeContext';
+import { normalizeFont, useBreakpoint } from '@/utils/responsive';
 import { Photo, RootStackParamList } from "../app/(tabs)/_layout"; // Import Photo and RootStackParamList from _layout.tsx
 import { onUserChange } from '../utils/userEvents';
 
@@ -59,7 +60,7 @@ interface UserType {
   avatar?: string | null;
 }
 
-const { width: screenWidth } = Dimensions.get("window");
+// screenWidth replaced by hook-driven width
 // OPENAI_API_KEY not used in HomeScreen
 
 // Helper Functions for Data Tracking
@@ -161,7 +162,11 @@ export default function HomeScreen({
   navigation,
 }: HomeScreenProps) {
   const { isDarkMode, theme } = useTheme();
-  const styles = getStyles(isDarkMode, theme) as any;
+  useWindowDimensions(); // invoke to trigger re-render on orientation change (width not directly needed here)
+  const bp = useBreakpoint();
+  const dim = useWindowDimensions();
+  const isLandscape = dim.width > dim.height;
+  const styles = getStyles(isDarkMode, theme, bp, isLandscape) as any;
   const barStyle = isDarkMode ? ("light-content" as const) : ("dark-content" as const);
   const barBg = isDarkMode ? theme.colors.background : "white";
 
@@ -179,6 +184,8 @@ export default function HomeScreen({
     startDate: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
+  // Track if we've already handled camera permission to avoid spammy logs/requests
+  const cameraPermissionCheckedRef = React.useRef<boolean>(false);
 
   useFocusEffect(() => {
     getCameraPermission();
@@ -292,9 +299,18 @@ export default function HomeScreen({
   };
 
   const getCameraPermission = async (): Promise<void> => {
+    if (cameraPermissionCheckedRef.current) return; // already checked this session
     try {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      console.log('camera permission status:', status);
+      // First see current status without prompting
+      const current = await Camera.getCameraPermissionsAsync();
+      if (current.status !== 'granted' && current.status !== 'denied') {
+        // Only request if it's undetermined
+        await Camera.requestCameraPermissionsAsync();
+      }
+      // Mark as checked to prevent repeated logs/requests
+      cameraPermissionCheckedRef.current = true;
+      // (Optional one-time log — commented out to keep console clean)
+      // console.log('[camera] permission:', (await Camera.getCameraPermissionsAsync()).status);
     } catch (err) {
       console.error('Error requesting camera permission:', err);
     }
@@ -379,6 +395,8 @@ export default function HomeScreen({
   };
 
   const weekDays = generateWeekDays();
+  const firstRowDays = isLandscape ? weekDays.slice(0,4) : weekDays;
+  const secondRowDays = isLandscape ? weekDays.slice(4) : [];
 
   const toggleModal = () => {
     setModalVisible(!isModalVisible);
@@ -546,11 +564,29 @@ export default function HomeScreen({
         </View>
 
         {/* Photo Tracking Calendar */}
-        <View style={styles.calendarContainer}>
-          {weekDays.map((dayInfo, index) => (
+        <View style={[styles.calendarContainer, isLandscape && styles.calendarContainerLandscape]}>
+          {firstRowDays.map((dayInfo, index) => (
             <TouchableOpacity
-              key={index}
-              style={[styles.dayButton, dayInfo.isToday && styles.dayButtonActive]}
+              key={`r1-${index}`}
+              style={[styles.dayButton, dayInfo.isToday && styles.dayButtonActive, isLandscape && styles.dayButtonLandscape]}
+            >
+              <Text style={[styles.dayText, dayInfo.isToday && styles.dayTextActive]}>{dayInfo.day}</Text>
+              <View
+                style={[
+                  styles.photoIndicator,
+                  dayInfo.hasPhoto && styles.hasPhoto,
+                  dayInfo.isToday && dayInfo.hasPhoto && styles.todayPhoto,
+                ]}
+              />
+            </TouchableOpacity>
+          ))}
+          {isLandscape && (
+            <View style={styles.calendarRowBreak} />
+          )}
+          {secondRowDays.map((dayInfo, index) => (
+            <TouchableOpacity
+              key={`r2-${index}`}
+              style={[styles.dayButton, dayInfo.isToday && styles.dayButtonActive, styles.dayButtonLandscape]}
             >
               <Text style={[styles.dayText, dayInfo.isToday && styles.dayTextActive]}>{dayInfo.day}</Text>
               <View
@@ -692,7 +728,16 @@ export default function HomeScreen({
   );
 }
 
-function getStyles(isDarkMode: boolean, theme: any): any {
+function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBreakpoint>, isLandscape: boolean): any {
+  const width = bp.width;
+  const baseHorizontal = bp.isSmallPhone ? 16 : 20;
+  const cardGap = 12;
+  const calcPlanCardWidth = width ? (width - (baseHorizontal * 2) - cardGap) / 2 : 160;
+  const fullWidthCard = width ? (width - (baseHorizontal * 2)) : calcPlanCardWidth;
+  const titleFont = normalizeFont(bp.isTablet ? 26 : 24);
+  const sectionFont = normalizeFont(bp.isTablet ? 24 : 22);
+  const smallFont = normalizeFont(11);
+  const bodyFont = normalizeFont(14);
   if (!isDarkMode) {
     // Exact LIGHT mode styles as provided
     return StyleSheet.create({
@@ -895,14 +940,14 @@ function getStyles(isDarkMode: boolean, theme: any): any {
         zIndex: 2,
       },
       challengeTitle: {
-        fontSize: 24,
+        fontSize: titleFont,
         fontWeight: "bold",
         color: "white",
         lineHeight: 28,
         marginBottom: 4,
       },
       challengeSubtitle: {
-        fontSize: 14,
+        fontSize: bodyFont,
         color: "rgba(255,255,255,0.9)",
         marginBottom: 16,
       },
@@ -914,12 +959,12 @@ function getStyles(isDarkMode: boolean, theme: any): any {
         alignItems: "center",
       },
       progressNumber: {
-        fontSize: 18,
+        fontSize: normalizeFont(18),
         fontWeight: "bold",
         color: "white",
       },
       progressLabel: {
-        fontSize: 11,
+        fontSize: smallFont,
         color: "rgba(255,255,255,0.8)",
       },
       challengeDecorations: {
@@ -1023,7 +1068,7 @@ function getStyles(isDarkMode: boolean, theme: any): any {
         marginBottom: 16,
       },
       sectionTitle: {
-        fontSize: 22,
+        fontSize: sectionFont,
         fontWeight: "bold",
         color: "#1F2937",
       },
@@ -1033,13 +1078,13 @@ function getStyles(isDarkMode: boolean, theme: any): any {
         fontWeight: "500",
       },
       planGrid: {
-        flexDirection: "row",
-        justifyContent: "space-between",
+        flexDirection: bp.isSmallPhone ? 'column' : 'row',
+        justifyContent: bp.isSmallPhone ? 'flex-start' : 'space-between',
         marginBottom: 20,
         gap: 12,
       },
       planCard: {
-        width: (screenWidth - 52) / 2,
+        width: bp.isSmallPhone ? fullWidthCard : calcPlanCardWidth,
         height: 200,
         borderRadius: 20,
         padding: 16,
@@ -1072,18 +1117,18 @@ function getStyles(isDarkMode: boolean, theme: any): any {
         flex: 1,
       },
       planCardTitle: {
-        fontSize: 18,
+        fontSize: normalizeFont(18),
         fontWeight: "bold",
         color: "white",
         marginBottom: 8,
       },
       planCardSubtitle: {
-        fontSize: 12,
+        fontSize: normalizeFont(12),
         color: "rgba(255,255,255,0.9)",
         marginBottom: 4,
       },
       planCardDetail: {
-        fontSize: 11,
+        fontSize: smallFont,
         color: "rgba(255,255,255,0.8)",
       },
       planCardFooter: {
@@ -1110,7 +1155,7 @@ function getStyles(isDarkMode: boolean, theme: any): any {
         marginRight: 6,
       },
       aiLabel: {
-        fontSize: 10,
+        fontSize: normalizeFont(10),
         color: "white",
         fontWeight: "500",
       },
@@ -1155,7 +1200,7 @@ function getStyles(isDarkMode: boolean, theme: any): any {
         marginBottom: 8,
       },
       featureLabel: {
-        fontSize: 11,
+        fontSize: smallFont,
         color: "#6B7280",
         fontWeight: "500",
         textAlign: "center",
@@ -1188,20 +1233,31 @@ function getStyles(isDarkMode: boolean, theme: any): any {
         flex: 1,
       },
       recentTitle: {
-        fontSize: 14,
+        fontSize: normalizeFont(14),
         fontWeight: "600",
         color: "#1F2937",
         marginBottom: 2,
       },
       recentDate: {
-        fontSize: 12,
+        fontSize: normalizeFont(12),
         color: "#6B7280",
         marginBottom: 4,
       },
       recentAnalysisText: {
-        fontSize: 12,
+        fontSize: normalizeFont(12),
         color: "#9CA3AF",
         lineHeight: 16,
+      },
+      calendarContainerLandscape: {
+        flexWrap: 'wrap',
+        rowGap: 8,
+      },
+      dayButtonLandscape: {
+        width: '22%',
+      },
+      calendarRowBreak: {
+        width: '100%',
+        height: 0,
       },
       viewButton: {
         width: 32,
@@ -1271,7 +1327,7 @@ function getStyles(isDarkMode: boolean, theme: any): any {
         textAlign: "center",
       },
       notificationScrollView: {
-        maxHeight: Dimensions.get("window").height * 0.5,
+        maxHeight: (bp.height || 800) * 0.5,
         width: "100%",
         paddingHorizontal: 10,
       },
@@ -1578,8 +1634,8 @@ function getStyles(isDarkMode: boolean, theme: any): any {
       alignItems: "center",
       marginBottom: 16,
     },
-    sectionTitle: {
-      fontSize: 22,
+  sectionTitle: {
+  fontSize: sectionFont,
       fontWeight: "bold",
       color: theme.colors.text,
     },
@@ -1589,13 +1645,13 @@ function getStyles(isDarkMode: boolean, theme: any): any {
       fontWeight: "500",
     },
     planGrid: {
-      flexDirection: "row",
-      justifyContent: "space-between",
+      flexDirection: bp.isSmallPhone ? 'column' : 'row',
+      justifyContent: bp.isSmallPhone ? 'flex-start' : 'space-between',
       marginBottom: 20,
       gap: 12,
     },
     planCard: {
-      width: (screenWidth - 52) / 2,
+      width: bp.isSmallPhone ? fullWidthCard : calcPlanCardWidth,
       height: 200,
       borderRadius: 20,
       padding: 16,
@@ -1628,18 +1684,18 @@ function getStyles(isDarkMode: boolean, theme: any): any {
       flex: 1,
     },
     planCardTitle: {
-      fontSize: 18,
+      fontSize: normalizeFont(18),
       fontWeight: "bold",
       color: theme.colors.text,
       marginBottom: 8,
     },
     planCardSubtitle: {
-      fontSize: 12,
+      fontSize: normalizeFont(12),
       color: theme.colors.text,
       marginBottom: 4,
     },
     planCardDetail: {
-      fontSize: 11,
+      fontSize: smallFont,
       color: theme.colors.text,
     },
     planCardFooter: {
@@ -1666,7 +1722,7 @@ function getStyles(isDarkMode: boolean, theme: any): any {
       marginRight: 6,
     },
     aiLabel: {
-      fontSize: 10,
+      fontSize: normalizeFont(10),
       color: theme.colors.text,
       fontWeight: "500",
     },
@@ -1711,7 +1767,7 @@ function getStyles(isDarkMode: boolean, theme: any): any {
       marginBottom: 8,
     },
     featureLabel: {
-      fontSize: 11,
+      fontSize: smallFont,
       color: theme.colors.text,
       fontWeight: "500",
       textAlign: "center",
@@ -1744,20 +1800,31 @@ function getStyles(isDarkMode: boolean, theme: any): any {
       flex: 1,
     },
     recentTitle: {
-      fontSize: 14,
+      fontSize: normalizeFont(14),
       fontWeight: "600",
       color: theme.colors.text,
       marginBottom: 2,
     },
     recentDate: {
-      fontSize: 12,
+      fontSize: normalizeFont(12),
       color: theme.colors.text,
       marginBottom: 4,
     },
     recentAnalysisText: {
-      fontSize: 12,
+      fontSize: normalizeFont(12),
       color: theme.colors.text,
       lineHeight: 16,
+    },
+    calendarContainerLandscape: {
+      flexWrap: 'wrap',
+      rowGap: 8,
+    },
+    dayButtonLandscape: {
+      width: '22%',
+    },
+    calendarRowBreak: {
+      width: '100%',
+      height: 0,
     },
     viewButton: {
       width: 32,

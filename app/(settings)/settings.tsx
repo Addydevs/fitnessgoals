@@ -4,11 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, Stack } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../utils/supabase';
 import { onUserChange } from '../../utils/userEvents';
-
-const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
 
 export default function SettingsScreen() {
   const [user, setUser] = useState<{ fullName: string; email: string; avatar?: string | null }>({ fullName: 'User', email: 'user@example.com' });
@@ -134,23 +133,25 @@ export default function SettingsScreen() {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: async () => {
+            onPress: async () => {
           try {
-            const response = await fetch(`${API_URL}/auth/delete-account`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: user.email }),
+            const session = await supabase.auth.getSession();
+            const accessToken = session?.data?.session?.access_token;
+            if (!accessToken) throw new Error('No active session');
+
+            // Invoke Supabase Edge Function and pass the user's access token for verification
+            const funcRes = await supabase.functions.invoke('delete-account', {
+              body: JSON.stringify({}),
+              headers: { Authorization: `Bearer ${accessToken}` },
             });
-            const data = await response.json();
-            if (!response.ok) {
-              Alert.alert('Error', data.error || 'Failed to delete account.');
-              return;
+            if (funcRes.error) {
+              throw new Error(funcRes.error.message || 'Failed');
             }
             await AsyncStorage.clear();
             Alert.alert('Account Deleted', 'Your account has been deleted.');
             router.replace('/(auth)/login');
-          } catch {
-            Alert.alert('Error', 'Failed to delete account.');
+          } catch (err: any) {
+            Alert.alert('Error', err.message || 'Failed to delete account.');
           }
         },
       },
@@ -210,7 +211,7 @@ export default function SettingsScreen() {
       {rightElement || (onPress && <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />)}
     </TouchableOpacity>
   );
-  const insets = useSafeAreaInsets();
+  // removed useSafeAreaInsets to simplify header padding on this screen
 
   if (loading) {
     return (
@@ -224,7 +225,7 @@ export default function SettingsScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <Stack.Screen options={{ headerShown: false }} />
       {/* User Profile Section - No redundant header, works with existing navigation */}
-      <View style={[styles.userSection, { backgroundColor: colors.primary, paddingTop: insets.top + 20 }]}>
+  <View style={[styles.userSection, { backgroundColor: colors.primary, paddingTop: 40 }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={{
