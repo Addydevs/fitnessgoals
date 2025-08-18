@@ -6,6 +6,7 @@ import * as FileSystem from "expo-file-system";
 import { Tabs } from "expo-router";
 import React, { createContext, useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { requestPermissions, scheduleDailySummary } from '../../utils/notifications';
 
 export type RootStackParamList = {
   homepage: undefined;
@@ -57,6 +58,35 @@ export default function TabLayout() {
 
   useEffect(() => {
     loadPhotos();
+    // On app start, if notifications enabled, restore scheduling
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem('notifications');
+        const enabled = raw !== null ? JSON.parse(raw) : false;
+        if (enabled) {
+          const timeRaw = await AsyncStorage.getItem('notificationsTime');
+          let hour = 19;
+          let minute = 0;
+          if (timeRaw) {
+            try {
+              const parsed = JSON.parse(timeRaw);
+              if (typeof parsed.hour === 'number') hour = parsed.hour;
+              if (typeof parsed.minute === 'number') minute = parsed.minute;
+            } catch {
+              // ignore parse errors and use defaults
+            }
+          }
+          const granted = await requestPermissions();
+          if (granted) {
+            await scheduleDailySummary(hour, minute);
+          } else {
+            console.log('Notifications permission not granted; skipping schedule');
+          }
+        }
+      } catch (err) {
+        console.warn('Error restoring notifications schedule:', err);
+      }
+    })();
   }, []);
 
   const loadPhotos = async () => {

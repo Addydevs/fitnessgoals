@@ -8,17 +8,17 @@ import { supabase } from '../../utils/supabase';
 import { emitUserChange } from '../../utils/userEvents';
 
 export default function LoginScreen() {
-  const auth = useContext(AuthContext);
-  const signIn = auth?.signIn;
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const inputTextColor = isDark ? "#F3F4F6" : theme.colors.text;
-  const inputBgColor = isDark ? "#1F2937" : "#fff";
-  const placeholderColor = isDark ? "#9CA3AF" : "#6B7280";
+  // const auth = useContext(AuthContext);
+  // const signIn = auth?.signIn;
+  // const router = useRouter();
+  // const [email, setEmail] = useState("");
+  // const [password, setPassword] = useState("");
+  // const [feedback, setFeedback] = useState("");
+  // const colorScheme = useColorScheme();
+  // const isDark = colorScheme === "dark";
+  // const inputTextColor = isDark ? "#F3F4F6" : theme.colors.text;
+  // const inputBgColor = isDark ? "#1F2937" : "#fff";
+  // const placeholderColor = isDark ? "#9CA3AF" : "#6B7280";
 
   const handleLogin = async () => {
     setFeedback("");
