@@ -1,11 +1,13 @@
 import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, Stack } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { cancelAllNotifications, requestPermissions, scheduleDailySummary, sendImmediateSummary } from '../../utils/notifications';
 import { supabase } from '../../utils/supabase';
 import { onUserChange } from '../../utils/userEvents';
 
@@ -13,6 +15,9 @@ export default function SettingsScreen() {
   const [user, setUser] = useState<{ fullName: string; email: string; avatar?: string | null }>({ fullName: 'User', email: 'user@example.com' });
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [notificationHour, setNotificationHour] = useState<number>(19);
+  const [notificationMinute, setNotificationMinute] = useState<number>(0);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [autoSave, setAutoSave] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -51,8 +56,9 @@ export default function SettingsScreen() {
       }
 
       // Load settings
-      const notifications = await AsyncStorage.getItem('notifications');
+  const notifications = await AsyncStorage.getItem('notifications');
       const autoSaveGallery = await AsyncStorage.getItem('autoSave');
+  const notificationsTime = await AsyncStorage.getItem('notificationsTime');
 
       console.log('🔔 Notifications from storage:', notifications);
       console.log('📸 Auto save from storage:', autoSaveGallery);
@@ -61,6 +67,16 @@ export default function SettingsScreen() {
         const notificationsValue = JSON.parse(notifications);
         setNotificationsEnabled(notificationsValue);
         console.log('🔔 Set notifications to:', notificationsValue);
+      }
+      if (notificationsTime !== null) {
+        try {
+          const parsed = JSON.parse(notificationsTime);
+          if (typeof parsed.hour === 'number') setNotificationHour(parsed.hour);
+          if (typeof parsed.minute === 'number') setNotificationMinute(parsed.minute);
+          console.log('⏰ Loaded notification time:', parsed);
+        } catch (err) {
+          console.warn('Failed to parse notificationsTime', err);
+        }
       }
       if (autoSaveGallery !== null) {
         const autoSaveValue = JSON.parse(autoSaveGallery);
@@ -86,6 +102,26 @@ export default function SettingsScreen() {
     }
   };
 
+  const saveNotificationTime = async (hour: number, minute: number) => {
+    try {
+      const payload = { hour, minute };
+      await AsyncStorage.setItem('notificationsTime', JSON.stringify(payload));
+      setNotificationHour(hour);
+      setNotificationMinute(minute);
+      console.log('✅ Saved notification time', payload);
+      // If notifications are enabled, re-schedule with the new time
+      if (notificationsEnabled) {
+  const granted = await requestPermissions();
+  if (granted) await scheduleDailySummary(hour, minute);
+        else Alert.alert('Permission required', 'Enable notifications to receive daily summaries');
+      }
+      return true;
+    } catch (err) {
+      console.warn('Failed to save notification time', err);
+      return false;
+    }
+  };
+
   const handleDarkModeToggle = async (value: boolean) => {
     console.log('🌙 Dark mode toggle called with value:', value);
     toggleDarkMode(value);
@@ -99,8 +135,19 @@ export default function SettingsScreen() {
 
     if (saveSuccess) {
       if (value) {
-        Alert.alert('Notifications Enabled', 'You will receive workout reminders and progress updates', [{ text: 'OK' }]);
+        // Request permission and schedule
+        const granted = await requestPermissions();
+        if (granted) {
+          await scheduleDailySummary(notificationHour, notificationMinute);
+          Alert.alert('Notifications Enabled', 'You will receive workout reminders and progress updates', [{ text: 'OK' }]);
+        } else {
+          Alert.alert('Permission required', 'Please allow notifications in your device settings');
+          // rollback setting
+          setNotificationsEnabled(false);
+          await saveSetting('notifications', false);
+        }
       } else {
+  await cancelAllNotifications();
         Alert.alert('Notifications Disabled', 'You will no longer receive push notifications', [{ text: 'OK' }]);
       }
     } else {
@@ -108,6 +155,8 @@ export default function SettingsScreen() {
       setNotificationsEnabled(!value);
     }
   };
+
+  // Time is selected via native DateTimePicker; helpers removed
 
   const handleAutoSaveToggle = async (value: boolean) => {
     console.log('📸 Auto save toggle called with value:', value);
@@ -122,9 +171,33 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleSendTestSummary = async () => {
+    try {
+      const granted = await requestPermissions();
+      if (!granted) {
+        Alert.alert('Permission required', 'Please enable notifications in your device settings to receive test summaries.');
+        return;
+      }
+      await sendImmediateSummary();
+      Alert.alert('Test Sent', 'A test summary notification was scheduled/sent.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to send test summary');
+    }
+  };
+
   const handleLogout = async () => {
-    await AsyncStorage.clear();
-    router.replace('/(auth)/login');
+    try {
+      // Preserve progressPhotos across logout so user's progress remains locally available.
+      const allKeys = await AsyncStorage.getAllKeys();
+      const keysToRemove = allKeys.filter((k) => k !== 'progressPhotos');
+      if (keysToRemove.length > 0) {
+        await AsyncStorage.multiRemove(keysToRemove);
+      }
+    } catch (err) {
+      console.warn('Error clearing storage on logout, preserving progressPhotos', err);
+    } finally {
+      router.replace('/(auth)/login');
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -319,6 +392,34 @@ export default function SettingsScreen() {
               />
             }
           />
+          {notificationsEnabled && (
+            <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+              <TouchableOpacity onPress={() => setShowTimePicker(true)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>Daily summary time</Text>
+                  <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{String(notificationHour).padStart(2, '0')}:{String(notificationMinute).padStart(2, '0')}</Text>
+                </View>
+                <Text style={{ color: colors.primary }}>{Platform.OS === 'android' ? 'Change' : ''}</Text>
+              </TouchableOpacity>
+              {showTimePicker && (
+                <DateTimePicker
+                  value={new Date(0, 0, 0, notificationHour, notificationMinute)}
+                  mode="time"
+                  is24Hour={true}
+                  onChange={async (event: any, selected?: Date | undefined) => {
+                    setShowTimePicker(Platform.OS === 'ios');
+                    if (event.type === 'dismissed') return;
+                    const date = selected || (event as any)?.nativeEvent?.timestamp;
+                    if (!date) return;
+                    const d = selected instanceof Date ? selected : new Date(date);
+                    const h = d.getHours();
+                    const m = d.getMinutes();
+                    await saveNotificationTime(h, m);
+                  }}
+                />
+              )}
+            </View>
+          )}
           <SettingsItem
             icon={isDarkMode ? 'moon' : 'sunny'}
             title="Dark Mode"
@@ -335,6 +436,12 @@ export default function SettingsScreen() {
               />
             }
             isLast
+          />
+          <SettingsItem
+            icon="send-outline"
+            title="Send test summary now"
+            subtitle="Sends a test daily-summary notification immediately"
+            onPress={handleSendTestSummary}
           />
         </SettingsSection>
         {/* Support */}

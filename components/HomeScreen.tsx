@@ -8,16 +8,16 @@ import { Camera } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    Modal,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  Image,
+  Modal,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -505,12 +505,13 @@ export default function HomeScreen({
               </Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.notificationButton} onPress={toggleModal}>
+          <TouchableOpacity style={styles.notificationButton} onPress={toggleModal} activeOpacity={0.9} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <MaterialCommunityIcons
-  name="bell"
-  size={24}
-  style={styles.notificationIcon}
-/>
+              name="bell"
+              size={24}
+              color={isDarkMode ? theme.colors.text : theme.colors.primary}
+              style={styles.notificationIcon}
+            />
             {generalNotifications.filter((notif) => !notif.read).length > 0 && (
               <View style={styles.notificationDot} />
             )}

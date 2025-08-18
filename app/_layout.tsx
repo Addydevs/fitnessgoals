@@ -10,7 +10,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { useColorScheme } from "react-native";
+import { useColorScheme, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { setAccessToken, supabase } from '../utils/supabase';
@@ -40,7 +40,9 @@ export default function RootLayout() {
   const [token, setToken] = useState<string | null>(null);
   const [, setChecking] = useState(true);
   const systemColorScheme = useColorScheme();
-  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === "dark");
+  // Start the app in dark mode so the initial background is black and fits the logo.
+  // Stored preference (if any) will be loaded in useEffect and override this.
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -85,17 +87,22 @@ export default function RootLayout() {
         }
       },
       signOut: async () => {
-  await AsyncStorage.removeItem("userToken");
-  await AsyncStorage.removeItem("user");
-  // Do NOT remove progressPhotos so progress persists after logout
-  // If you want to clear other keys, do so here, but never clear progressPhotos
   try {
+    // clear only auth-related keys; preserve progressPhotos and other local data
+    const allKeys = await AsyncStorage.getAllKeys();
+    const keysToRemove = allKeys.filter((k) => k === 'userToken' || k === 'user' || k === 'session');
+    if (keysToRemove.length > 0) {
+      await AsyncStorage.multiRemove(keysToRemove);
+    }
     // clear auth on the Supabase client
-    (supabase.auth as any).setAuth('');
-  } catch {
-    // ignore any errors while clearing client auth
+    try {
+      (supabase.auth as any).setAuth('');
+    } catch {}
+  } catch (err) {
+    console.warn('Error during signOut cleanup:', err);
+  } finally {
+    setToken(null);
   }
-  setToken(null);
       },
       resetProgress: async () => {
   await AsyncStorage.removeItem("progressPhotos");
@@ -117,7 +124,8 @@ export default function RootLayout() {
   }, [isDarkMode]);
 
   if (!loaded) {
-    return null;
+    // Render a simple black background while fonts and settings load so the app opens on black.
+    return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   }
 
   return (

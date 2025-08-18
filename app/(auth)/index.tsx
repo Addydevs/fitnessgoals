@@ -5,65 +5,65 @@ import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type Slide = {
-  title: string;
-  subtitle: string;
-  icon: string;
-  colors: readonly [string, string];
-};
+//   title: string;
+//   subtitle: string;
+//   icon: string;
+//   colors: readonly [string, string];
+// };
 
-const slides: Slide[] = [
-  {
-    title: "Track Your Progress",
-    subtitle: "Take photos and let AI analyze your fitness journey",
-    icon: "📷",
-    colors: ["#A855F7", "#7C3AED"],
-  },
-  {
-    title: "AI-Powered Analysis",
-    subtitle: "Get detailed insights about your body transformation",
-    icon: "⚡",
-    colors: ["#10B981", "#059669"],
-  },
-  {
-    title: "Stay Motivated",
-    subtitle: "Build streaks and celebrate your achievements",
-    icon: "📈",
-    colors: ["#F59E0B", "#D97706"],
-  },
-];
+// const slides: Slide[] = [
+//   {
+//     title: "Track Your Progress",
+//     subtitle: "Take photos and let AI analyze your fitness journey",
+//     icon: "📷",
+//     colors: ["#A855F7", "#7C3AED"],
+//   },
+//   {
+//     title: "AI-Powered Analysis",
+//     subtitle: "Get detailed insights about your body transformation",
+//     icon: "⚡",
+//     colors: ["#10B981", "#059669"],
+//   },
+//   {
+//     title: "Stay Motivated",
+//     subtitle: "Build streaks and celebrate your achievements",
+//     icon: "📈",
+//     colors: ["#F59E0B", "#D97706"],
+//   },
+// ];
 
-export default function IntroScreen() {
-  const [index, setIndex] = useState(0);
-  const router = useRouter();
-  const slide = slides[index];
+// export default function IntroScreen() {
+//   const [index, setIndex] = useState(0);
+//   const router = useRouter();
+//   const slide = slides[index];
 
-  const next = async () => {
-    console.log("Next button pressed", index);
-    if (index < slides.length - 1) {
-      setIndex(index + 1);
-    } else {
-      try {
-        await AsyncStorage.setItem("onboarded", "true");
-        router.replace("/(auth)/login");
-      } catch (e) {
-        console.log("Error onboarding, fallback to login", e);
-        router.replace("/(auth)/login");
-      }
-    }
-  };
+//   const next = async () => {
+//     console.log("Next button pressed", index);
+//     if (index < slides.length - 1) {
+//       setIndex(index + 1);
+//     } else {
+//       try {
+//         await AsyncStorage.setItem("onboarded", "true");
+//         router.replace("/(auth)/login");
+//       } catch (e) {
+//         console.log("Error onboarding, fallback to login", e);
+//         router.replace("/(auth)/login");
+//       }
+//     }
+//   };
 
-  return (
-    <LinearGradient colors={slide.colors} style={styles.container}>
-      <Pressable
-        onPress={async () => {
-          console.log("Skip button pressed");
-          try {
-            await AsyncStorage.setItem("onboarded", "true");
-            console.log("Onboarded flag set");
-          } catch (e) {
-            console.log("Error setting onboarded flag", e);
-          }
-          router.replace("/(auth)/login");
+//   return (
+//     <LinearGradient colors={slide.colors} style={styles.container}>
+//       <Pressable
+//         onPress={async () => {
+//           console.log("Skip button pressed");
+//           try {
+//             await AsyncStorage.setItem("onboarded", "true");
+//             console.log("Onboarded flag set");
+//           } catch (e) {
+//             console.log("Error setting onboarded flag", e);
+//           }
+//           router.replace("/(auth)/login");
         }}
         style={styles.skip}
       >
