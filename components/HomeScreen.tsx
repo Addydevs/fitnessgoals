@@ -24,6 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from '@/contexts/ThemeContext';
 import { normalizeFont, useBreakpoint } from '@/utils/responsive';
 import { Photo, RootStackParamList } from "../app/(tabs)/_layout"; // Import Photo and RootStackParamList from _layout.tsx
+import { supabase } from '../utils/supabase';
 import { onUserChange } from '../utils/userEvents';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -184,15 +185,55 @@ export default function HomeScreen({
     startDate: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
+  const [userPhotos, setUserPhotos] = useState<Photo[]>([]);
   // Track if we've already handled camera permission to avoid spammy logs/requests
   const cameraPermissionCheckedRef = React.useRef<boolean>(false);
 
   useFocusEffect(() => {
     getCameraPermission();
     checkWelcomeStatus();
-    loadUserStatsData();
     loadGeneralNotificationsData();
-    loadUserData();
+    // Fetch user and photos from Supabase
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        setUser(null);
+        setUserPhotos([]);
+        setUserStats({
+          totalPhotos: 0,
+          currentStreak: 0,
+          photosThisWeek: 0,
+          lastPhotoDate: null,
+          startDate: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        return;
+      }
+      // Fetch profile info from Supabase (if you have a profiles table)
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      setUser({
+        fullName: profileData?.full_name || 'User',
+        email: profileData?.email || '',
+        avatar: profileData?.avatar_url || null,
+      });
+      // Fetch photos from Supabase
+      const { data: photosData } = await supabase.from('photos').select('*').eq('user_id', user.id).order('timestamp', { ascending: true });
+      setUserPhotos(photosData || []);
+      // Compute stats
+      const totalPhotos = photosData?.length || 0;
+      const lastPhotoDate = totalPhotos > 0 ? photosData[totalPhotos - 1].timestamp : null;
+      const startDate = totalPhotos > 0 ? photosData[0].timestamp : new Date().toISOString();
+      const currentStreak = getCurrentStreak(photosData || []);
+      const photosThisWeek = getPhotosThisWeek(photosData || []);
+      setUserStats({
+        totalPhotos,
+        lastPhotoDate,
+        startDate,
+        currentStreak,
+        photosThisWeek,
+        updatedAt: new Date().toISOString(),
+      });
+    })();
   });
 
   // Subscribe to external user updates (from ProfileScreen)
@@ -263,10 +304,7 @@ export default function HomeScreen({
   };
 
   const updateUserStats = useCallback(async () => {
-    const newStats = await saveUserStats(photos);
-    if (newStats) {
-      setUserStats(newStats);
-    }
+  // Stats now loaded from Supabase, no need to update from local photos
   }, [photos]);
 
   useEffect(() => {
@@ -360,6 +398,13 @@ export default function HomeScreen({
     const updatedNotifications = [...generalNotifications, newNotification];
     setGeneralNotifications(updatedNotifications);
     await saveGeneralNotifications(updatedNotifications);
+    // Integrate push notification
+    try {
+      const { sendImmediateSummary } = require('../utils/notifications');
+      await sendImmediateSummary();
+    } catch (err) {
+      console.warn('Failed to send push notification:', err);
+    }
   };
 
   const markGeneralNotificationAsRead = async (id: string): Promise<void> => {
@@ -405,36 +450,38 @@ export default function HomeScreen({
   const NotificationModal = () => {
 
     return (
-      <Modal animationType="slide" transparent={true} visible={isModalVisible} onRequestClose={toggleModal}>
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Notifications</Text>
-            <ScrollView style={styles.notificationScrollView}>
-              {generalNotifications.length === 0 ? (
-                <Text style={styles.noNotificationsText}>No notifications yet.</Text>
-              ) : (
-                generalNotifications.map((notif) => (
-                  <View key={notif.id} style={[styles.notificationItem, !notif.read && styles.unreadNotification]}>
-                    <View style={styles.notificationTextContent}>
-                      <Text style={styles.notificationMessage}>{notif.message}</Text>
-                      <Text style={styles.notificationTimestamp}>
-                        {new Date(notif.timestamp).toLocaleString()}
-                      </Text>
+      <Modal animationType="fade" transparent={true} visible={isModalVisible} onRequestClose={toggleModal}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' }}>
+          <SafeAreaView style={[styles.modalContainer, { justifyContent: 'center', alignItems: 'center', width: '100%' }]}> 
+            <View style={[styles.modalContent, { maxHeight: '80%', width: '90%', padding: 16, borderRadius: 18, backgroundColor: 'white', elevation: 10 }]}> 
+              <Text style={[styles.modalTitle, { marginBottom: 12 }]}>Notifications</Text>
+              <ScrollView style={[styles.notificationScrollView, { maxHeight: 320 }]} contentContainerStyle={{ paddingBottom: 16 }}>
+                {generalNotifications.length === 0 ? (
+                  <Text style={styles.noNotificationsText}>No notifications yet.</Text>
+                ) : (
+                  generalNotifications.map((notif) => (
+                    <View key={notif.id} style={[styles.notificationItem, !notif.read && styles.unreadNotification, { marginBottom: 10, borderRadius: 10, backgroundColor: '#F3F4F6', padding: 10 }]}> 
+                      <View style={styles.notificationTextContent}>
+                        <Text style={styles.notificationMessage}>{notif.message}</Text>
+                        <Text style={styles.notificationTimestamp}>
+                          {new Date(notif.timestamp).toLocaleString()}
+                        </Text>
+                      </View>
+                      {!notif.read && (
+                        <TouchableOpacity onPress={() => markGeneralNotificationAsRead(notif.id)} style={styles.markReadButton}>
+                          <Feather name="check-circle" size={20} color="#10B981" />
+                        </TouchableOpacity>
+                      )}
                     </View>
-                    {!notif.read && (
-                      <TouchableOpacity onPress={() => markGeneralNotificationAsRead(notif.id)} style={styles.markReadButton}>
-                        <Feather name="check-circle" size={20} color="#10B981" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))
-              )}
-            </ScrollView>
-            <TouchableOpacity onPress={toggleModal} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
+                  ))
+                )}
+              </ScrollView>
+              <TouchableOpacity onPress={toggleModal} style={[styles.closeButton, { marginTop: 10, alignSelf: 'center', backgroundColor: '#a8e6cf', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 8 }]}> 
+                <Text style={[styles.closeButtonText, { color: '#333', fontWeight: 'bold' }]}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
       </Modal>
     );
   };
@@ -484,15 +531,21 @@ export default function HomeScreen({
           <View style={styles.userProfile}>
             <View style={styles.profileImageContainer}>
               {user?.avatar ? (
-  <Image source={{ uri: normalizeAvatarUri(user.avatar) || undefined }} style={styles.avatarImage}
-    onLoad={() => console.log('Header avatar loaded:', user?.avatar)}
-    onError={(e) => console.error('Header avatar failed to load', e.nativeEvent || e)}
-  />
-) : user?.fullName ? (
-  <Text style={styles.avatarText}>{user.fullName.charAt(0).toUpperCase()}</Text>
-) : (
-  <Feather name="user" size={24} color="#FF6B35" />
-)}
+                <Image
+                  source={{ uri: normalizeAvatarUri(user.avatar) || undefined }}
+                  style={styles.avatarImage}
+                  onLoad={() => console.log('Header avatar loaded:', user?.avatar)}
+                  onError={(e) => {
+                    console.error('Header avatar failed to load', e.nativeEvent || e);
+                    // Fallback: show initial or icon if image fails
+                    setUser((prev) => prev ? { ...prev, avatar: null } : prev);
+                  }}
+                />
+              ) : user?.fullName ? (
+                <Text style={styles.avatarText}>{user.fullName.charAt(0).toUpperCase()}</Text>
+              ) : (
+                <Feather name="user" size={24} color="#FF6B35" />
+              )}
             </View>
             <View style={styles.greetingContainer}>
               <Text style={styles.greeting}>{user?.fullName || "CaptureFit Progress"}</Text>

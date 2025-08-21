@@ -8,23 +8,24 @@ import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    Easing,
-    Linking,
-    Modal,
-    Platform,
-    Pressable,
-    Text,
-    View,
+  Alert,
+  Animated,
+  Easing,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  View,
 } from "react-native";
+import { uploadToCloudinary } from "../utils/cloudinary";
 import { supabase } from '../utils/supabase';
 
 import Layout, {
-    EmptyState,
-    ModernCard,
-    ModernHeader,
-    ModernLoading,
+  EmptyState,
+  ModernCard,
+  ModernHeader,
+  ModernLoading,
 } from "./Layout";
 
 // No client-side OpenAI key; Edge Function will call OpenAI.
@@ -185,27 +186,39 @@ export default function CameraScreen({
   const processNewPhoto = async (photo: any): Promise<void> => {
     setLoading(true);
     try {
-      const fileName = `progress_photo_${Date.now()}.jpg`;
-      const permanentUri = FileSystem.documentDirectory + fileName;
-      await FileSystem.copyAsync({ from: photo.uri, to: permanentUri });
+      // Upload to Cloudinary
+      const cloudinaryUrl = await uploadToCloudinary(photo.uri);
 
-      const newPhoto: any = {
-        id: Date.now().toString(),
-        uri: permanentUri,
-        date: new Date().toISOString(),
-        analysis: null as string | null,
-      };
+      // Get current user ID from Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("User not authenticated");
 
+      // Analyze photo with aicoach
+      let analysis = null;
       const previousPhoto = photos.length > 0 ? photos[photos.length - 1] : null;
       if (previousPhoto) {
-        const analysis = await getAIAnalysis(previousPhoto.uri, permanentUri);
-        newPhoto.analysis = analysis;
+        analysis = await getAIAnalysis(previousPhoto.uri, photo.uri);
       } else {
-        newPhoto.analysis = "Great start! This is your first progress photo. Keep going!";
+        analysis = "Great start! This is your first progress photo. Keep going!";
       }
 
+      // Save metadata to Supabase
+      const { error } = await supabase.from('photos').insert({
+        user_id: user.id,
+        url: cloudinaryUrl,
+        timestamp: new Date().toISOString(),
+        analysis,
+      });
+      if (error) throw error;
+
+      // Update local state (optional: fetch from Supabase instead)
+      const newPhoto: any = {
+        id: Date.now().toString(),
+        uri: cloudinaryUrl,
+        date: new Date().toISOString(),
+        analysis,
+      };
       const updatedPhotos = [...photos, newPhoto];
-      await AsyncStorage.setItem("progressPhotos", JSON.stringify(updatedPhotos));
       setPhotos(updatedPhotos);
     } catch (error) {
       console.error("Error processing photo:", error);
@@ -239,10 +252,29 @@ export default function CameraScreen({
   };
 
   const uriToBase64 = async (uri: string): Promise<string> => {
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    return base64;
+    if (uri.startsWith('http')) {
+      // Remote URL: fetch and convert to base64
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      // Read blob as base64
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          // Remove the data URL prefix to get only base64 string
+          const base64 = dataUrl.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } else {
+      // Local file: use FileSystem
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      return base64;
+    }
   };
 
   /** ---------- UI ---------- */

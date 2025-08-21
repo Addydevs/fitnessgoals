@@ -2,10 +2,10 @@ import { AuthContext } from '@/app/_layout';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useBreakpoint } from '@/utils/responsive';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useContext } from 'react';
 import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Photo } from '../app/(tabs)/_layout'; // Assuming Photo interface is exported from _layout.tsx
+import { supabase } from '../utils/supabase';
 import Layout, { ModernCard, ModernHeader, SectionHeader } from './Layout';
 
 interface ProgressScreenProps {
@@ -25,7 +25,8 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
   const maxBarHeight = 80; // Max height for the bars
   const auth = useContext(AuthContext);
   const resetProgress = auth?.resetProgress;
-  const [localPhotos, setLocalPhotos] = React.useState<Photo[]>(photos);
+  const [cloudPhotos, setCloudPhotos] = React.useState<Photo[]>([]);
+  const [loadingCloud, setLoadingCloud] = React.useState<boolean>(true);
 
   // Calculate current streak (consecutive days with photos)
   const getCurrentStreak = (photoList: Photo[]): number => {
@@ -60,13 +61,34 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
 
   useBreakpoint();
   useWindowDimensions(); // re-render on orientation/size changes
-  const currentStreak = getCurrentStreak(localPhotos);
-  const daysTracked = getDaysTracked(localPhotos);
+  const currentStreak = getCurrentStreak(cloudPhotos);
+  const daysTracked = getDaysTracked(cloudPhotos);
 
-  // Sync localPhotos with prop changes
+  // Fetch photos from Supabase (Cloudinary URLs)
   React.useEffect(() => {
-    setLocalPhotos(photos);
-  }, [photos]);
+    const fetchCloudPhotos = async () => {
+      setLoadingCloud(true);
+      try {
+        const { data, error } = await supabase.from('photos').select('*').order('timestamp', { ascending: false });
+        if (error) throw error;
+        // Map Supabase data to Photo type
+        const mapped = (data || []).map((p: any) => ({
+          id: p.id || p.timestamp,
+          uri: p.url,
+          timestamp: p.timestamp,
+          analysis: p.analysis || null,
+          analyzed: true,
+          progressScore: null,
+        }));
+        setCloudPhotos(mapped);
+      } catch (err) {
+        setCloudPhotos([]);
+      } finally {
+        setLoadingCloud(false);
+      }
+    };
+    fetchCloudPhotos();
+  }, []);
 
   // Show last 7 days (rolling window)
   const getWeeklyPhotoCounts = (photoList: Photo[]) => {
@@ -106,9 +128,6 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
             onPress={async () => {
               if (resetProgress) {
                 await resetProgress();
-                // Reload photos from AsyncStorage
-                const updated = JSON.parse(await AsyncStorage.getItem('progressPhotos') || '[]');
-                setLocalPhotos(updated);
                 Alert.alert('Progress Reset', 'All progress photos have been cleared.');
               } else {
                 Alert.alert('Error', 'Reset progress function not available.');
@@ -161,9 +180,11 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
         </ModernCard>
         <SectionHeader title="Recent Photos" />
         <ModernCard style={styles.recentPhotosCard}>
-          {localPhotos.length > 0 ? (
+          {loadingCloud ? (
+            <Text style={[styles.noPhotosText, { color: sub }]}>Loading photos...</Text>
+          ) : cloudPhotos.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoScrollContainer}>
-              {localPhotos.map((photo, index) => (
+              {cloudPhotos.map((photo, index) => (
                 <Image
                   key={index}
                   source={{ uri: photo.uri }}

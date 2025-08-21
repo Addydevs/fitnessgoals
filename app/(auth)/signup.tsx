@@ -15,14 +15,34 @@ export default function SignupScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [feedback, setFeedback] = useState("");
+    const [passwordError, setPasswordError] = useState("");
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const inputTextColor = isDark ? "#F3F4F6" : theme.colors.text;
   const inputBgColor = isDark ? "#1F2937" : "#fff";
   const placeholderColor = isDark ? "#9CA3AF" : "#6B7280";
 
+  // Password validation function
+  const validatePassword = (pwd: string) => {
+    if (pwd.length < 8) return "Password must be at least 8 characters.";
+    if (!/[A-Z]/.test(pwd)) return "Password must include an uppercase letter.";
+    if (!/[a-z]/.test(pwd)) return "Password must include a lowercase letter.";
+    if (!/[0-9]/.test(pwd)) return "Password must include a number.";
+    if (!/[!@#$%^&*(),.?\":{}|<>\[\]\\/;'`~_-]/.test(pwd)) return "Password must include a special character.";
+    return "";
+  };
+
+  const handlePasswordChange = (pwd: string) => {
+    setPassword(pwd);
+    setPasswordError(validatePassword(pwd));
+  };
+
   const handleSignup = async () => {
     setFeedback("");
+    if (validatePassword(password)) {
+      setFeedback(validatePassword(password));
+      return;
+    }
     try {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { fullName: name } } });
       if (error) throw error;
@@ -98,11 +118,14 @@ export default function SignupScreen() {
         <TextInput
           placeholder="Password"
           value={password}
-          onChangeText={setPassword}
+            onChangeText={handlePasswordChange}
           style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
           placeholderTextColor={placeholderColor}
           secureTextEntry
         />
+          {passwordError ? (
+            <Text style={{ color: 'red', marginBottom: 4 }}>{passwordError}</Text>
+          ) : null}
         <Pressable style={styles.button} onPress={handleSignup}>
           <Text style={styles.buttonText}>Create Account</Text>
         </Pressable>

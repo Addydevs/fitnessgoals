@@ -23,6 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 
 import { PhotoContext } from "../app/(tabs)/_layout";
+import { uploadToCloudinary } from '../utils/cloudinary';
 import { supabase } from '../utils/supabase';
 // import * as Haptics from "expo-haptics"; // optional
 
@@ -57,6 +58,17 @@ const SUGGESTIONS_BASE = [
 ];
 
 const AICoachScreen: React.FC = () => {
+  // Initial ping to warm up Supabase Edge Function for instant OpenAI feedback
+  React.useEffect(() => {
+    supabase.functions.invoke('aicoach', { body: JSON.stringify({ text: 'ping' }) });
+  }, []);
+  // Keep Supabase Edge Function warm to reduce cold start latency
+  React.useEffect(() => {
+    const pingInterval = setInterval(() => {
+      supabase.functions.invoke('aicoach', { body: JSON.stringify({ text: 'ping' }) });
+    }, 120000); // every 2 minutes
+    return () => clearInterval(pingInterval);
+  }, []);
   const { isDarkMode: isDark, theme: navTheme } = useTheme();
   const palette = isDark ? Colors.dark : Colors.light;
   // Add PhotoContext for progress tracking
@@ -111,21 +123,39 @@ const AICoachScreen: React.FC = () => {
   const sendPromptToBackend = useCallback(async (prompt: string) => {
     addMessage(prompt, "user");
     setIsTyping(true);
+  let slowResponseTimer: any;
+    slowResponseTimer = setTimeout(() => {
+      addMessage("AI Coach is taking longer than usual. Please wait…", "ai");
+    }, 3000);
     try {
       const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
       const payload = { text: prompt, goal: userGoal };
       const res = await supabase.functions.invoke('aicoach', { body: JSON.stringify(payload) });
+      if (slowResponseTimer) clearTimeout(slowResponseTimer);
       setIsTyping(false);
       if (res.error) {
-        console.warn('aicoach function error:', res.error);
-        addMessage('AI Coach could not answer your question. Please try again.', 'ai');
+        let errorMsg = 'AI Coach could not answer your question. Please try again.';
+        if (res.data && typeof res.data === 'object') {
+          if (res.data.details) {
+            errorMsg += `\nDetails: ${res.data.details}`;
+          } else if (res.data.error) {
+            errorMsg += `\nError: ${res.data.error}`;
+          }
+        }
+        if (!res.data) {
+          errorMsg += `\nRaw error: ${JSON.stringify(res)}`;
+        }
+        addMessage(errorMsg, 'ai');
       } else {
         const data = res.data as any;
-        if (!data?.feedback || typeof data.feedback !== 'string' || data.feedback.trim().length === 0) {
-          addMessage('AI Coach could not answer your question. Please try again.', 'ai');
-        } else {
-          addMessage(data.feedback, 'ai');
+        // Parse new OpenAI response format
+        let aiMessage = 'AI Coach could not answer your question. Please try again.';
+        if (data.output && Array.isArray(data.output) && data.output[0]?.content?.[0]?.text) {
+          aiMessage = data.output[0].content[0].text;
+        } else if (data.feedback && typeof data.feedback === 'string') {
+          aiMessage = data.feedback;
         }
+        addMessage(aiMessage, 'ai');
       }
     } catch (err) {
       setIsTyping(false);
@@ -227,35 +257,42 @@ const AICoachScreen: React.FC = () => {
     }
   };
 
-  const uriToBase64 = async (uri: string) => {
-    try {
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      return base64;
-    } catch {
-      return "";
-    }
-  };
 
   const uploadAndAnalyzePhoto = async () => {
     try {
+      // Check user authentication
+      const session = await supabase.auth.getSession();
+      if (!session?.data?.session) {
+        addMessage("You must be logged in to analyze photos.", "ai");
+        return;
+      }
       const result = await ImagePicker.launchCameraAsync({
-  mediaTypes: 'images',
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [3, 4],
-        quality: 0.9,
+        quality: 0.5, // compress for speed
       });
       if (!result.canceled) {
         const photo = result.assets[0];
         const fileName = `aicoach_photo_${Date.now()}.jpg`;
         const permanentUri = FileSystem.documentDirectory + fileName;
         await FileSystem.copyAsync({ from: photo.uri, to: permanentUri });
+
+        // Upload to Cloudinary
+        addMessage("Uploading photo to Cloudinary...", "ai");
+        let cloudinaryUrl = "";
+        try {
+          cloudinaryUrl = await uploadToCloudinary(permanentUri);
+        } catch {
+          addMessage("Cloudinary upload failed. Please try again.", "ai");
+          return;
+        }
+
         // Save photo to AsyncStorage and update context
         const savedPhotos = JSON.parse(await AsyncStorage.getItem("progressPhotos") || "[]");
         const newPhoto = {
           id: `${Date.now()}-${Math.random()}`,
-          uri: permanentUri,
+          uri: cloudinaryUrl,
           timestamp: new Date().toISOString(),
           analysis: null,
           analyzed: false,
@@ -264,15 +301,18 @@ const AICoachScreen: React.FC = () => {
         savedPhotos.push(newPhoto);
         await AsyncStorage.setItem("progressPhotos", JSON.stringify(savedPhotos));
         setPhotos(savedPhotos);
-  addImageMessage(permanentUri, "user", "[Photo uploaded]");
-  setIsTyping(true);
-  addMessage("Analyzing photo...", "ai");
-  // Automatically call backend for analysis
-  const previousPhoto = savedPhotos.length > 1 ? savedPhotos[savedPhotos.length - 2].uri : "";
-  const previousBase64 = previousPhoto ? await uriToBase64(previousPhoto) : "";
-  const currentBase64 = await uriToBase64(permanentUri);
-  const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
-  const feedback = await analyzePhotoWithBackend(previousBase64, currentBase64, userGoal);
+        addImageMessage(cloudinaryUrl, "user", "[Photo uploaded]");
+        setIsTyping(true);
+        addMessage("Analyzing photo...", "ai");
+        // Automatically call backend for analysis
+        const previousPhoto = savedPhotos.length > 1 ? savedPhotos[savedPhotos.length - 2].uri : "";
+        // Only send public URLs for analysis
+        let previousUrl = "";
+        if (previousPhoto && previousPhoto.startsWith("http")) {
+          previousUrl = previousPhoto;
+        }
+        const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
+        const feedback = await analyzePhotoWithBackend(previousUrl, cloudinaryUrl, userGoal);
         setIsTyping(false);
         if (!feedback || typeof feedback !== "string" || feedback.trim().length === 0 || feedback.toLowerCase().includes("error")) {
           addMessage(feedback || "AI Coach could not analyze your photo. Please try again or use a different image.", "ai");
@@ -287,39 +327,50 @@ const AICoachScreen: React.FC = () => {
 
   const handleUploadPhoto = useCallback(async () => {
     try {
+      // Check user authentication
+      const session = await supabase.auth.getSession();
+      if (!session?.data?.session) {
+        addMessage("You must be logged in to analyze photos.", "ai");
+        return;
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
-  mediaTypes: 'images',
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [3, 4],
-        quality: 0.9,
+        quality: 0.5, // compress for speed
       });
       if (!result.canceled) {
         const photo = result.assets[0];
-        // Get extension from asset or fallback to .img
         const extMatch = photo.uri.match(/\.([a-zA-Z0-9]+)$/);
         const ext = extMatch ? extMatch[1] : "img";
         const fileName = `aicoach_photo_${Date.now()}.${ext}`;
         const permanentUri = FileSystem.documentDirectory + fileName;
-        // Copy the file and wait for completion
         await FileSystem.copyAsync({ from: photo.uri, to: permanentUri });
-        // Ensure the file exists before preview
-        const fileInfo = await FileSystem.getInfoAsync(permanentUri);
-        if (fileInfo.exists) {
-          addImageMessage(permanentUri, "user", "[Photo uploaded]");
-        } else {
-          addImageMessage(photo.uri, "user", "[Photo uploaded]");
+
+        // Upload to Cloudinary
+        addMessage("Uploading photo to Cloudinary...", "ai");
+        let cloudinaryUrl = "";
+        try {
+          cloudinaryUrl = await uploadToCloudinary(permanentUri);
+        } catch {
+          addMessage("Cloudinary upload failed. Please try again.", "ai");
+          return;
         }
+
         // Save photo to AsyncStorage (optional)
-  const savedPhotos = JSON.parse(await AsyncStorage.getItem("progressPhotos") || "[]");
-        savedPhotos.push({ uri: permanentUri, date: new Date().toISOString() });
-  await AsyncStorage.setItem("progressPhotos", JSON.stringify(savedPhotos));
+        const savedPhotos = JSON.parse(await AsyncStorage.getItem("progressPhotos") || "[]");
+        savedPhotos.push({ uri: cloudinaryUrl, date: new Date().toISOString() });
+        await AsyncStorage.setItem("progressPhotos", JSON.stringify(savedPhotos));
+        addImageMessage(cloudinaryUrl, "user", "[Photo uploaded]");
         addMessage("Analyzing photo...", "ai");
         // Automatically call backend for analysis
         const previousPhoto = savedPhotos.length > 1 ? savedPhotos[savedPhotos.length - 2].uri : "";
-        const previousBase64 = previousPhoto ? await uriToBase64(previousPhoto) : "";
-        const currentBase64 = await uriToBase64(permanentUri);
+        let previousUrl = "";
+        if (previousPhoto && previousPhoto.startsWith("http")) {
+          previousUrl = previousPhoto;
+        }
         const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
-        const feedback = await analyzePhotoWithBackend(previousBase64, currentBase64, userGoal);
+        const feedback = await analyzePhotoWithBackend(previousUrl, cloudinaryUrl, userGoal);
         addMessage(feedback, "ai");
       }
     } catch {
@@ -465,7 +516,7 @@ const ChatBubble = React.memo(function ChatBubble({
           <Pressable onLongPress={() => onLongPress(item.text)}>
             <Text style={styles.userText}>{item.text}</Text>
           </Pressable>
-        </LinearGradient>
+        </LinearGradient> 
       ) : (
         <Pressable onLongPress={() => onLongPress(item.text)} style={[styles.aiBubble, { backgroundColor: ui.aiBubble, borderColor: ui.stroke }]}
         >

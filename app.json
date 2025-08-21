@@ -39,13 +39,6 @@
     "experiments": {
       "typedRoutes": true
     },
-    "extra": {
-      "API_URL": "http://YOUR_LAN_IP:3000",
-      "SUPABASE_URL": "https://vpnitpweduycfmndmxsf.supabase.co",
-      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwbml0cHdlZHV5Y2ZtbmRteHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTU3MjksImV4cCI6MjA3MDg3MTcyOX0.LRVY6boXeixgCHJi1BelSdO6UHIePJYIJk-T7eWxY9s",
-      "SUPABASE_PROJECT_REF": "vpnitpweduycfmndmxsf"
-    }
-    ,
     "splash": {
       "image": "./assets/images/capturefit-logo.png",
       "resizeMode": "contain",

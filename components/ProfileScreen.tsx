@@ -2,14 +2,12 @@ import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Modal,
@@ -23,6 +21,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { uploadToCloudinary } from '../utils/cloudinary';
+import { supabase } from '../utils/supabase';
 import { emitUserChange } from '../utils/userEvents';
 import Layout from './Layout';
 
@@ -64,7 +64,6 @@ const CaptureFitProfile = () => {
   const border = theme.colors.border;
   const background = theme.colors.background;
   const surface = palette.surface;
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [userData, setUserData] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<Stats>({
     startWeight: 117,
@@ -84,83 +83,39 @@ const CaptureFitProfile = () => {
 
   const fetchUserData = React.useCallback(async (): Promise<void> => {
     try {
-      setIsLoading(true);
-      const userDataFromStorage = await AsyncStorage.getItem('user');
-      if (userDataFromStorage) {
-  const parsed = JSON.parse(userDataFromStorage);
-  // Normalize name fields so other screens (Settings/Home) see the same value
-  const normalizedName = parsed.name || parsed.fullName || parsed.full_name || parsed.fullname || '';
-  if (normalizedName && !parsed.name) parsed.name = normalizedName;
-  if (normalizedName && !parsed.fullName) parsed.fullName = normalizedName;
-
-        // Also load recent progress photos (persisted even when logged out)
-        const photosJson = await AsyncStorage.getItem('progressPhotos');
-        let recentPhotos = parsed.recentPhotos || [];
-        if (photosJson) {
-          try {
-            const allPhotos = JSON.parse(photosJson) as any[];
-            // take up to 3 most recent
-            const lastThree = allPhotos.slice(-3).reverse();
-            recentPhotos = lastThree.map((p, idx) => ({ id: idx + 1, date: p.timestamp || p.date || new Date().toISOString(), week: computeWeekLabel(p.timestamp || p.date), uri: p.uri || p.uri }));
-            // compute streak from allPhotos and persist into user profile
-            try {
-              const streak = computeCurrentStreakFromPhotos(allPhotos);
-              parsed.weekStreak = streak;
-              // update stored user with new streak
-              try {
-                await AsyncStorage.setItem('user', JSON.stringify(parsed));
-                // notify other screens
-                try { emitUserChange({ weekStreak: streak }); } catch { /* ignore */ }
-              } catch {
-                  console.warn('Failed to persist updated weekStreak into user storage');
-                }
-            } catch {
-              // ignore streak computation errors
-            }
-            } catch {
-            console.warn('Failed to parse progressPhotos:');
-          }
-        }
-
-  setUserData({ ...parsed, recentPhotos });
-      } else {
-        // Fallback to default data if no user data in AsyncStorage
-        setUserData({
-          name: 'John Smith',
-          joinDate: '2024-06-15',
-          avatar: null,
-          totalPhotos: 8,
-          weekStreak: 3,
-          daysTracked: 21,
-          recentPhotos: [
-            { id: 1, date: '2025-08-03', week: 'This week' },
-            { id: 2, date: '2025-07-27', week: 'Last week' },
-            { id: 3, date: '2025-07-20', week: '2 weeks ago' },
-          ],
-        });
+      // Try to load cached user data first for instant UI
+      const cached = await AsyncStorage.getItem('userProfileCache');
+      if (cached) {
+        setUserData(JSON.parse(cached));
       }
-
-      // In a real app, you might still try to sync with a backend after loading from storage
-      // const response = await fetch('/api/user', { ... });
-      // if (response.ok) {
-      //   const data = await response.json();
-      //   setUserData(data);
-      //   await AsyncStorage.setItem('user', JSON.stringify(data)); // Update local storage
-      // }
-
+      // Get current user from Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        setUserData(null);
+        return;
+      }
+      // Fetch profile and photos in parallel, only needed columns
+      const [profileRes, photosRes] = await Promise.all([
+        supabase.from('profiles').select('full_name,created_at,avatar_url').eq('id', user.id).single(),
+        supabase.from('photos').select('timestamp,url').eq('user_id', user.id).order('timestamp', { ascending: false }).limit(3)
+      ]);
+      const profileData = profileRes.data;
+      const photosData = photosRes.data;
+      const newProfile = {
+        name: profileData?.full_name || 'User',
+        fullName: profileData?.full_name || 'User',
+        joinDate: profileData?.created_at || new Date().toISOString(),
+        avatar: profileData?.avatar_url || null,
+        totalPhotos: photosData?.length || 0,
+        weekStreak: 0, // You can compute streak from photosData
+        daysTracked: 0, // You can compute days tracked from photosData
+        recentPhotos: (photosData || []).map((p: any, idx: number) => ({ id: idx + 1, date: p.timestamp, week: computeWeekLabel(p.timestamp), uri: p.url })),
+      };
+      setUserData(newProfile);
+      await AsyncStorage.setItem('userProfileCache', JSON.stringify(newProfile));
     } catch (error) {
       console.error('Error loading user data:', error);
-      setUserData({
-        name: 'User',
-        joinDate: new Date().toISOString(),
-        avatar: null,
-        totalPhotos: 0,
-        weekStreak: 0,
-        daysTracked: 0,
-        recentPhotos: [],
-      });
-    } finally {
-      setIsLoading(false);
+      setUserData(null);
     }
   }, []);
 
@@ -177,34 +132,6 @@ const CaptureFitProfile = () => {
     }
   };
 
-  const computeCurrentStreakFromPhotos = (photos: any[] = []) => {
-    try {
-      const dateSet = new Set<string>();
-      photos.forEach((p) => {
-        const ts = p.timestamp || p.date || p.createdAt || p.time;
-        if (!ts) return;
-        const d = new Date(ts);
-        const key = d.toISOString().slice(0, 10); // yyyy-mm-dd
-        dateSet.add(key);
-      });
-
-      let streak = 0;
-      const today = new Date();
-      let cursor = new Date(today);
-      while (true) {
-        const key = cursor.toISOString().slice(0, 10);
-        if (dateSet.has(key)) {
-          streak++;
-          cursor.setDate(cursor.getDate() - 1);
-        } else {
-          break;
-        }
-      }
-      return streak;
-    } catch {
-      return 0;
-    }
-  };
 
   const openNameEditor = () => {
     setNameTemp(userData?.name || '');
@@ -319,12 +246,12 @@ const CaptureFitProfile = () => {
     }
   }, []);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchUserData();
-      loadStats();
-    }, [fetchUserData, loadStats])
-  );
+  // Fetch data after initial render
+  React.useEffect(() => {
+    fetchUserData();
+    loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openEditor = (field: keyof Stats): void => {
     setTempValue(String(stats[field]));
@@ -374,35 +301,17 @@ const CaptureFitProfile = () => {
         const pickedUri = result.assets[0].uri;
         console.log('Picked URI:', pickedUri);
 
-        const fileName = `avatar_${Date.now()}.jpg`;
-        const dest = FileSystem.documentDirectory + fileName;
-        let finalAvatar = pickedUri;
-
+        let cloudinaryUrl = null;
         try {
-          // Try copying into app storage
-          await FileSystem.copyAsync({ from: pickedUri, to: dest });
-          console.log('Copied avatar to:', dest);
-          finalAvatar = dest;
-        } catch (copyErr) {
-          console.warn('copyAsync failed, trying base64 fallback:', copyErr);
-          try {
-            const base64 = await FileSystem.readAsStringAsync(pickedUri, { encoding: FileSystem.EncodingType.Base64 });
-            await FileSystem.writeAsStringAsync(dest, base64, { encoding: FileSystem.EncodingType.Base64 });
-            const info = await FileSystem.getInfoAsync(dest);
-            if (info.exists) {
-              console.log('Wrote avatar via base64 to:', dest);
-              finalAvatar = dest;
-            }
-          } catch (b64Err) {
-            console.error('Base64 fallback also failed:', b64Err);
-            finalAvatar = pickedUri; // fallback to original uri
-          }
+          cloudinaryUrl = await uploadToCloudinary(pickedUri);
+        } catch (cloudErr) {
+          console.error('Cloudinary upload failed:', cloudErr);
+          cloudinaryUrl = pickedUri; // fallback to local uri
         }
 
         const updatedUserData: UserProfile = {
           ...(userData as UserProfile),
-          avatar: finalAvatar,
-          // keep both name/fullName in storage for consistency
+          avatar: cloudinaryUrl,
           name: userData?.name || userData?.fullName || 'User',
           fullName: (userData as any)?.fullName || userData?.name || 'User',
           joinDate: userData?.joinDate || new Date().toISOString(),
@@ -482,14 +391,7 @@ const CaptureFitProfile = () => {
       year: 'numeric',
     });
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-  <ActivityIndicator size="large" color={primary} />
-  <Text style={[styles.loadingText, { color: sub }]}>Loading profile...</Text>
-      </View>
-    );
-  }
+
 
   return (
     <Layout>
