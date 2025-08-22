@@ -38,23 +38,62 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   });
 }
 
-// Helper to set access token for the client (used by app startup to restore session)
+// Helper to set access token for the client (used by app startup or after login)
 async function setAccessToken(token: string | null) {
   if (!token) return;
   try {
     // supabase-js provides auth.setSession to restore access/refresh tokens, but it expects both tokens.
-    // Many times we only store the access token; if setSession isn't available, try setAuth (internal).
+    // If you only have the access token, setSession may still accept it depending on client version.
     if (typeof (supabase.auth as any)?.setSession === 'function') {
-      // We only have an access token; setSession expects an object with access_token and refresh_token
-      // If refresh missing, setSession may still accept it depending on client version.
       await (supabase.auth as any).setSession({ access_token: token });
     } else if (typeof (supabase.auth as any)?.setAuth === 'function') {
       (supabase.auth as any).setAuth(token);
     }
+    console.log('Access token injected into Supabase client');
   } catch (err) {
     console.warn('setAccessToken failed', err);
   }
 }
 
-export { setAccessToken, supabase };
+// Upload photo to Supabase Storage and return public URL
+async function uploadPhotoToSupabase(photoUri: string, userId: string, prefix: string = "") {
+  const fileExt = photoUri.split('.').pop()?.toLowerCase() || 'jpg';
+  const fileName = `${prefix}${Date.now()}.${fileExt}`;
+  const storagePath = `${userId}/${fileName}`;
+  let contentType = 'image/*';
+  if (["jpg", "jpeg"].includes(fileExt)) contentType = "image/jpeg";
+  else if (fileExt === "png") contentType = "image/png";
+  else if (fileExt === "gif") contentType = "image/gif";
+  else if (fileExt === "webp") contentType = "image/webp";
+  else if (fileExt === "bmp") contentType = "image/bmp";
+  else if (fileExt === "svg") contentType = "image/svg+xml";
+  else if (fileExt === "heic") contentType = "image/heic";
+
+  // Check authentication/session before upload
+  const { data: sessionData } = await supabase.auth.getSession();
+  console.log('Supabase session:', sessionData);
+  if (!sessionData?.session) {
+    throw new Error('User is not authenticated');
+  }
+
+  const response = await fetch(photoUri);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image from ${photoUri}`);
+  }
+  const blob = await response.blob();
+  console.log('Blob type:', blob.type);
+console.log('Blob size:', blob.size);
+console.log('Storage path:', storagePath);
+console.log('Content type:', contentType);
+  const { error: uploadError } = await supabase.storage.from('photos').upload(storagePath, blob, {
+    contentType,
+    upsert: true,
+  });
+  console.log('Upload error:', JSON.stringify(uploadError, null, 2));
+  if (uploadError) throw uploadError;
+  const { data: urlData } = supabase.storage.from('photos').getPublicUrl(storagePath);
+  return urlData?.publicUrl;
+}
+
+export { setAccessToken, uploadPhotoToSupabase, supabase };
 export default supabase;

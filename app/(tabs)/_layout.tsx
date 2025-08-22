@@ -2,11 +2,11 @@ import { Colors } from "@/constants/Colors";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as FileSystem from "expo-file-system";
 import { Tabs } from "expo-router";
 import React, { createContext, useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { requestPermissions, scheduleDailySummary } from '../../utils/notifications';
+import { supabase } from '../../utils/supabase';
 
 export type RootStackParamList = {
   homepage: undefined;
@@ -57,7 +57,87 @@ export default function TabLayout() {
   };
 
   useEffect(() => {
-    loadPhotos();
+    const synchronizeStorageAndDatabase = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // 1. Get all files from Storage
+        const { data: files, error: listError } = await supabase.storage
+          .from('photos')
+          .list(user.id, { limit: 1000 }); // Increase limit if needed
+        if (listError) throw listError;
+
+        // 2. Get all photo URLs from the database
+        const { data: dbPhotos, error: dbError } = await supabase
+          .from('photos')
+          .select('url')
+          .eq('user_id', user.id);
+        if (dbError) throw dbError;
+
+        const dbUrls = new Set(dbPhotos.map(p => p.url));
+
+        // 3. Find files that are in storage but not in the database
+        const missingPhotos = [];
+        for (const file of files) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('photos')
+            .getPublicUrl(`${user.id}/${file.name}`);
+          
+          if (!dbUrls.has(publicUrl)) {
+            missingPhotos.push({
+              user_id: user.id,
+              url: publicUrl,
+              timestamp: file.created_at,
+              analysis: 'No analysis available for this photo.', // Default analysis
+            });
+          }
+        }
+
+        // 4. Insert missing photo records into the database
+        if (missingPhotos.length > 0) {
+          console.log(`Found ${missingPhotos.length} photos to backfill. Syncing...`);
+          const { error: insertError } = await supabase.from('photos').insert(missingPhotos);
+          if (insertError) {
+            console.error('Error backfilling photos:', insertError);
+          } else {
+            console.log('Successfully backfilled photos.');
+            // Reload photos to reflect the changes
+            await loadPhotos();
+          }
+        }
+      } catch (error) {
+        console.error('Failed to synchronize storage and database:', error);
+      }
+    };
+
+    const handleSync = async () => {
+      try {
+        const lastSync = await AsyncStorage.getItem('lastPhotoSync');
+        const now = new Date().getTime();
+        // Sync if it's been more than an hour, or never synced
+        const oneHour = 60 * 60 * 1000;
+
+        if (!lastSync || (now - parseInt(lastSync, 10)) > oneHour) {
+          console.log('Starting photo synchronization...');
+          await synchronizeStorageAndDatabase();
+          await AsyncStorage.setItem('lastPhotoSync', now.toString());
+          console.log('Photo synchronization finished.');
+        } else {
+          console.log('Skipping photo synchronization, recently performed.');
+        }
+      } catch (error) {
+        console.warn('Failed to run photo sync:', error);
+      }
+    };
+
+    loadPhotos(); // Load photos immediately from DB
+
+    // Run synchronization in the background after a short delay
+    const timer = setTimeout(() => {
+      handleSync();
+    }, 2000); // Increased delay slightly
+
     // On app start, if notifications enabled, restore scheduling
     (async () => {
       try {
@@ -87,34 +167,49 @@ export default function TabLayout() {
         console.warn('Error restoring notifications schedule:', err);
       }
     })();
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, []);
 
   const loadPhotos = async () => {
+    setLoading(true);
     try {
-      const savedPhotos = await AsyncStorage.getItem("progressPhotos");
-      if (savedPhotos) {
-        const parsedPhotos = JSON.parse(savedPhotos);
-        const validPhotos: Photo[] = [];
-        for (const photo of parsedPhotos) {
-          try {
-            const fileInfo = await FileSystem.getInfoAsync(photo.uri);
-            if (fileInfo.exists) {
-              validPhotos.push(photo);
-            }
-          } catch {
-            // ignore
-          }
-        }
-        if (validPhotos.length !== parsedPhotos.length) {
-          await AsyncStorage.setItem(
-            "progressPhotos",
-            JSON.stringify(validPhotos),
-          );
-        }
-        setPhotos(validPhotos);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setPhotos([]);
+        return;
+      }
+
+      // Fetch photo metadata from the 'photos' table
+      const { data, error } = await supabase
+        .from('photos')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('timestamp', { ascending: true });
+
+      if (error) {
+        console.error("Error fetching photos from database:", error);
+        throw error;
+      }
+
+      if (data) {
+        // The 'url' from the database is already the public URL
+        const loadedPhotos = data.map(photo => ({
+          id: photo.id,
+          uri: photo.url, // Use the URL directly from the table
+          timestamp: photo.timestamp,
+          analysis: photo.analysis,
+          analyzed: !!photo.analysis, 
+          progressScore: null, // Do not compare or score
+        }));
+        setPhotos(loadedPhotos);
       }
     } catch (error) {
       console.error("Error loading photos:", error);
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import { useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -23,7 +24,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 
 import { PhotoContext } from "../app/(tabs)/_layout";
-import { uploadToCloudinary } from '../utils/cloudinary';
 import { supabase } from '../utils/supabase';
 // import * as Haptics from "expo-haptics"; // optional
 
@@ -58,6 +58,7 @@ const SUGGESTIONS_BASE = [
 ];
 
 const AICoachScreen: React.FC = () => {
+  const { photoUri } = useLocalSearchParams();
   // Initial ping to warm up Supabase Edge Function for instant OpenAI feedback
   React.useEffect(() => {
     supabase.functions.invoke('aicoach', { body: JSON.stringify({ text: 'ping' }) });
@@ -123,15 +124,10 @@ const AICoachScreen: React.FC = () => {
   const sendPromptToBackend = useCallback(async (prompt: string) => {
     addMessage(prompt, "user");
     setIsTyping(true);
-  let slowResponseTimer: any;
-    slowResponseTimer = setTimeout(() => {
-      addMessage("AI Coach is taking longer than usual. Please wait…", "ai");
-    }, 3000);
     try {
       const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
       const payload = { text: prompt, goal: userGoal };
       const res = await supabase.functions.invoke('aicoach', { body: JSON.stringify(payload) });
-      if (slowResponseTimer) clearTimeout(slowResponseTimer);
       setIsTyping(false);
       if (res.error) {
         let errorMsg = 'AI Coach could not answer your question. Please try again.';
@@ -240,10 +236,52 @@ const AICoachScreen: React.FC = () => {
     []
   );
 
-  const analyzePhotoWithBackend = async (previousPhotoBase64: string, currentPhotoBase64: string, goal?: string) => {
-    // Currently this Edge Function supports text prompts. For photo analysis enable Vision API or extend the function.
+  const uploadPhotoViaFunction = async (photoUri: string, userId: string, fileNamePrefix: string = 'photo_') => {
+    // 1. Read the file and get content type
+    const response = await fetch(photoUri);
+    const blob = await response.blob();
+    const contentType = blob.type || 'image/jpeg';
+
+    // 2. Convert file to base64
+    const base64 = await FileSystem.readAsStringAsync(photoUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    // 3. Prepare the payload
+    const fileName = `${fileNamePrefix}${userId}_${Date.now()}.jpg`;
+    const payload = {
+      userId,
+      fileName,
+      fileBase64: base64,
+      contentType,
+    };
+
+    // 4. Invoke the Edge Function
+    const { data, error } = await supabase.functions.invoke('upload-photo', {
+      body: JSON.stringify(payload),
+    });
+
+    if (error) {
+      console.error('Edge function invocation error:', error);
+      throw new Error(error.message || 'Failed to upload photo via function.');
+    }
+    
+    if (data.error) {
+        console.error('Edge function returned an error:', data.error);
+        throw new Error(data.error);
+    }
+
+    console.log('Edge function success data:', data);
+    if (!data.publicUrl) {
+        throw new Error('Upload succeeded but did not return a public URL.');
+    }
+    return data.publicUrl;
+  };
+
+  const analyzePhotoWithBackend = async (previousPhotoUrl: string, currentPhotoUrl: string, goal?: string) => {
+    // Now sends image URLs instead of base64
     try {
-      const payload = { previousPhoto: previousPhotoBase64, currentPhoto: currentPhotoBase64, goal };
+      const payload = { previousPhotoUrl, currentPhotoUrl, goal };
       const res = await supabase.functions.invoke('aicoach', { body: JSON.stringify(payload) });
       if (res.error) {
         console.warn('aicoach function error:', res.error);
@@ -270,58 +308,61 @@ const AICoachScreen: React.FC = () => {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [3, 4],
-        quality: 0.5, // compress for speed
+        quality: 0.5,
       });
       if (!result.canceled) {
         const photo = result.assets[0];
-        const fileName = `aicoach_photo_${Date.now()}.jpg`;
-        const permanentUri = FileSystem.documentDirectory + fileName;
-        await FileSystem.copyAsync({ from: photo.uri, to: permanentUri });
-
-        // Upload to Cloudinary
-        addMessage("Uploading photo to Cloudinary...", "ai");
-        let cloudinaryUrl = "";
-        try {
-          cloudinaryUrl = await uploadToCloudinary(permanentUri);
-        } catch {
-          addMessage("Cloudinary upload failed. Please try again.", "ai");
+        // Get user ID for folder
+        const user = await supabase.auth.getUser();
+        const userId = user?.data?.user?.id;
+        if (!userId) {
+          addMessage('Photo upload failed: user ID not found', 'ai');
           return;
         }
-
-        // Save photo to AsyncStorage and update context
-        const savedPhotos = JSON.parse(await AsyncStorage.getItem("progressPhotos") || "[]");
-        const newPhoto = {
-          id: `${Date.now()}-${Math.random()}`,
-          uri: cloudinaryUrl,
-          timestamp: new Date().toISOString(),
-          analysis: null,
-          analyzed: false,
-          progressScore: null,
-        };
-        savedPhotos.push(newPhoto);
-        await AsyncStorage.setItem("progressPhotos", JSON.stringify(savedPhotos));
-        setPhotos(savedPhotos);
-        addImageMessage(cloudinaryUrl, "user", "[Photo uploaded]");
-        setIsTyping(true);
-        addMessage("Analyzing photo...", "ai");
-        // Automatically call backend for analysis
-        const previousPhoto = savedPhotos.length > 1 ? savedPhotos[savedPhotos.length - 2].uri : "";
-        // Only send public URLs for analysis
-        let previousUrl = "";
-        if (previousPhoto && previousPhoto.startsWith("http")) {
-          previousUrl = previousPhoto;
+        // Upload photo via Edge Function
+        let supabaseUrl = "";
+        try {
+          addMessage("Uploading photo...", "ai");
+          supabaseUrl = await uploadPhotoViaFunction(photo.uri, userId, "aicoach_photo_");
+        } catch (err) {
+          addMessage(`Photo upload failed: ${err instanceof Error ? err.message : JSON.stringify(err)}`, "ai");
+          return;
         }
-        const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
-        const feedback = await analyzePhotoWithBackend(previousUrl, cloudinaryUrl, userGoal);
-        setIsTyping(false);
-        if (!feedback || typeof feedback !== "string" || feedback.trim().length === 0 || feedback.toLowerCase().includes("error")) {
-          addMessage(feedback || "AI Coach could not analyze your photo. Please try again or use a different image.", "ai");
-        } else {
-          addMessage(feedback, "ai");
-        }
+        // Update context and analyze using Supabase URL
+        setPhotos((prevPhotos: any[]) => {
+          const newPhoto = {
+            id: `${Date.now()}-${Math.random()}`,
+            uri: supabaseUrl,
+            timestamp: new Date().toISOString(),
+            analysis: null,
+            analyzed: false,
+            progressScore: null,
+          };
+          const updatedPhotos = [...(prevPhotos || []), newPhoto];
+          addImageMessage(supabaseUrl, "user", "[Photo uploaded]");
+          setIsTyping(true);
+          addMessage("Analyzing photo...", "ai");
+          // Automatically call backend for analysis
+          const previousPhoto = updatedPhotos.length > 1 ? updatedPhotos[updatedPhotos.length - 2].uri : "";
+          let previousUrl = "";
+          if (previousPhoto && previousPhoto.startsWith("http")) {
+            previousUrl = previousPhoto;
+          }
+          (async () => {
+            const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
+            const feedback = await analyzePhotoWithBackend(previousUrl, supabaseUrl, userGoal);
+            setIsTyping(false);
+            if (!feedback || typeof feedback !== "string" || feedback.trim().length === 0 || feedback.toLowerCase().includes("error")) {
+              addMessage("Sorry, I couldn't analyze your photo. Please try again later.", "ai");
+            } else {
+              addMessage(feedback, "ai");
+            }
+          })();
+          return updatedPhotos;
+        });
       }
-    } catch {
-      addMessage("Error uploading or analyzing photo. Please try again.", "ai");
+    } catch (error) {
+      addMessage(`Photo upload failed: ${error instanceof Error ? error.message : JSON.stringify(error)}`, "ai");
     }
   };
 
@@ -341,42 +382,87 @@ const AICoachScreen: React.FC = () => {
       });
       if (!result.canceled) {
         const photo = result.assets[0];
-        const extMatch = photo.uri.match(/\.([a-zA-Z0-9]+)$/);
-        const ext = extMatch ? extMatch[1] : "img";
-        const fileName = `aicoach_photo_${Date.now()}.${ext}`;
-        const permanentUri = FileSystem.documentDirectory + fileName;
-        await FileSystem.copyAsync({ from: photo.uri, to: permanentUri });
-
-        // Upload to Cloudinary
-        addMessage("Uploading photo to Cloudinary...", "ai");
-        let cloudinaryUrl = "";
+        // Get user ID for folder
+        const user = await supabase.auth.getUser();
+        const userId = user?.data?.user?.id || 'unknown';
+        // Upload photo via Edge Function
+        let supabaseUrl = "";
         try {
-          cloudinaryUrl = await uploadToCloudinary(permanentUri);
-        } catch {
-          addMessage("Cloudinary upload failed. Please try again.", "ai");
+          addMessage("Uploading photo...", "ai");
+          supabaseUrl = await uploadPhotoViaFunction(photo.uri, userId, "aicoach_photo_");
+        } catch (err) {
+          addMessage(`Photo upload failed: ${err instanceof Error ? err.message : JSON.stringify(err)}`, "ai");
           return;
         }
-
-        // Save photo to AsyncStorage (optional)
-        const savedPhotos = JSON.parse(await AsyncStorage.getItem("progressPhotos") || "[]");
-        savedPhotos.push({ uri: cloudinaryUrl, date: new Date().toISOString() });
-        await AsyncStorage.setItem("progressPhotos", JSON.stringify(savedPhotos));
-        addImageMessage(cloudinaryUrl, "user", "[Photo uploaded]");
-        addMessage("Analyzing photo...", "ai");
-        // Automatically call backend for analysis
-        const previousPhoto = savedPhotos.length > 1 ? savedPhotos[savedPhotos.length - 2].uri : "";
-        let previousUrl = "";
-        if (previousPhoto && previousPhoto.startsWith("http")) {
-          previousUrl = previousPhoto;
-        }
-        const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
-        const feedback = await analyzePhotoWithBackend(previousUrl, cloudinaryUrl, userGoal);
-        addMessage(feedback, "ai");
+        // Update context and analyze using Supabase URL
+        setPhotos((prevPhotos: any[]) => {
+          const newPhoto = {
+            id: `${Date.now()}-${Math.random()}`,
+            uri: supabaseUrl,
+            timestamp: new Date().toISOString(),
+            analysis: null,
+            analyzed: false,
+            progressScore: null,
+          };
+          const updatedPhotos = [...(prevPhotos || []), newPhoto];
+          addImageMessage(supabaseUrl, "user", "[Photo uploaded]");
+          addMessage("Analyzing photo...", "ai");
+          // Automatically call backend for analysis
+          const previousPhoto = updatedPhotos.length > 1 ? updatedPhotos[updatedPhotos.length - 2].uri : "";
+          let previousUrl = "";
+          if (previousPhoto && previousPhoto.startsWith("http")) {
+            previousUrl = previousPhoto;
+          }
+          (async () => {
+            const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
+            const feedback = await analyzePhotoWithBackend(previousUrl, supabaseUrl, userGoal);
+            addMessage(feedback, "ai");
+          })();
+          return updatedPhotos;
+        });
       }
     } catch {
       addMessage("Error attaching photo. Please try again.", "ai");
     }
-  }, [addMessage, addImageMessage]);
+  }, [addMessage, addImageMessage, setPhotos]);
+
+  // Test Supabase connectivity
+  console.log('Testing Supabase connectivity:', process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+  if (process.env.EXPO_PUBLIC_SUPABASE_URL) {
+    fetch(process.env.EXPO_PUBLIC_SUPABASE_URL)
+      .then(res => console.log('Supabase status:', res.status))
+      .catch(err => console.log('Supabase fetch error:', err));
+  }
+
+  React.useEffect(() => {
+    if (photoUri && typeof photoUri === "string") {
+      // Add the photo to chat and analyze automatically
+      addImageMessage(photoUri, "user", "[Photo uploaded]");
+      setPhotos((prevPhotos: any[]) => {
+        const newPhoto = {
+          id: `${Date.now()}-${Math.random()}`,
+          uri: photoUri,
+          timestamp: new Date().toISOString(),
+          analysis: null,
+          analyzed: false,
+          progressScore: null,
+        };
+        return [...(prevPhotos || []), newPhoto];
+      });
+      setIsTyping(true);
+      addMessage("Analyzing photo...", "ai");
+      (async () => {
+        const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
+        const feedback = await analyzePhotoWithBackend("", photoUri, userGoal);
+        setIsTyping(false);
+        if (!feedback || typeof feedback !== "string" || feedback.trim().length === 0 || feedback.toLowerCase().includes("error")) {
+          addMessage("Sorry, I couldn't analyze your photo. Please try again later.", "ai");
+        } else {
+          addMessage(feedback, "ai");
+        }
+      })();
+    }
+  }, [photoUri, addImageMessage, addMessage, setPhotos]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: ui.bg }]} edges={["top", "left", "right"]}>

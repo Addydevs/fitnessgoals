@@ -43,6 +43,6 @@
       "image": "./assets/images/capturefit-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
+      }
     }
   }
-}

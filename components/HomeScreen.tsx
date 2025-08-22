@@ -8,7 +8,6 @@ import { Camera } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   Modal,
   ScrollView,
@@ -17,7 +16,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-  useWindowDimensions,
+  useWindowDimensions
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -263,7 +262,6 @@ export default function HomeScreen({
   useEffect(() => {
     const unsub = onUserChange((u) => {
       try {
-        // Support multiple possible payload shapes: { fullName, name, email, avatar, uri }
         const fullName = (u as any).fullName || (u as any).name || null;
         const email = (u as any).email || null;
         const avatarRaw = (u as any).avatar || (u as any).uri || (u as any).avatarUri || null;
@@ -768,16 +766,7 @@ export default function HomeScreen({
         )}
       </ScrollView>
 
-      {/* Loading Overlay */}
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color="#8B5FBF" />
-            <Text style={styles.loadingTitle}>Analyzing Progress</Text>
-            <Text style={styles.loadingSubtext}>AI is working its magic...</Text>
-          </View>
-        </View>
-      )}
+  {/* Removed loading overlay card */}
     </SafeAreaView>
   );
 }
@@ -922,8 +911,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         borderRadius: 22,
         resizeMode: 'cover',
         borderWidth: 2,
-        borderColor: '#F3F4F6',
-        backgroundColor: '#F3F4F6',
+        borderColor: isDarkMode ? '#F3F4F6' : theme.colors.border,
+        backgroundColor: isDarkMode ? '#F3F4F6' : theme.colors.card,
       },
       greetingContainer: {
         flex: 1,

@@ -21,7 +21,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { uploadToCloudinary } from '../utils/cloudinary';
 import { supabase } from '../utils/supabase';
 import { emitUserChange } from '../utils/userEvents';
 import Layout from './Layout';
@@ -301,17 +300,22 @@ const CaptureFitProfile = () => {
         const pickedUri = result.assets[0].uri;
         console.log('Picked URI:', pickedUri);
 
-        let cloudinaryUrl = null;
-        try {
-          cloudinaryUrl = await uploadToCloudinary(pickedUri);
-        } catch (cloudErr) {
-          console.error('Cloudinary upload failed:', cloudErr);
-          cloudinaryUrl = pickedUri; // fallback to local uri
-        }
+        // Upload avatar to Supabase Storage
+        const fileExt = pickedUri.split('.').pop();
+        const fileName = `avatar_${userData?.name || 'user'}_${Date.now()}.${fileExt}`;
+        const response = await fetch(pickedUri);
+        const blob = await response.blob();
+        const { data, error: uploadError } = await supabase.storage.from('avatars').upload(fileName, blob, {
+          contentType: `image/${fileExt}`,
+          upsert: true,
+        });
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
+        const supabaseUrl = urlData?.publicUrl;
 
         const updatedUserData: UserProfile = {
           ...(userData as UserProfile),
-          avatar: cloudinaryUrl,
+          avatar: supabaseUrl,
           name: userData?.name || userData?.fullName || 'User',
           fullName: (userData as any)?.fullName || userData?.name || 'User',
           joinDate: userData?.joinDate || new Date().toISOString(),

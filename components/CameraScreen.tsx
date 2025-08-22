@@ -3,9 +3,9 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Camera } from "expo-camera";
-
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -18,14 +18,12 @@ import {
   Text,
   View,
 } from "react-native";
-import { uploadToCloudinary } from "../utils/cloudinary";
 import { supabase } from '../utils/supabase';
 
 import Layout, {
   EmptyState,
   ModernCard,
-  ModernHeader,
-  ModernLoading,
+  ModernHeader
 } from "./Layout";
 
 // No client-side OpenAI key; Edge Function will call OpenAI.
@@ -59,6 +57,7 @@ export default function CameraScreen({
   const [count, setCount] = useState<number>(0);
   const countdownAnim = useRef(new Animated.Value(0)).current;
   const intervalRef = useRef<any>(null);
+  const router = useRouter();
 
   const requestCameraPermissionWithPrompt = async () => {
     Alert.alert(
@@ -186,58 +185,63 @@ export default function CameraScreen({
   const processNewPhoto = async (photo: any): Promise<void> => {
     setLoading(true);
     try {
-      // Upload to Cloudinary
-      const cloudinaryUrl = await uploadToCloudinary(photo.uri);
-
-      // Get current user ID from Supabase
+      // Always fetch current user ID from Supabase
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("User not authenticated");
-
+      const userId = user?.id;
+      if (!userId) throw new Error("Photo upload failed: user ID not found");
+      
+      // Upload photo via Edge Function
+      let supabaseUrl = "";
+      try {
+        supabaseUrl = await uploadPhotoViaFunction(photo.uri, userId, "camera_photo_");
+      } catch (err) {
+        Alert.alert("Photo upload failed", err instanceof Error ? err.message : JSON.stringify(err));
+        setLoading(false);
+        return;
+      }
       // Analyze photo with aicoach
       let analysis = null;
       const previousPhoto = photos.length > 0 ? photos[photos.length - 1] : null;
       if (previousPhoto) {
-        analysis = await getAIAnalysis(previousPhoto.uri, photo.uri);
+        analysis = await getAIAnalysis(previousPhoto.uri, supabaseUrl);
       } else {
         analysis = "Great start! This is your first progress photo. Keep going!";
       }
-
       // Save metadata to Supabase
       const { error } = await supabase.from('photos').insert({
         user_id: user.id,
-        url: cloudinaryUrl,
+        url: supabaseUrl,
         timestamp: new Date().toISOString(),
         analysis,
       });
       if (error) throw error;
-
       // Update local state (optional: fetch from Supabase instead)
       const newPhoto: any = {
         id: Date.now().toString(),
-        uri: cloudinaryUrl,
+        uri: supabaseUrl,
         date: new Date().toISOString(),
         analysis,
       };
       const updatedPhotos = [...photos, newPhoto];
       setPhotos(updatedPhotos);
+      // Navigate to AI Coach screen and pass photo
+      router.push('/(tabs)/aicoach?photoUri=' + encodeURIComponent(supabaseUrl));
     } catch (error) {
       console.error("Error processing photo:", error);
-      Alert.alert("Error", "Failed to save photo. Please try again.");
+      Alert.alert("Error", error instanceof Error ? error.message : JSON.stringify(error));
     } finally {
       setLoading(false);
     }
   };
 
   const getAIAnalysis = async (
-    previousPhotoUri: string,
-    currentPhotoUri: string
+    previousPhotoUrl: string,
+    currentPhotoUrl: string
   ): Promise<string> => {
     try {
       const userGoal = (await AsyncStorage.getItem("fitnessGoal")) || "";
-      const previousBase64 = await uriToBase64(previousPhotoUri);
-      const currentBase64 = await uriToBase64(currentPhotoUri);
-
-      const payload = { previousPhoto: previousBase64, currentPhoto: currentBase64, goal: userGoal };
+      // Send image URLs instead of base64
+      const payload = { previousPhotoUrl, currentPhotoUrl, goal: userGoal };
       const res = await supabase.functions.invoke('aicoach', { body: JSON.stringify(payload) });
       if (res.error) {
         console.warn('aicoach function error:', res.error);
@@ -251,31 +255,48 @@ export default function CameraScreen({
     }
   };
 
-  const uriToBase64 = async (uri: string): Promise<string> => {
-    if (uri.startsWith('http')) {
-      // Remote URL: fetch and convert to base64
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      // Read blob as base64
-      return await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const dataUrl = reader.result as string;
-          // Remove the data URL prefix to get only base64 string
-          const base64 = dataUrl.split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    } else {
-      // Local file: use FileSystem
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      return base64;
+  const uploadPhotoViaFunction = async (photoUri: string, userId: string, fileNamePrefix: string = 'photo_') => {
+    // 1. Read the file and get content type
+    const response = await fetch(photoUri);
+    const blob = await response.blob();
+    const contentType = blob.type || 'image/jpeg';
+
+    // 2. Convert file to base64
+    const base64 = await FileSystem.readAsStringAsync(photoUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    // 3. Prepare the payload
+    const fileName = `${fileNamePrefix}${userId}_${Date.now()}.jpg`;
+    const payload = {
+      userId,
+      fileName,
+      fileBase64: base64,
+      contentType,
+    };
+
+    // 4. Invoke the Edge Function
+    const { data, error } = await supabase.functions.invoke('upload-photo', {
+      body: JSON.stringify(payload),
+    });
+
+    if (error) {
+      console.error('Edge function invocation error:', error);
+      throw new Error(error.message || 'Failed to upload photo via function.');
     }
+    
+    if (data.error) {
+        console.error('Edge function returned an error:', data.error);
+        throw new Error(data.error);
+    }
+
+    console.log('Edge function success data:', data);
+    if (!data.publicUrl) {
+        throw new Error('Upload succeeded but did not return a public URL.');
+    }
+    return data.publicUrl;
   };
+
 
   /** ---------- UI ---------- */
 
@@ -475,7 +496,7 @@ export default function CameraScreen({
           secondaryButtonText="Import from Library"
           onSecondaryButtonPress={importFromLibrary}
         />
-        {loading && <ModernLoading title="Analyzing Progress" subtitle="AI is working..." />}
+  {/* Removed loading card */}
         <TipsModal />
         <CountdownOverlay />
       </Layout>
@@ -573,7 +594,7 @@ export default function CameraScreen({
         </ModernCard>
       </View>
 
-      {loading && <ModernLoading title="Analyzing Progress" subtitle="AI is working..." />}
+  {/* Removed loading card */}
       <TipsModal />
       <CountdownOverlay />
     </Layout>

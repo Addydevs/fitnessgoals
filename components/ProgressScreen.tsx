@@ -71,14 +71,14 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
       try {
         const { data, error } = await supabase.from('photos').select('*').order('timestamp', { ascending: false });
         if (error) throw error;
-        // Map Supabase data to Photo type
+        // Map Supabase data to Photo type (no comparison, just fetch)
         const mapped = (data || []).map((p: any) => ({
           id: p.id || p.timestamp,
           uri: p.url,
           timestamp: p.timestamp,
           analysis: p.analysis || null,
           analyzed: true,
-          progressScore: null,
+          progressScore: null, // keep for compatibility, but do not compare
         }));
         setCloudPhotos(mapped);
       } catch (err) {
