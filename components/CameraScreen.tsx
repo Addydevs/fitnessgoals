@@ -8,22 +8,22 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  Animated,
-  Easing,
-  Linking,
-  Modal,
-  Platform,
-  Pressable,
-  Text,
-  View,
+    Alert,
+    Animated,
+    Easing,
+    Linking,
+    Modal,
+    Platform,
+    Pressable,
+    Text,
+    View,
 } from "react-native";
 import { supabase } from '../utils/supabase';
 
 import Layout, {
-  EmptyState,
-  ModernCard,
-  ModernHeader
+    EmptyState,
+    ModernCard,
+    ModernHeader
 } from "./Layout";
 
 // No client-side OpenAI key; Edge Function will call OpenAI.
@@ -171,31 +171,41 @@ export default function CameraScreen({
   };
 
   const importFromLibrary = async (): Promise<void> => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.9,
-    });
-    if (!result.canceled) {
-      await processNewPhoto(result.assets[0]);
+    setLoading(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [3, 4],
+        quality: 0.9,
+      });
+      if (!result.canceled) {
+        // Immediately navigate to AI Coach with local photo URI and switch tab
+        router.replace('/(tabs)/aicoach?photoUri=' + encodeURIComponent(result.assets[0].uri));
+        // Now upload and analyze in the background
+        await processNewPhoto(result.assets[0]);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   const processNewPhoto = async (photo: any): Promise<void> => {
     setLoading(true);
     try {
+      // Immediately navigate to AI Coach with local photo URI and switch tab
+      router.replace('/(tabs)/aicoach?photoUri=' + encodeURIComponent(photo.uri));
+      // Now upload and analyze in the background
       // Always fetch current user ID from Supabase
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id;
       if (!userId) throw new Error("Photo upload failed: user ID not found");
-      
       // Upload photo via Edge Function
       let supabaseUrl = "";
       try {
         supabaseUrl = await uploadPhotoViaFunction(photo.uri, userId, "camera_photo_");
       } catch (err) {
-        Alert.alert("Photo upload failed", err instanceof Error ? err.message : JSON.stringify(err));
+        // Optionally, send error to AI Coach via context or notification
         setLoading(false);
         return;
       }
@@ -214,22 +224,9 @@ export default function CameraScreen({
         timestamp: new Date().toISOString(),
         analysis,
       });
-      if (error) throw error;
-      // Update local state (optional: fetch from Supabase instead)
-      const newPhoto: any = {
-        id: Date.now().toString(),
-        uri: supabaseUrl,
-        date: new Date().toISOString(),
-        analysis,
-      };
-      const updatedPhotos = [...photos, newPhoto];
-      setPhotos(updatedPhotos);
-      // Navigate to AI Coach screen and pass photo
-      router.push('/(tabs)/aicoach?photoUri=' + encodeURIComponent(supabaseUrl));
+      // Optionally, update local state or notify AI Coach
+      setLoading(false);
     } catch (error) {
-      console.error("Error processing photo:", error);
-      Alert.alert("Error", error instanceof Error ? error.message : JSON.stringify(error));
-    } finally {
       setLoading(false);
     }
   };

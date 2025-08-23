@@ -1,32 +1,72 @@
 import { AuthContext } from '@/app/_layout';
 import { Colors } from '@/constants/Colors';
+import { useProgressStore } from '@/contexts/ProgressContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useBreakpoint } from '@/utils/responsive';
 import React, { useContext } from 'react';
-import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { Photo } from '../app/(tabs)/_layout'; // Assuming Photo interface is exported from _layout.tsx
-import { supabase } from '../utils/supabase';
+import { ActivityIndicator, Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import Layout, { ModernCard, ModernHeader, SectionHeader } from './Layout';
+import { supabase } from '@/utils/supabase';
 
-interface ProgressScreenProps {
-  photos?: Photo[];
+// Define the Photo type locally if it's not easily importable
+interface Photo {
+  id: string;
+  url: string;
+  created_at: string;
 }
 
 const { width } = Dimensions.get('window');
 
-export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
-  // (Removed duplicate declarations)
+export default function ProgressScreen() {
+  const { photos, loading, error, fetchPhotos } = useProgressStore();
+  const auth = useContext(AuthContext);
+  const { token } = auth || {};
+  // Get session from Supabase
+  const [session, setSession] = React.useState<any>(null);
+  React.useEffect(() => {
+    async function getSession() {
+      const { data } = await supabase.auth.getSession();
+      setSession(data?.session);
+    }
+    getSession();
+  }, [token]);
   const { isDarkMode, theme } = useTheme();
   const palette = isDarkMode ? Colors.dark : Colors.light;
   const primary = palette.primary;
   const sub = palette.textSecondary;
   const border = theme.colors.border;
   const totalPhotos = photos.length;
-  const maxBarHeight = 80; // Max height for the bars
-  const auth = useContext(AuthContext);
-  const resetProgress = auth?.resetProgress;
-  const [cloudPhotos, setCloudPhotos] = React.useState<Photo[]>([]);
-  const [loadingCloud, setLoadingCloud] = React.useState<boolean>(true);
+  const maxBarHeight = 80;
+
+  // Fetch photos on screen focus
+  React.useEffect(() => {
+    if (session?.user?.id) {
+      fetchPhotos(session.user.id);
+    }
+  }, [session?.user?.id]);
+
+  const resetProgress = async () => {
+    Alert.alert(
+      "Reset Progress",
+      "Are you sure you want to delete all your progress photos? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: async () => {
+            if (session?.user?.id) {
+              await supabase.from('photos').delete().eq('user_id', session.user.id);
+              fetchPhotos(session.user.id); // Refresh after deletion
+            }
+            if (auth?.resetProgress) {
+              await auth.resetProgress(); // Also clear local storage
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Calculate current streak (consecutive days with photos)
   const getCurrentStreak = (photoList: Photo[]): number => {
@@ -37,7 +77,7 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
       const checkDate = new Date(today);
       checkDate.setDate(today.getDate() - i);
       const hasPhotoOnDate = photoList.some((photo) => {
-        const photoDate = new Date(photo.timestamp);
+        const photoDate = new Date(photo.created_at);
         return photoDate.toDateString() === checkDate.toDateString();
       });
       if (hasPhotoOnDate) {
@@ -53,42 +93,16 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
   const getDaysTracked = (photoList: Photo[]): number => {
     const uniqueDays = new Set<string>();
     photoList.forEach((photo) => {
-      const photoDate = new Date(photo.timestamp).toDateString();
+      const photoDate = new Date(photo.created_at).toDateString();
       uniqueDays.add(photoDate);
     });
     return uniqueDays.size;
   };
 
   useBreakpoint();
-  useWindowDimensions(); // re-render on orientation/size changes
-  const currentStreak = getCurrentStreak(cloudPhotos);
-  const daysTracked = getDaysTracked(cloudPhotos);
-
-  // Fetch photos from Supabase (Cloudinary URLs)
-  React.useEffect(() => {
-    const fetchCloudPhotos = async () => {
-      setLoadingCloud(true);
-      try {
-        const { data, error } = await supabase.from('photos').select('*').order('timestamp', { ascending: false });
-        if (error) throw error;
-        // Map Supabase data to Photo type (no comparison, just fetch)
-        const mapped = (data || []).map((p: any) => ({
-          id: p.id || p.timestamp,
-          uri: p.url,
-          timestamp: p.timestamp,
-          analysis: p.analysis || null,
-          analyzed: true,
-          progressScore: null, // keep for compatibility, but do not compare
-        }));
-        setCloudPhotos(mapped);
-      } catch (err) {
-        setCloudPhotos([]);
-      } finally {
-        setLoadingCloud(false);
-      }
-    };
-    fetchCloudPhotos();
-  }, []);
+  useWindowDimensions();
+  const currentStreak = getCurrentStreak(photos);
+  const daysTracked = getDaysTracked(photos);
 
   // Show last 7 days (rolling window)
   const getWeeklyPhotoCounts = (photoList: Photo[]) => {
@@ -100,170 +114,164 @@ export default function ProgressScreen({ photos = [] }: ProgressScreenProps) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       days.push(date);
+      counts.push({
+        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        value: 0,
+      });
     }
-    days.forEach(date => {
-      const dayName = date.toLocaleDateString(undefined, { weekday: 'short' });
-      const count = photoList.filter(photo => {
-        const photoDate = new Date(photo.timestamp);
-        photoDate.setHours(0, 0, 0, 0);
-        return photoDate.getTime() === date.getTime();
-      }).length;
-      counts.push({ day: dayName, value: count });
+
+    photoList.forEach((photo) => {
+      const photoDate = new Date(photo.created_at);
+      photoDate.setHours(0, 0, 0, 0);
+      const dayIndex = days.findIndex((d) => d.getTime() === photoDate.getTime());
+      if (dayIndex !== -1) {
+        counts[dayIndex].value++;
+      }
     });
+
     return counts;
   };
 
-  const weeklyData = getWeeklyPhotoCounts(photos);
-  const maxVal = Math.max(1, ...weeklyData.map(d => d.value));
-  const photosThisWeek = weeklyData.reduce((acc, d) => acc + d.value, 0);
+  const weeklyPhotoCounts = getWeeklyPhotoCounts(photos);
+  const maxWeeklyPhotos = Math.max(...weeklyPhotoCounts.map((d) => d.value), 1);
+
+
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: palette.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { backgroundColor: palette.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: palette.text }}>Error: {error}</Text>
+      </View>
+    );
+  }
 
   return (
     <Layout>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <ModernHeader title="Your Progress" subtitle="Analytics & Insights" />
-        <SectionHeader title="Actions" />
-        <ModernCard style={{ marginHorizontal: 20, marginBottom: 20 }}>
-          <TouchableOpacity
-            style={{ backgroundColor: palette.primary, padding: 12, borderRadius: 12, alignItems: 'center' }}
-            onPress={async () => {
-              if (resetProgress) {
-                await resetProgress();
-                Alert.alert('Progress Reset', 'All progress photos have been cleared.');
-              } else {
-                Alert.alert('Error', 'Reset progress function not available.');
-              }
-            }}
-          >
-            <Text style={{ color: 'white', fontWeight: '600' }}>Reset Progress</Text>
-          </TouchableOpacity>
-        </ModernCard>
-        <SectionHeader title="Photo Stats" />
-        <ModernCard style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: primary }]}>{totalPhotos}</Text>
-          <Text style={[styles.statLabel, { color: sub }]}>Photos Taken</Text>
-          <Text style={{ marginTop: 4, color: sub, fontSize: 12 }}>
-            {photosThisWeek} this week
-          </Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: primary }}>{currentStreak}</Text>
-              <Text style={{ fontSize: 12, color: sub }}>Current Streak</Text>
+      <ModernHeader title="Your Progress" />
+      <ScrollView style={styles.container}>
+        <View style={styles.statsContainer}>
+          <ModernCard>
+            <Text style={[styles.statValue, { color: primary }]}>{totalPhotos}</Text>
+            <Text style={[styles.statLabel, { color: sub }]}>Total Photos</Text>
+          </ModernCard>
+          <ModernCard>
+            <Text style={[styles.statValue, { color: primary }]}>{currentStreak}</Text>
+            <Text style={[styles.statLabel, { color: sub }]}>Current Streak</Text>
+          </ModernCard>
+          <ModernCard>
+            <Text style={[styles.statValue, { color: primary }]}>{daysTracked}</Text>
+            <Text style={[styles.statLabel, { color: sub }]}>Days Tracked</Text>
+          </ModernCard>
+        </View>
+
+        <SectionHeader title="Weekly Activity" />
+        <View style={[styles.chartContainer, { backgroundColor: theme.colors.card }]}>
+          {weeklyPhotoCounts.map((day, index) => (
+            <View key={index} style={styles.barWrapper}>
+              <View
+                style={[
+                  styles.bar,
+                  {
+                    height: (day.value / maxWeeklyPhotos) * maxBarHeight,
+                    backgroundColor: primary,
+                  },
+                ]}
+              />
+              <Text style={[styles.barLabel, { color: sub }]}>{day.day}</Text>
             </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: primary }}>{daysTracked}</Text>
-              <Text style={{ fontSize: 12, color: sub }}>Days Tracked</Text>
-            </View>
-          </View>
-        </ModernCard>
-        <SectionHeader title="Weekly Progress" />
-        <ModernCard style={styles.chartCard}>
-          {maxVal === 1 && photosThisWeek === 0 ? (
-            <Text style={{ textAlign: 'center', color: sub }}>No photos this week yet.</Text>
-          ) : (
-            <View style={styles.chartContainer}>
-              {weeklyData.map((data, i) => (
-                <View key={i} style={styles.barWrapper}>
-                  <View
-                    style={{
-                      width: 25,
-                      height: (data.value / maxVal) * maxBarHeight,
-                      backgroundColor: primary,
-                      borderRadius: 8,
-                      marginBottom: 5,
-                    }}
-                  />
-                  <Text style={[styles.barLabel, { color: sub }]}>{data.day}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </ModernCard>
-        <SectionHeader title="Recent Photos" />
-        <ModernCard style={styles.recentPhotosCard}>
-          {loadingCloud ? (
-            <Text style={[styles.noPhotosText, { color: sub }]}>Loading photos...</Text>
-          ) : cloudPhotos.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoScrollContainer}>
-              {cloudPhotos.map((photo, index) => (
-                <Image
-                  key={index}
-                  source={{ uri: photo.uri }}
-                  style={[styles.recentPhoto, { borderColor: border, borderWidth: 1 }]}
-                />
-              ))}
-            </ScrollView>
-          ) : (
-            <Text style={[styles.noPhotosText, { color: sub }]}>No photos taken yet. Capture your first progress photo!</Text>
-          )}
-        </ModernCard>
+          ))}
+        </View>
+
+        <SectionHeader title="All Photos" />
+        <TouchableOpacity onPress={() => session?.user?.id && fetchPhotos(session.user.id)} style={{margin: 10, alignSelf: 'flex-end', backgroundColor: primary, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8}}>
+          <Text style={{color: '#fff', fontWeight: 'bold'}}>Refresh</Text>
+        </TouchableOpacity>
+        <View style={styles.photoGrid}>
+          {photos.map((photo, index) => (
+            <TouchableOpacity key={index} style={styles.photoContainer}>
+              <Image source={{ uri: photo.url }} style={styles.photo} onError={e => console.log('Image error:', photo.url, e.nativeEvent)} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity onPress={resetProgress} style={styles.resetButton}>
+          <Text style={styles.resetButtonText}>Reset Progress</Text>
+        </TouchableOpacity>
       </ScrollView>
     </Layout>
   );
 }
 
 const styles = StyleSheet.create({
-  statCard: {
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    paddingVertical: 15,
+  container: {
+    flex: 1,
   },
-  statNumber: {
-    fontSize: 38,
-    fontWeight: '800',
-  color: '#6A057F', // overridden by theme
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 10,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   statLabel: {
-    fontSize: 18,
-  color: '#555', // overridden by theme
-    marginTop: 5,
-  },
-  chartCard: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-    paddingVertical: 15,
+    fontSize: 14,
+    textAlign: 'center',
   },
   chartContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
     justifyContent: 'space-around',
-    height: 150, // Increased height for better visual
-    paddingHorizontal: 10,
+    alignItems: 'flex-end',
+    padding: 10,
+    borderRadius: 10,
+    margin: 10,
+    height: 120,
   },
   barWrapper: {
     alignItems: 'center',
-    // width will be overridden dynamically inline using available width
-    width: (width - 80) / 7,
   },
   bar: {
-    width: 25, // Slightly wider bars
-  backgroundColor: '#4CAF50', // overridden by theme
-    borderRadius: 8,
-    marginBottom: 5,
+    width: 20,
+    borderRadius: 5,
   },
   barLabel: {
+    marginTop: 5,
     fontSize: 12,
-  color: '#777', // overridden by theme
   },
-  recentPhotosCard: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-    paddingVertical: 15,
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
   },
-  photoScrollContainer: {
-    paddingHorizontal: 5,
+  photoContainer: {
+    width: width / 3 - 2,
+    height: width / 3 - 2,
+    margin: 1,
   },
-  recentPhoto: {
-    width: 90,
-    height: 90,
+  photo: {
+    flex: 1,
+    width: undefined,
+    height: undefined,
+  },
+  resetButton: {
+    margin: 20,
+    padding: 15,
+    backgroundColor: '#ff3b30',
     borderRadius: 10,
-    marginHorizontal: 5,
-    resizeMode: 'cover',
+    alignItems: 'center',
   },
-  noPhotosText: {
-    textAlign: 'center',
-  color: '#888', // overridden by theme
-    fontStyle: 'italic',
-    paddingVertical: 20,
+  resetButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });

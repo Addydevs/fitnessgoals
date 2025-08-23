@@ -8,17 +8,18 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Alert,
-  Animated,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -86,6 +87,7 @@ const AICoachScreen: React.FC = () => {
       ts: Date.now(),
     },
   ]);
+  const [quickLoading, setQuickLoading] = useState<string | null>(null);
 
   // animated send scale
   const sendScale = useRef(new Animated.Value(1)).current;
@@ -297,6 +299,7 @@ const AICoachScreen: React.FC = () => {
 
 
   const uploadAndAnalyzePhoto = async () => {
+    setQuickLoading('camera');
     try {
       // Check user authentication
       const session = await supabase.auth.getSession();
@@ -363,10 +366,13 @@ const AICoachScreen: React.FC = () => {
       }
     } catch (error) {
       addMessage(`Photo upload failed: ${error instanceof Error ? error.message : JSON.stringify(error)}`, "ai");
+    } finally {
+      setQuickLoading(null);
     }
   };
 
   const handleUploadPhoto = useCallback(async () => {
+    setQuickLoading('upload');
     try {
       // Check user authentication
       const session = await supabase.auth.getSession();
@@ -423,6 +429,8 @@ const AICoachScreen: React.FC = () => {
       }
     } catch {
       addMessage("Error attaching photo. Please try again.", "ai");
+    } finally {
+      setQuickLoading(null);
     }
   }, [addMessage, addImageMessage, setPhotos]);
 
@@ -489,7 +497,7 @@ const AICoachScreen: React.FC = () => {
 
         {/* Quick Actions */}
         <View style={styles.quickRow}>
-          <QuickAction ui={ui} label="Upload Photo" icon="cloud-upload" onPress={uploadAndAnalyzePhoto} />
+          <QuickAction ui={ui} label="Upload Photo" icon="cloud-upload" onPress={uploadAndAnalyzePhoto} loading={quickLoading === 'camera'} />
           <QuickAction ui={ui} label="Compare" icon="compare" onPress={() => sendPromptToBackend("Compare my latest two photos")} />
           <QuickAction ui={ui} label="Plan" icon="calendar-check" onPress={() => sendPromptToBackend("What’s my plan for this week?")} />
           <QuickAction ui={ui} label="Nutrition" icon="food-apple-outline" onPress={() => sendPromptToBackend("Give me a nutrition tip")} />
@@ -563,17 +571,18 @@ const QuickAction = React.memo(function QuickAction({
   icon,
   onPress,
   ui,
+  loading = false,
 }: {
   label: string;
   icon: any;
   onPress: () => void;
   ui: any;
+  loading?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.quickCard, { transform: [{ scale: pressed ? 0.98 : 1 }], backgroundColor: ui.card, borderColor: ui.stroke }]}
-    >
-      <View style={[styles.quickIcon, { backgroundColor: ui.quickIconBg }]}>
-        <MaterialCommunityIcons name={icon} size={18} color={ui.primary} />
+    <Pressable onPress={loading ? undefined : onPress} style={({ pressed }) => [styles.quickCard, { transform: [{ scale: pressed ? 0.98 : 1 }], backgroundColor: ui.card, borderColor: ui.stroke, opacity: loading ? 0.6 : 1 }]}>
+      <View style={[styles.quickIcon, { backgroundColor: ui.quickIconBg }]}> 
+        {loading ? <ActivityIndicator size={16} color={ui.primary} /> : <MaterialCommunityIcons name={icon} size={18} color={ui.primary} />}
       </View>
       <Text style={[styles.quickLabel, { color: ui.text }]}>{label}</Text>
     </Pressable>

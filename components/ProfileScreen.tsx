@@ -278,44 +278,56 @@ const CaptureFitProfile = () => {
     try {
       permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     } catch (err) {
-      console.error('Error requesting media permissions:', err);
       permissionResult = null;
     }
 
     // Some platforms return { status } instead of granted
     const hasPermission = permissionResult && (permissionResult.granted || permissionResult.status === 'granted');
 
-    console.log('handleAvatarPress permissionResult:', permissionResult, 'hasPermission:', hasPermission);
-
     if (hasPermission) {
       // Launch the image picker
       const result = await ImagePicker.launchImageLibraryAsync({
-  mediaTypes: 'images',
+        mediaTypes: 'images',
         aspect: [4, 3],
         quality: 1,
       });
 
-      console.log('ImagePicker result:', result);
       if (!result.canceled && result.assets && result.assets[0]) {
         const pickedUri = result.assets[0].uri;
-        console.log('Picked URI:', pickedUri);
-
-        // Upload avatar to Supabase Storage
         const fileExt = pickedUri.split('.').pop();
         const fileName = `avatar_${userData?.name || 'user'}_${Date.now()}.${fileExt}`;
-        const response = await fetch(pickedUri);
-        const blob = await response.blob();
-        const { data, error: uploadError } = await supabase.storage.from('avatars').upload(fileName, blob, {
-          contentType: `image/${fileExt}`,
-          upsert: true,
-        });
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
-        const supabaseUrl = urlData?.publicUrl;
 
+        // Prepare FormData for edge function
+        const formData = new FormData();
+        formData.append('avatar', {
+          uri: pickedUri,
+          name: fileName,
+          type: `image/${fileExt}`,
+        });
+
+        // Get current session token
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+
+        // Call edge function
+        const response = await fetch('https://vpnitpweduycfmndmxsf.supabase.co/functions/v1/upload-avatar', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          // Optionally show error to user
+          return;
+        }
+        const { avatarUrl } = await response.json();
+
+        // Update UI
         const updatedUserData: UserProfile = {
           ...(userData as UserProfile),
-          avatar: supabaseUrl,
+          avatar: avatarUrl,
           name: userData?.name || userData?.fullName || 'User',
           fullName: (userData as any)?.fullName || userData?.name || 'User',
           joinDate: userData?.joinDate || new Date().toISOString(),
@@ -328,8 +340,6 @@ const CaptureFitProfile = () => {
         setUserData(updatedUserData);
         await AsyncStorage.setItem('user', JSON.stringify(updatedUserData));
         emitUserChange({ fullName: updatedUserData.name, avatar: updatedUserData.avatar, email: '' });
-      } else {
-        console.log('ImagePicker cancelled or no assets returned:', result);
       }
     }
   };
