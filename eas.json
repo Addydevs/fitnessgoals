@@ -6,13 +6,8 @@
       "ios": { "simulator": true }
     },
     "production": {
-      "autoIncrement": "ios",
+      "autoIncrement": true,
       "ios": { "simulator": false }
-    }
-  },
-  "submit": {
-    "production": {
-      "ios": { "ascAppId": null }
     }
   }
 }
