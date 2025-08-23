@@ -1,88 +1,64 @@
 {
-"expo": {
-"name": "CAPTURE FIT",
-"slug": "capturefit",
-"version": "1.0.0",
-"orientation": "portrait",
-"icon": "./assets/images/capturefit-logo.png",
-"scheme": "fitnessprogressmvp",
-"userInterfaceStyle": "automatic",
-"newArchEnabled": true,
+  "expo": {
+    "name": "CAPTURE FIT",
+    "slug": "capturefit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/capturefit-logo.png",
+    "scheme": "capturefit",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
 
+    "ios": {
+      "bundleIdentifier": "com.addyde.capturefit",
+      "buildNumber": "1.0.0",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "We use the camera to capture progress photos.",
+        "NSPhotoLibraryUsageDescription": "We need access to your photos so you can select and analyze progress images.",
+        "NSPhotoLibraryAddUsageDescription": "We save processed images to your library when you choose to export."
+      }
+    },
 
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/capturefit-logo.png",
+        "backgroundColor": "#000000"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.addyde.capturefit"
+    },
 
-"ios": {
-"bundleIdentifier": "com.addyde.capturefit", 
-"buildNumber": "1.0.0", 
-"supportsTablet": true,
-"infoPlist": {
-"NSCameraUsageDescription": "We use the camera to capture progress photos.",
-"NSPhotoLibraryUsageDescription": "We need access to your photos so you can select and analyze progress images.",
-"NSPhotoLibraryAddUsageDescription": "We save processed images to your library when you choose to export."
-}
-},
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/capturefit-logo.png"
+    },
 
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/capturefit-logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ]
+    ],
 
+    "experiments": { "typedRoutes": true },
 
-"android": {
-"adaptiveIcon": {
-"foregroundImage": "./assets/images/capturefit-logo.png",
-"backgroundColor": "#000000"
-},
-"edgeToEdgeEnabled": true,
-"package": "com.anonymous.fitnessprogressmvp"
-},
+    "splash": {
+      "image": "./assets/images/capturefit-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
 
-
-
-"web": {
-"bundler": "metro",
-"output": "static",
-"favicon": "./assets/images/capturefit-logo.png"
-},
-
-
-
-"plugins": [
-"expo-router",
-["expo-splash-screen", {
-"image": "./assets/images/capturefit-logo.png",
-"imageWidth": 200,
-"resizeMode": "contain",
-"backgroundColor": "#000000"
-}]
-],
-
-
-
-"experiments": { "typedRoutes": true },
-
-
-
-"splash": {
-"image": "./assets/images/capturefit-logo.png",
-"resizeMode": "contain",
-"backgroundColor": "#000000"
-},
-
-
-
-"extra": {
-	"router": {},
-	"eas": { "projectId": "18a9772b-423c-4760-a845-bfd539cc2988" }
-},
-"cli": { "version": ">= 10.0.0" },
-"build": {
-	"production": {
-		"ios": { "simulator": false }
-	},
-	"development": {
-		"developmentClient": true,
-		"ios": { "simulator": true }
-	}
-},
-"submit": {
-	"production": { "ios": { "ascAppId": null } }
-}
-}
+    "extra": {
+      "router": {},
+      "eas": { "projectId": "18a9772b-423c-4760-a845-bfd539cc2988" }
+    }
+  }
 }
