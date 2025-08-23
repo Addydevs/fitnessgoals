@@ -1,12 +1,11 @@
 import { AuthContext } from '@/app/_layout';
 import { Colors } from '@/constants/Colors';
-import { useProgressStore } from '@/contexts/ProgressContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useBreakpoint } from '@/utils/responsive';
+import { supabase } from '@/utils/supabase';
 import React, { useContext } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import Layout, { ModernCard, ModernHeader, SectionHeader } from './Layout';
-import { supabase } from '@/utils/supabase';
 
 // Define the Photo type locally if it's not easily importable
 interface Photo {
@@ -18,7 +17,10 @@ interface Photo {
 const { width } = Dimensions.get('window');
 
 export default function ProgressScreen() {
-  const { photos, loading, error, fetchPhotos } = useProgressStore();
+  // Use local state for photos
+  const [photos, setPhotos] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const auth = useContext(AuthContext);
   const { token } = auth || {};
   // Get session from Supabase
@@ -38,35 +40,89 @@ export default function ProgressScreen() {
   const totalPhotos = photos.length;
   const maxBarHeight = 80;
 
+
+  // Always fetch photos from Supabase and update local state, stable reference
+  const fetchPhotosFromDB = React.useCallback(async (userId: string) => {
+    setLoading(true);
+    setError(null);
+    const { data, error } = await supabase
+      .from('photos')
+      .select('id, url, user_id, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      setError(error.message);
+      setPhotos([]);
+    } else if (data) {
+      setPhotos(data.map((p: any) => ({ id: p.id, url: p.url, user_id: p.user_id, created_at: p.created_at })));
+    }
+    setLoading(false);
+  }, []);
+
   // Fetch photos on screen focus
   React.useEffect(() => {
     if (session?.user?.id) {
-      fetchPhotos(session.user.id);
+      fetchPhotosFromDB(session.user.id);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, fetchPhotosFromDB]);
 
-  const resetProgress = async () => {
-    Alert.alert(
-      "Reset Progress",
-      "Are you sure you want to delete all your progress photos? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reset",
-          style: "destructive",
-          onPress: async () => {
-            if (session?.user?.id) {
-              await supabase.from('photos').delete().eq('user_id', session.user.id);
-              fetchPhotos(session.user.id); // Refresh after deletion
+ const resetProgress = async () => {
+  console.log('resetProgress called');
+  Alert.alert(
+    "Reset Progress",
+    "Are you sure you want to delete all your progress photos? This action cannot be undone.",
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Reset",
+        style: "destructive",
+        onPress: async () => {
+          // ...existing code...
+          if (session?.user?.id) {
+            for (const photo of photos) {
+              try {
+                // Extract storage path from URL
+                const path = photo.url.replace(
+                  /^https:\/\/[^/]+\/storage\/v1\/object\/public\/photos\//,
+                  ''
+                );
+
+                const res = await fetch(
+                  'https://vpnitpweduycfmndmxsf.supabase.co/functions/v1/delete-photo-storage',
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session.access_token}`, // ✅ added
+                    },
+                    body: JSON.stringify({
+                      photoId: photo.id,
+                      path: path,
+                    }),
+                  }
+                );
+
+                const result = await res.json();
+                // ...existing code...
+              } catch (err) {
+                // ...existing code...
+              }
             }
-            if (auth?.resetProgress) {
-              await auth.resetProgress(); // Also clear local storage
-            }
-          },
+
+            // Refresh after all deletions are done
+            fetchPhotosFromDB(session.user.id);
+          }
+
+          if (auth?.resetProgress) {
+            await auth.resetProgress(); // Also clear local storage
+          }
         },
-      ]
-    );
-  };
+      },
+    ]
+  );
+};
+
 
   // Calculate current streak (consecutive days with photos)
   const getCurrentStreak = (photoList: Photo[]): number => {
@@ -191,15 +247,23 @@ export default function ProgressScreen() {
         </View>
 
         <SectionHeader title="All Photos" />
-        <TouchableOpacity onPress={() => session?.user?.id && fetchPhotos(session.user.id)} style={{margin: 10, alignSelf: 'flex-end', backgroundColor: primary, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8}}>
-          <Text style={{color: '#fff', fontWeight: 'bold'}}>Refresh</Text>
+        <TouchableOpacity onPress={() => session?.user?.id && fetchPhotosFromDB(session.user.id)} style={{ margin: 10, alignSelf: 'flex-end', backgroundColor: primary, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Refresh</Text>
         </TouchableOpacity>
+        {/* Ensure refresh button fetches from DB */}
+        {/* Use fetchPhotosFromDB for refresh */}
         <View style={styles.photoGrid}>
-          {photos.map((photo, index) => (
-            <TouchableOpacity key={index} style={styles.photoContainer}>
-              <Image source={{ uri: photo.url }} style={styles.photo} onError={e => console.log('Image error:', photo.url, e.nativeEvent)} />
-            </TouchableOpacity>
-          ))}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading photos...</Text>
+            </View>
+          ) : (
+            photos.map((photo, index) => (
+              <TouchableOpacity key={photo.id || index} style={styles.photoContainer}>
+                <Image source={{ uri: photo.url }} style={styles.photo} />
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         <TouchableOpacity onPress={resetProgress} style={styles.resetButton}>

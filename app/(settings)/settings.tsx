@@ -18,6 +18,17 @@ export default function SettingsScreen() {
   const [notificationHour, setNotificationHour] = useState<number>(19);
   const [notificationMinute, setNotificationMinute] = useState<number>(0);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  // Add missing handler for logging access token
+  const handleLogAccessToken = async () => {
+    try {
+      const session = await supabase.auth.getSession();
+      const accessToken = session?.data?.session?.access_token;
+      console.log('Current user access token:', accessToken);
+      Alert.alert('Access Token', accessToken ? 'Check console for token.' : 'No access token found.');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to get access token.');
+    }
+  }
   const [autoSave, setAutoSave] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -206,7 +217,8 @@ export default function SettingsScreen() {
       {
         text: 'Delete',
         style: 'destructive',
-            onPress: async () => {
+        onPress: async () => {
+          Alert.alert('Delete Account', 'Attempting to call delete-account function...');
           try {
             const session = await supabase.auth.getSession();
             const accessToken = session?.data?.session?.access_token;
@@ -217,6 +229,7 @@ export default function SettingsScreen() {
               body: JSON.stringify({}),
               headers: { Authorization: `Bearer ${accessToken}` },
             });
+            console.log('delete-account function response:', funcRes);
             if (funcRes.error) {
               throw new Error(funcRes.error.message || 'Failed');
             }
@@ -343,6 +356,12 @@ export default function SettingsScreen() {
             subtitle="Permanently remove your account"
             onPress={handleDeleteAccount}
           />
+            <TouchableOpacity
+              style={{ marginVertical: 10, padding: 12, backgroundColor: '#eee', borderRadius: 8 }}
+              onPress={handleLogAccessToken}
+            >
+              <Text style={{ color: '#333', textAlign: 'center' }}>Log Access Token to Console</Text>
+            </TouchableOpacity>
           <SettingsItem
             icon="shield-checkmark-outline"
             title="Privacy & Security"

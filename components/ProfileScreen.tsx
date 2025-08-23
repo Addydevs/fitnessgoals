@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React, { useState } from "react";
 import {
   FlatList,
@@ -245,12 +245,12 @@ const CaptureFitProfile = () => {
     }
   }, []);
 
-  // Fetch data after initial render
-  React.useEffect(() => {
-    fetchUserData();
-    loadStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUserData();
+      loadStats();
+    }, [fetchUserData, loadStats])
+  );
 
   const openEditor = (field: keyof Stats): void => {
     setTempValue(String(stats[field]));

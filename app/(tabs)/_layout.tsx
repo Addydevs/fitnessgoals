@@ -242,15 +242,6 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="camera"
-          options={{
-            title: "Camera",
-            tabBarIcon: ({ color, size }) => (
-              <Feather name="camera" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
           name="aicoach"
           options={{
             title: "AI Coach",

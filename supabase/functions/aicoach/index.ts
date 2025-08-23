@@ -11,17 +11,35 @@ Deno.serve(async (req: Request) => {
     const { text, previousPhotoUrl, currentPhotoUrl, goal } = await req.json()
 
     const fitnessInstruction =
-      'You are a fitness and gym expert. Only provide answers, analysis, and advice related to fitness, exercise, gym routines, nutrition for athletes, and workout progress. Ignore or refuse any non-fitness topics.'
+  'You are a fitness progress coach. Compare the provided progress photos and describe observable differences in posture, muscle visibility, or overall shape using neutral, objective language. Focus on fitness-related observations only (such as visible muscle tone, symmetry, or posture). Do not make comments about attractiveness, beauty, or personal identity. Provide constructive workout and nutrition advice in a supportive and motivational tone.'
 
     let prompt = `${fitnessInstruction}\n${text}`
     if (previousPhotoUrl && currentPhotoUrl) {
-      prompt = `${fitnessInstruction}\nCompare the two provided photos and describe the physical and fitness-related changes you observe. Focus on muscle definition, posture, body composition, and any visible progress. ${
-        goal ? 'Goal: ' + goal : ''
-      }`
+  if (text && /compare|difference|progress|change/i.test(text)) {
+    prompt = `${fitnessInstruction}\nCompare the two provided photos and:
+ 1. Describe the changes in physical appearance and fitness between the previous and current photo (muscle definition, posture, body composition, visible progress).
+ 2. Give advice on what the person should improve next, and which body parts need more work.
+ 3. Highlight which body parts look good and which need more attention.
+ 4. Give specific, actionable advice for their next steps and training focus.
+ 5. Be encouraging and constructive in your feedback.
+${goal ? '\nGoal: ' + goal : ''}`
+  } else {
+    prompt = `${fitnessInstruction}\nAnalyze the person's physical appearance in this photo:
+ 1. Describe their fitness, physique, muscle definition, posture, and body composition.
+ 2. Highlight which body parts look good and which need more work.
+ 3. Give advice on what they should improve next and how.
+ 4. Give specific, actionable advice for their next steps and training focus.
+ 5. Be encouraging and constructive in your feedback.
+${goal ? '\nGoal: ' + goal : ''}`
+  }
     } else if (currentPhotoUrl) {
-      prompt = `${fitnessInstruction}\nDescribe the fitness, physique, muscle definition, posture, and body composition of the person in this photo. ${
-        goal ? 'Goal: ' + goal : ''
-      }`
+  prompt = `${fitnessInstruction}\nAnalyze the person's physical appearance in this photo:
+ 1. Describe their fitness, physique, muscle definition, posture, and body composition.
+ 2. Highlight which body parts look good and which need more work.
+ 3. Give advice on what they should improve next and how.
+ 4. Give specific, actionable advice for their next steps and training focus.
+ 5. Be encouraging and constructive in your feedback.
+${goal ? '\nGoal: ' + goal : ''}`
     }
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')

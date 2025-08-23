@@ -24,12 +24,12 @@ Deno.serve(async (req) => {
   }
 
   const fileExt = file.name.split(".").pop();
-  const fileName = `avatar_${user.id}_${Date.now()}.${fileExt}`;
+  const fileName = `photo_${user.id}_${Date.now()}.${fileExt}`;
 
-  // Upload
+  // Upload to photos bucket
   const arrayBuffer = await file.arrayBuffer();
   const { error: uploadError } = await supabase.storage
-    .from("avatars")
+    .from("photos")
     .upload(fileName, new Uint8Array(arrayBuffer), {
       contentType: file.type,
       upsert: true,
@@ -40,13 +40,26 @@ Deno.serve(async (req) => {
   }
 
   // Public URL
-  const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(fileName);
-  const avatarUrl = urlData.publicUrl;
+  const { data: urlData } = supabase.storage.from("photos").getPublicUrl(fileName);
+  const photoUrl = urlData.publicUrl;
 
-  // Update profile
-  await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("id", user.id);
+  // Insert into photos table
+  const timestamp = new Date().toISOString();
+  const analysis = null; // Placeholder for analysis
+  const { error: photoError } = await supabase
+    .from("photos")
+    .insert({
+      user_id: user.id,
+      url: photoUrl,
+      timestamp,
+      analysis,
+      created_at: timestamp,
+    });
+  if (photoError) {
+    return new Response(JSON.stringify({ error: photoError.message }), { status: 500 });
+  }
 
-  return new Response(JSON.stringify({ avatarUrl }), {
+  return new Response(JSON.stringify({ photoUrl }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
