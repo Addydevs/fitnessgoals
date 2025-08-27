@@ -1,4 +1,5 @@
 import ProgressScreen from "@/components/ProgressScreen";
+import Constants from 'expo-constants';
 import React, { useContext } from "react";
 import { PhotoContext } from "./_layout";
 
@@ -13,6 +14,4 @@ export default function ProgressPage() {
   
   return <ProgressScreen photos={photos} />;
 }
-}
-import Constants from 'expo-constants';
 

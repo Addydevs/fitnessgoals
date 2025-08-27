@@ -24,8 +24,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 
+import Constants from 'expo-constants'; // <-- Moved import here
 import { PhotoContext } from "../app/(tabs)/_layout";
 import { supabase } from '../utils/supabase';
+
 // import * as Haptics from "expo-haptics"; // optional
 
 /**
@@ -435,7 +437,6 @@ const AICoachScreen: React.FC = () => {
   }, [addMessage, addImageMessage, setPhotos]);
 
   // Test Supabase connectivity
-  import Constants from 'expo-constants';
   console.log('Testing Supabase connectivity:', Constants.expoConfig.extra.EXPO_PUBLIC_SUPABASE_URL, Constants.expoConfig.extra.EXPO_PUBLIC_SUPABASE_ANON_KEY);
   if (Constants.expoConfig.extra.EXPO_PUBLIC_SUPABASE_URL) {
     fetch(Constants.expoConfig.extra.EXPO_PUBLIC_SUPABASE_URL)
