@@ -8,6 +8,7 @@ import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'reac
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../utils/supabase';
 import { emitUserChange } from '../../utils/userEvents';
+// Removed unused environment variable declarations
 
 export default function EditProfileScreen() {
   const [fullName, setFullName] = useState('');
