@@ -69,7 +69,7 @@
 
 "extra": {
 	"router": {},
-	"eas": { "projectId": "18a9772b-423c-4760-a845-bfd539cc2988" }
+	"eas": { "projectId": "97f4ca5d-ea69-42cd-84eb-21b788c918ad" }
 },
 "cli": { "version": ">= 10.0.0" },
 "build": {

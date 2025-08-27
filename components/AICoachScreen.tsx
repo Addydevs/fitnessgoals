@@ -435,9 +435,10 @@ const AICoachScreen: React.FC = () => {
   }, [addMessage, addImageMessage, setPhotos]);
 
   // Test Supabase connectivity
-  console.log('Testing Supabase connectivity:', process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
-  if (process.env.EXPO_PUBLIC_SUPABASE_URL) {
-    fetch(process.env.EXPO_PUBLIC_SUPABASE_URL)
+  import Constants from 'expo-constants';
+  console.log('Testing Supabase connectivity:', Constants.expoConfig.extra.EXPO_PUBLIC_SUPABASE_URL, Constants.expoConfig.extra.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+  if (Constants.expoConfig.extra.EXPO_PUBLIC_SUPABASE_URL) {
+    fetch(Constants.expoConfig.extra.EXPO_PUBLIC_SUPABASE_URL)
       .then(res => console.log('Supabase status:', res.status))
       .catch(err => console.log('Supabase fetch error:', err));
   }
