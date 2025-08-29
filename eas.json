@@ -1,27 +1,13 @@
 {
-  "cli": {
-    "version": ">= 10.0.0",
-    "appVersionSource": "remote"
-  },
+  "cli": { "version": ">= 10.0.0" },
   "build": {
     "development": {
       "developmentClient": true,
-      "ios": {
-        "simulator": true
-      }
+      "ios": { "simulator": true }
     },
     "production": {
       "autoIncrement": true,
-      "ios": {
-        "simulator": false
-      },
-      "android": {
-        "buildType": "app-bundle"
-      },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://vpnitpweduycfmndmxsf.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwbml0cHdlZHV5Y2ZtbmRteHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTU3MjksImV4cCI6MjA3MDg3MTcyOX0.LRVY6boXeixgCHJi1BelSdO6UHIePJYIJk-T7eWxY9s"
-      }
+      "ios": { "simulator": false }
     }
   }
 }

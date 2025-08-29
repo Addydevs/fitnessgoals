@@ -8,18 +8,18 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -62,15 +62,15 @@ const SUGGESTIONS_BASE = [
 
 const AICoachScreen: React.FC = () => {
   const { photoUri } = useLocalSearchParams();
-  // Initial lightweight ping to warm up Supabase Edge Function for instant AI feedback
+  // Initial ping to warm up Supabase Edge Function for instant OpenAI feedback
   React.useEffect(() => {
-    supabase.functions.invoke('aicoach', { body: JSON.stringify({ ping: true }) });
+    supabase.functions.invoke('aicoach', { body: JSON.stringify({ text: 'ping' }) });
   }, []);
-  // Keep Supabase Edge Function warm to reduce cold start latency (every 1 minute)
+  // Keep Supabase Edge Function warm to reduce cold start latency
   React.useEffect(() => {
     const pingInterval = setInterval(() => {
-      supabase.functions.invoke('aicoach', { body: JSON.stringify({ ping: true }) });
-    }, 60000); // every 1 minute
+      supabase.functions.invoke('aicoach', { body: JSON.stringify({ text: 'ping' }) });
+    }, 120000); // every 2 minutes
     return () => clearInterval(pingInterval);
   }, []);
   const { isDarkMode: isDark, theme: navTheme } = useTheme();
