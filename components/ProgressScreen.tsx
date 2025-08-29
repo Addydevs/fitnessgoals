@@ -1,212 +1,253 @@
-import { AuthContext } from '@/app/_layout';
-import { Colors } from '@/constants/Colors';
-import { useTheme } from '@/contexts/ThemeContext';
-import { useBreakpoint } from '@/utils/responsive';
-import { supabase } from '@/utils/supabase';
-import React, { useContext } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import Layout, { ModernCard, ModernHeader, SectionHeader } from './Layout';
+"use client"
+
+import { AuthContext } from "@/app/_layout"
+import { Colors } from "@/constants/Colors"
+import { useTheme } from "@/contexts/ThemeContext"
+import { useBreakpoint } from "@/utils/responsive"
+import { supabase } from "@/utils/supabase"
+import { useContext, useMemo, useState, useCallback, useEffect } from "react"
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from "react-native"
+import Layout, { ModernCard, ModernHeader, SectionHeader } from "./Layout"
 
 // Define the Photo type locally if it's not easily importable
 interface Photo {
-  id: string;
-  url: string;
-  created_at: string;
+  id: string
+  url: string
+  created_at: string
 }
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window")
+
+// Calculate current streak (consecutive days with photos)
+const getCurrentStreak = (photoList: Photo[]): number => {
+  if (photoList.length === 0) return 0
+  let streak = 0
+  const today = new Date()
+  for (let i = 0; i < 365; i++) {
+    const checkDate = new Date(today)
+    checkDate.setDate(today.getDate() - i)
+    const hasPhotoOnDate = photoList.some((photo) => {
+      const photoDate = new Date(photo.created_at)
+      return photoDate.toDateString() === checkDate.toDateString()
+    })
+    if (hasPhotoOnDate) {
+      streak++
+    } else {
+      break
+    }
+  }
+  return streak
+}
+
+// Calculate days tracked (unique days with photos)
+const getDaysTracked = (photoList: Photo[]): number => {
+  const uniqueDays = new Set<string>()
+  photoList.forEach((photo) => {
+    const photoDate = new Date(photo.created_at).toDateString()
+    uniqueDays.add(photoDate)
+  })
+  return uniqueDays.size
+}
+
+// Show last 7 days (rolling window)
+const getWeeklyPhotoCounts = (photoList: Photo[]) => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days = []
+  const counts: { day: string; value: number }[] = []
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(today)
+    date.setDate(today.getDate() - i)
+    days.push(date)
+    counts.push({
+      day: date.toLocaleDateString("en-US", { weekday: "short" }),
+      value: 0,
+    })
+  }
+
+  photoList.forEach((photo) => {
+    const photoDate = new Date(photo.created_at)
+    photoDate.setHours(0, 0, 0, 0)
+    const dayIndex = days.findIndex((d) => d.getTime() === photoDate.getTime())
+    if (dayIndex !== -1) {
+      counts[dayIndex].value++
+    }
+  })
+
+  return counts
+}
 
 export default function ProgressScreen() {
   // Use local state for photos
-  const [photos, setPhotos] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const auth = useContext(AuthContext);
-  const { token } = auth || {};
+  const [photos, setPhotos] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const auth = useContext(AuthContext)
+  const { token } = auth || {}
   // Get session from Supabase
-  const [session, setSession] = React.useState<any>(null);
-  React.useEffect(() => {
+  const [session, setSession] = useState<any>(null)
+  useEffect(() => {
     async function getSession() {
-      const { data } = await supabase.auth.getSession();
-      setSession(data?.session);
+      const { data } = await supabase.auth.getSession()
+      setSession(data?.session)
     }
-    getSession();
-  }, [token]);
-  const { isDarkMode, theme } = useTheme();
-  const palette = isDarkMode ? Colors.dark : Colors.light;
-  const primary = palette.primary;
-  const sub = palette.textSecondary;
-  const border = theme.colors.border;
-  const totalPhotos = photos.length;
-  const maxBarHeight = 80;
+    getSession()
+  }, [token])
+  const { isDarkMode, theme } = useTheme()
+  const palette = isDarkMode ? Colors.dark : Colors.light
+  const primary = palette.primary
+  const sub = palette.textSecondary
+  const border = theme.colors.border
+  const totalPhotos = photos.length
+  const maxBarHeight = 80
 
+  const [displayedPhotos, setDisplayedPhotos] = useState<any[]>([])
+  const [photosPerPage] = useState(20)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const currentStreak = useMemo(() => getCurrentStreak(photos), [photos])
+  const daysTracked = useMemo(() => getDaysTracked(photos), [photos])
+  const weeklyPhotoCounts = useMemo(() => getWeeklyPhotoCounts(photos), [photos])
+  const maxWeeklyPhotos = useMemo(() => Math.max(...weeklyPhotoCounts.map((d) => d.value), 1), [weeklyPhotoCounts])
 
   // Always fetch photos from Supabase and update local state, stable reference
-  const fetchPhotosFromDB = React.useCallback(async (userId: string) => {
-    setLoading(true);
-    setError(null);
-    const { data, error } = await supabase
-      .from('photos')
-      .select('id, url, user_id, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+  const fetchPhotosFromDB = useCallback(async (userId: string, showLoading = true) => {
+    if (showLoading) setLoading(true)
+    setError(null)
 
-    if (error) {
-      setError(error.message);
-      setPhotos([]);
-    } else if (data) {
-      setPhotos(data.map((p: any) => ({ id: p.id, url: p.url, user_id: p.user_id, created_at: p.created_at })));
+    try {
+      const { data, error } = await supabase
+        .from("photos")
+        .select("id, url, user_id, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+
+      if (error) throw error
+
+      setPhotos(data || [])
+      setCurrentPage(1) // Reset pagination
+    } catch (err: any) {
+      setError(err.message)
+      setPhotos([])
+    } finally {
+      if (showLoading) setLoading(false)
     }
-    setLoading(false);
-  }, []);
+  }, [])
 
   // Fetch photos on screen focus
-  React.useEffect(() => {
+  useEffect(() => {
     if (session?.user?.id) {
-      fetchPhotosFromDB(session.user.id);
+      fetchPhotosFromDB(session.user.id)
     }
-  }, [session?.user?.id, fetchPhotosFromDB]);
+  }, [session?.user?.id, fetchPhotosFromDB])
 
- const resetProgress = async () => {
-  console.log('resetProgress called');
-  Alert.alert(
-    "Reset Progress",
-    "Are you sure you want to delete all your progress photos? This action cannot be undone.",
-    [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Reset",
-        style: "destructive",
-        onPress: async () => {
-          // ...existing code...
-          if (session?.user?.id) {
-            for (const photo of photos) {
-              try {
-                // Extract storage path from URL
-                const path = photo.url.replace(
-                  /^https:\/\/[^/]+\/storage\/v1\/object\/public\/photos\//,
-                  ''
-                );
+  useEffect(() => {
+    const startIndex = 0
+    const endIndex = currentPage * photosPerPage
+    setDisplayedPhotos(photos.slice(startIndex, endIndex))
+  }, [photos, currentPage, photosPerPage])
 
-                const res = await fetch(
-                  'https://vpnitpweduycfmndmxsf.supabase.co/functions/v1/delete-photo-storage',
-                  {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session.access_token}`, // ✅ added
-                    },
-                    body: JSON.stringify({
-                      photoId: photo.id,
-                      path: path,
-                    }),
-                  }
-                );
+  const resetProgress = async () => {
+    Alert.alert(
+      "Reset Progress",
+      "Are you sure you want to delete all your progress photos? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: async () => {
+            if (!session?.user?.id || photos.length === 0) return
 
-                const result = await res.json();
-                // ...existing code...
-              } catch (err) {
-                // ...existing code...
+            setLoading(true)
+            try {
+              for (const photo of photos) {
+                // Extract path from URL (remove the base URL part)
+                const urlParts = photo.url.split("/photos/")
+                const path = urlParts.length > 1 ? urlParts[1] : photo.url
+
+                const res = await fetch("https://vpnitpweduycfmndmxsf.supabase.co/functions/v1/delete-photo-storage", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${session.access_token}`,
+                  },
+                  body: JSON.stringify({
+                    photoId: photo.id,
+                    path: path,
+                  }),
+                })
+
+                if (!res.ok) {
+                  const errorData = await res.json()
+                  throw new Error(`Failed to delete photo ${photo.id}: ${errorData.error || "Unknown error"}`)
+                }
               }
+
+              // Clear local state immediately for better UX
+              setPhotos([])
+              setDisplayedPhotos([])
+
+              if (auth?.resetProgress) {
+                await auth.resetProgress()
+              }
+            } catch (err: any) {
+              setError(err.message)
+              // Refresh to get current state if deletion failed
+              fetchPhotosFromDB(session.user.id, false)
+            } finally {
+              setLoading(false)
             }
-
-            // Refresh after all deletions are done
-            fetchPhotosFromDB(session.user.id);
-          }
-
-          if (auth?.resetProgress) {
-            await auth.resetProgress(); // Also clear local storage
-          }
+          },
         },
-      },
-    ]
-  );
-};
+      ],
+    )
+  }
 
+  useBreakpoint()
+  useWindowDimensions()
 
-  // Calculate current streak (consecutive days with photos)
-  const getCurrentStreak = (photoList: Photo[]): number => {
-    if (photoList.length === 0) return 0;
-    let streak = 0;
-    const today = new Date();
-    for (let i = 0; i < 365; i++) {
-      const checkDate = new Date(today);
-      checkDate.setDate(today.getDate() - i);
-      const hasPhotoOnDate = photoList.some((photo) => {
-        const photoDate = new Date(photo.created_at);
-        return photoDate.toDateString() === checkDate.toDateString();
-      });
-      if (hasPhotoOnDate) {
-        streak++;
-      } else {
-        break;
-      }
+  const loadMorePhotos = () => {
+    if (displayedPhotos.length < photos.length) {
+      setCurrentPage((prev) => prev + 1)
     }
-    return streak;
-  };
-
-  // Calculate days tracked (unique days with photos)
-  const getDaysTracked = (photoList: Photo[]): number => {
-    const uniqueDays = new Set<string>();
-    photoList.forEach((photo) => {
-      const photoDate = new Date(photo.created_at).toDateString();
-      uniqueDays.add(photoDate);
-    });
-    return uniqueDays.size;
-  };
-
-  useBreakpoint();
-  useWindowDimensions();
-  const currentStreak = getCurrentStreak(photos);
-  const daysTracked = getDaysTracked(photos);
-
-  // Show last 7 days (rolling window)
-  const getWeeklyPhotoCounts = (photoList: Photo[]) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const days = [];
-    const counts: { day: string; value: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      days.push(date);
-      counts.push({
-        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        value: 0,
-      });
-    }
-
-    photoList.forEach((photo) => {
-      const photoDate = new Date(photo.created_at);
-      photoDate.setHours(0, 0, 0, 0);
-      const dayIndex = days.findIndex((d) => d.getTime() === photoDate.getTime());
-      if (dayIndex !== -1) {
-        counts[dayIndex].value++;
-      }
-    });
-
-    return counts;
-  };
-
-  const weeklyPhotoCounts = getWeeklyPhotoCounts(photos);
-  const maxWeeklyPhotos = Math.max(...weeklyPhotoCounts.map((d) => d.value), 1);
-
-
+  }
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: palette.background, justifyContent: 'center', alignItems: 'center' }]}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: palette.background, justifyContent: "center", alignItems: "center" },
+        ]}
+      >
         <ActivityIndicator size="large" color={primary} />
       </View>
-    );
+    )
   }
 
   if (error) {
     return (
-      <View style={[styles.container, { backgroundColor: palette.background, justifyContent: 'center', alignItems: 'center' }]}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: palette.background, justifyContent: "center", alignItems: "center" },
+        ]}
+      >
         <Text style={{ color: palette.text }}>Error: {error}</Text>
       </View>
-    );
+    )
   }
 
   return (
@@ -233,13 +274,7 @@ export default function ProgressScreen() {
           {weeklyPhotoCounts.map((day, index) => (
             <View key={index} style={styles.barWrapper}>
               <View
-                style={[
-                  styles.bar,
-                  {
-                    height: (day.value / maxWeeklyPhotos) * maxBarHeight,
-                    backgroundColor: primary,
-                  },
-                ]}
+                style={[styles.bar, { height: (day.value / maxWeeklyPhotos) * maxBarHeight, backgroundColor: primary }]}
               />
               <Text style={[styles.barLabel, { color: sub }]}>{day.day}</Text>
             </View>
@@ -247,31 +282,38 @@ export default function ProgressScreen() {
         </View>
 
         <SectionHeader title="All Photos" />
-        <TouchableOpacity onPress={() => session?.user?.id && fetchPhotosFromDB(session.user.id)} style={{ margin: 10, alignSelf: 'flex-end', backgroundColor: primary, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 }}>
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Refresh</Text>
+        <TouchableOpacity
+          onPress={() => session?.user?.id && fetchPhotosFromDB(session.user.id)}
+          style={[styles.refreshButton, { backgroundColor: primary }]}
+          disabled={loading}
+        >
+          <Text style={styles.refreshButtonText}>{loading ? "Refreshing..." : "Refresh"}</Text>
         </TouchableOpacity>
-        {/* Ensure refresh button fetches from DB */}
-        {/* Use fetchPhotosFromDB for refresh */}
+
         <View style={styles.photoGrid}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading photos...</Text>
-            </View>
-          ) : (
-            photos.map((photo, index) => (
-              <TouchableOpacity key={photo.id || index} style={styles.photoContainer}>
-                <Image source={{ uri: photo.url }} style={styles.photo} />
-              </TouchableOpacity>
-            ))
-          )}
+          {displayedPhotos.map((photo, index) => (
+            <TouchableOpacity key={photo.id || index} style={styles.photoContainer}>
+              <Image
+                source={{ uri: photo.url }}
+                style={styles.photo}
+                onError={() => console.log("Failed to load image:", photo.url)}
+              />
+            </TouchableOpacity>
+          ))}
         </View>
 
-        <TouchableOpacity onPress={resetProgress} style={styles.resetButton}>
-          <Text style={styles.resetButtonText}>Reset Progress</Text>
+        {displayedPhotos.length < photos.length && (
+          <TouchableOpacity onPress={loadMorePhotos} style={[styles.loadMoreButton, { backgroundColor: primary }]}>
+            <Text style={styles.loadMoreButtonText}>Load More Photos</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity onPress={resetProgress} style={styles.resetButton} disabled={loading}>
+          <Text style={styles.resetButtonText}>{loading ? "Resetting..." : "Reset Progress"}</Text>
         </TouchableOpacity>
       </ScrollView>
     </Layout>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -279,30 +321,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     padding: 10,
   },
   statValue: {
     fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
   },
   statLabel: {
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: "center",
   },
   chartContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "flex-end",
     padding: 10,
     borderRadius: 10,
     margin: 10,
     height: 120,
   },
   barWrapper: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   bar: {
     width: 20,
@@ -313,9 +355,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
   },
   photoContainer: {
     width: width / 3 - 2,
@@ -330,12 +372,33 @@ const styles = StyleSheet.create({
   resetButton: {
     margin: 20,
     padding: 15,
-    backgroundColor: '#ff3b30',
+    backgroundColor: "#ff3b30",
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   resetButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: "white",
+    fontWeight: "bold",
   },
-});
+  refreshButton: {
+    margin: 10,
+    alignSelf: "flex-end",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  refreshButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  loadMoreButton: {
+    margin: 20,
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  loadMoreButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+})
