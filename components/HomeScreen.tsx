@@ -1,63 +1,64 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from '@react-navigation/native';
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Camera } from "expo-camera";
+"use client"
+
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
+import AsyncStorage from "@react-native-async-storage/async-storage"
+import { useFocusEffect } from "@react-navigation/native"
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
+import { Camera } from "expo-camera"
 // FileSystem not used in HomeScreen
 // ImagePicker not used directly in HomeScreen
-import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useEffect, useState } from "react";
+import { LinearGradient } from "expo-linear-gradient"
+import React, { useCallback, useEffect, useState } from "react"
 import {
-    Image,
-    Modal,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-    useWindowDimensions
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+  Image,
+  Modal,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from "react-native"
+import { SafeAreaView } from "react-native-safe-area-context"
 
-import { useTheme } from '@/contexts/ThemeContext';
-import { normalizeFont, useBreakpoint } from '@/utils/responsive';
-import { Photo, RootStackParamList } from "../app/(tabs)/_layout"; // Import Photo and RootStackParamList from _layout.tsx
-import { supabase } from '../utils/supabase';
-import { onUserChange } from '../utils/userEvents';
+import { useTheme } from "@/contexts/ThemeContext"
+import { normalizeFont, useBreakpoint } from "@/utils/responsive"
+import type { Photo, RootStackParamList } from "../app/(tabs)/_layout" // Import Photo and RootStackParamList from _layout.tsx
+import { supabase } from "../utils/supabase"
+import { onUserChange } from "../utils/userEvents"
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>
 
 interface Notification {
-  id: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
+  id: string
+  message: string
+  timestamp: string
+  read: boolean
 }
 
 interface UserStats {
-  totalPhotos: number;
-  lastPhotoDate: string | null;
-  startDate: string;
-  currentStreak: number;
-  photosThisWeek: number;
-  updatedAt: string;
+  totalPhotos: number
+  lastPhotoDate: string | null
+  startDate: string
+  currentStreak: number
+  photosThisWeek: number
+  updatedAt: string
 }
 
 interface HomeScreenProps {
-  photos: Photo[];
-  setPhotos: (photos: Photo[]) => void;
-  loading: boolean;
-  setLoading: (loading: boolean) => void;
-  navigation?: NavigationProp;
+  photos: Photo[]
+  setPhotos: (photos: Photo[]) => void
+  loading: boolean
+  setLoading: (loading: boolean) => void
+  navigation?: NavigationProp
 }
 
 // UserType interface
 interface UserType {
-  fullName: string;
-  email: string;
-  avatar?: string | null;
+  fullName: string
+  email: string
+  avatar?: string | null
 }
 
 // screenWidth replaced by hook-driven width
@@ -65,46 +66,46 @@ interface UserType {
 
 // Helper Functions for Data Tracking
 const getCurrentStreak = (photos: Photo[]): number => {
-  if (photos.length === 0) return 0;
+  if (photos.length === 0) return 0
 
-  let streak = 0;
-  const today = new Date();
+  let streak = 0
+  const today = new Date()
 
   for (let i = 0; i < 365; i++) {
-    const checkDate = new Date(today);
-    checkDate.setDate(today.getDate() - i);
+    const checkDate = new Date(today)
+    checkDate.setDate(today.getDate() - i)
 
     const hasPhotoOnDate = photos.some((photo) => {
-      const photoDate = new Date(photo.timestamp);
-      return photoDate.toDateString() === checkDate.toDateString();
-    });
+      const photoDate = new Date(photo.timestamp)
+      return photoDate.toDateString() === checkDate.toDateString()
+    })
 
     if (hasPhotoOnDate) {
-      streak++;
+      streak++
     } else {
-      break;
+      break
     }
   }
 
-  return streak;
-};
+  return streak
+}
 
 const getPhotosThisWeek = (photos: Photo[]): number => {
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAgo = new Date()
+  weekAgo.setDate(weekAgo.getDate() - 7)
 
   return photos.filter((photo) => {
-    const photoDate = new Date(photo.timestamp);
-    return photoDate >= weekAgo;
-  }).length;
-};
+    const photoDate = new Date(photo.timestamp)
+    return photoDate >= weekAgo
+  }).length
+}
 
 const hasPhotoOnDate = (photos: Photo[], targetDate: Date): boolean => {
   return photos.some((photo) => {
-    const photoDate = new Date(photo.timestamp);
-    return photoDate.toDateString() === targetDate.toDateString();
-  });
-};
+    const photoDate = new Date(photo.timestamp)
+    return photoDate.toDateString() === targetDate.toDateString()
+  })
+}
 
 const saveUserStats = async (photos: Photo[]): Promise<UserStats | null> => {
   const stats: UserStats = {
@@ -114,20 +115,20 @@ const saveUserStats = async (photos: Photo[]): Promise<UserStats | null> => {
     currentStreak: getCurrentStreak(photos),
     photosThisWeek: getPhotosThisWeek(photos),
     updatedAt: new Date().toISOString(),
-  };
+  }
 
   try {
-    await AsyncStorage.setItem("userStats", JSON.stringify(stats));
-    return stats;
+    await AsyncStorage.setItem("userStats", JSON.stringify(stats))
+    return stats
   } catch (error) {
-    console.error("Error saving user stats:", error);
-    return null;
+    console.error("Error saving user stats:", error)
+    return null
   }
-};
+}
 
 const loadUserStats = async (): Promise<UserStats> => {
   try {
-    const stats = await AsyncStorage.getItem("userStats");
+    const stats = await AsyncStorage.getItem("userStats")
     return stats
       ? JSON.parse(stats)
       : {
@@ -137,9 +138,9 @@ const loadUserStats = async (): Promise<UserStats> => {
           currentStreak: 0,
           photosThisWeek: 0,
           updatedAt: new Date().toISOString(),
-        };
+        }
   } catch (error) {
-    console.error("Error loading user stats:", error);
+    console.error("Error loading user stats:", error)
     return {
       totalPhotos: 0,
       lastPhotoDate: null,
@@ -147,9 +148,9 @@ const loadUserStats = async (): Promise<UserStats> => {
       currentStreak: 0,
       photosThisWeek: 0,
       updatedAt: new Date().toISOString(),
-    };
+    }
   }
-};
+}
 
 // extractProgressScore removed (not used in this file)
 
@@ -161,21 +162,21 @@ export default function HomeScreen({
   setLoading = () => {},
   navigation,
 }: HomeScreenProps) {
-  const { isDarkMode, theme } = useTheme();
-  useWindowDimensions(); // invoke to trigger re-render on orientation change (width not directly needed here)
-  const bp = useBreakpoint();
-  const dim = useWindowDimensions();
-  const isLandscape = dim.width > dim.height;
-  const styles = getStyles(isDarkMode, theme, bp, isLandscape) as any;
-  const barStyle = isDarkMode ? ("light-content" as const) : ("dark-content" as const);
-  const barBg = isDarkMode ? theme.colors.background : "white";
+  const { isDarkMode, theme } = useTheme()
+  useWindowDimensions() // invoke to trigger re-render on orientation change (width not directly needed here)
+  const bp = useBreakpoint()
+  const dim = useWindowDimensions()
+  const isLandscape = dim.width > dim.height
+  const styles = getStyles(isDarkMode, theme, bp, isLandscape) as any
+  const barStyle = isDarkMode ? ("light-content" as const) : ("dark-content" as const)
+  const barBg = isDarkMode ? theme.colors.background : "white"
 
   // cameraPermission state removed (not needed in HomeScreen)
-  const [showWelcome, setShowWelcome] = useState<boolean>(true);
-  const [currentDate] = useState<Date>(new Date());
-  const [isModalVisible, setModalVisible] = useState(false);
-  const [generalNotifications, setGeneralNotifications] = useState<Notification[]>([]);
-  const [user, setUser] = useState<UserType | null>(null);
+  const [showWelcome, setShowWelcome] = useState<boolean>(true)
+  const [currentDate] = useState<Date>(new Date())
+  const [isModalVisible, setModalVisible] = useState(false)
+  const [generalNotifications, setGeneralNotifications] = useState<Notification[]>([])
+  const [user, setUser] = useState<UserType | null>(null)
   const [userStats, setUserStats] = useState<UserStats>({
     totalPhotos: 0,
     currentStreak: 0,
@@ -183,21 +184,23 @@ export default function HomeScreen({
     lastPhotoDate: null,
     startDate: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  });
-  const [userPhotos, setUserPhotos] = useState<Photo[]>([]);
+  })
+  const [userPhotos, setUserPhotos] = useState<Photo[]>([])
   // Track if we've already handled camera permission to avoid spammy logs/requests
-  const cameraPermissionCheckedRef = React.useRef<boolean>(false);
+  const cameraPermissionCheckedRef = React.useRef<boolean>(false)
 
   useFocusEffect(() => {
-    getCameraPermission();
-    checkWelcomeStatus();
-    loadGeneralNotificationsData();
+    getCameraPermission()
+    checkWelcomeStatus()
+    loadGeneralNotificationsData()
     // Fetch user and photos from Supabase
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user?.id) {
-        setUser(null);
-        setUserPhotos([]);
+        setUser(null)
+        setUserPhotos([])
         setUserStats({
           totalPhotos: 0,
           currentStreak: 0,
@@ -205,25 +208,29 @@ export default function HomeScreen({
           lastPhotoDate: null,
           startDate: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-        });
-        return;
+        })
+        return
       }
       // Fetch profile info from Supabase (if you have a profiles table)
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
       setUser({
-        fullName: profileData?.full_name || 'User',
-        email: profileData?.email || '',
+        fullName: profileData?.full_name || "User",
+        email: profileData?.email || "",
         avatar: profileData?.avatar_url || null,
-      });
+      })
       // Fetch photos from Supabase
-      const { data: photosData } = await supabase.from('photos').select('*').eq('user_id', user.id).order('timestamp', { ascending: true });
-      setUserPhotos(photosData || []);
+      const { data: photosData } = await supabase
+        .from("photos")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("timestamp", { ascending: true })
+      setUserPhotos(photosData || [])
       // Compute stats
-      const totalPhotos = photosData?.length || 0;
-      const lastPhotoDate = totalPhotos > 0 ? photosData[totalPhotos - 1].timestamp : null;
-      const startDate = totalPhotos > 0 ? photosData[0].timestamp : new Date().toISOString();
-      const currentStreak = getCurrentStreak(photosData || []);
-      const photosThisWeek = getPhotosThisWeek(photosData || []);
+      const totalPhotos = photosData?.length || 0
+      const lastPhotoDate = totalPhotos > 0 ? photosData[totalPhotos - 1].timestamp : null
+      const startDate = totalPhotos > 0 ? photosData[0].timestamp : new Date().toISOString()
+      const currentStreak = getCurrentStreak(photosData || [])
+      const photosThisWeek = getPhotosThisWeek(photosData || [])
       setUserStats({
         totalPhotos,
         lastPhotoDate,
@@ -231,201 +238,205 @@ export default function HomeScreen({
         currentStreak,
         photosThisWeek,
         updatedAt: new Date().toISOString(),
-      });
-    })();
-  });
+      })
+    })()
+  })
 
   // Subscribe to external user updates (from ProfileScreen)
   // loadUserData needs to be stable for effects; define above as useCallback
   const loadUserData = React.useCallback(async (): Promise<void> => {
     try {
-      const userData = await AsyncStorage.getItem("user");
+      const userData = await AsyncStorage.getItem("user")
       if (userData) {
-        const parsed = JSON.parse(userData);
+        const parsed = JSON.parse(userData)
         const nextUser = {
           fullName: parsed.name || parsed.fullName || "User",
           email: parsed.email || "",
           avatar: normalizeAvatarUri(parsed.avatar) || null,
-        };
+        }
         // Avoid unnecessary state updates
         setUser((prev) => {
-          if (!prev) return nextUser;
-          if (prev.fullName === nextUser.fullName && prev.email === nextUser.email && prev.avatar === nextUser.avatar) return prev;
-          return nextUser;
-        });
+          if (!prev) return nextUser
+          if (prev.fullName === nextUser.fullName && prev.email === nextUser.email && prev.avatar === nextUser.avatar)
+            return prev
+          return nextUser
+        })
       }
     } catch (error) {
-      console.error("Error loading user data:", error);
+      console.error("Error loading user data:", error)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
     const unsub = onUserChange((u) => {
       try {
-        const fullName = (u as any).fullName || (u as any).name || null;
-        const email = (u as any).email || null;
-        const avatarRaw = (u as any).avatar || (u as any).uri || (u as any).avatarUri || null;
-        const avatar = normalizeAvatarUri(avatarRaw) || null;
+        const fullName = (u as any).fullName || (u as any).name || null
+        const email = (u as any).email || null
+        const avatarRaw = (u as any).avatar || (u as any).uri || (u as any).avatarUri || null
+        const avatar = normalizeAvatarUri(avatarRaw) || null
         // If the payload contains at least one user field, update state directly and skip async reload
         if (fullName || email || avatar) {
           setUser((prev) => {
-            const next = { ...(prev || { fullName: fullName || 'User', email: email || '' }), avatar: avatar || prev?.avatar || null, fullName: fullName || prev?.fullName } as any;
-            if (prev && prev.fullName === next.fullName && prev.email === next.email && prev.avatar === next.avatar) return prev;
-            return next;
-          });
+            const next = {
+              ...(prev || { fullName: fullName || "User", email: email || "" }),
+              avatar: avatar || prev?.avatar || null,
+              fullName: fullName || prev?.fullName,
+            } as any
+            if (prev && prev.fullName === next.fullName && prev.email === next.email && prev.avatar === next.avatar)
+              return prev
+            return next
+          })
 
           // If a weekStreak is provided by the profile, update userStats.currentStreak only if different
-          const weekStreak = (u as any).weekStreak;
-          if (typeof weekStreak === 'number') {
+          const weekStreak = (u as any).weekStreak
+          if (typeof weekStreak === "number") {
             setUserStats((s) => {
-              if (s && s.currentStreak === weekStreak) return s;
-              return { ...(s || {}), currentStreak: weekStreak };
-            });
+              if (s && s.currentStreak === weekStreak) return s
+              return { ...(s || {}), currentStreak: weekStreak }
+            })
           }
         } else {
           // Fallback: if payload is empty/unknown, reload stored user
-          loadUserData();
+          loadUserData()
         }
       } catch (err) {
-        console.error('Error handling onUserChange:', err);
+        console.error("Error handling onUserChange:", err)
       }
-    });
-    return () => unsub();
-  }, [loadUserData]);
+    })
+    return () => unsub()
+  }, [loadUserData])
 
   const normalizeAvatarUri = (uri: string | null | undefined): string | null => {
-    if (!uri) return null;
-    const s = String(uri);
-    if (s.startsWith('http') || s.startsWith('data:') || s.startsWith('file:') || s.startsWith('content:')) return s;
-    if (s.startsWith('/')) return `file://${s}`;
-    return s;
-  };
+    if (!uri) return null
+    const s = String(uri)
+    if (s.startsWith("http") || s.startsWith("data:") || s.startsWith("file:") || s.startsWith("content:")) return s
+    if (s.startsWith("/")) return `file://${s}`
+    return s
+  }
 
   const updateUserStats = useCallback(async () => {
-  // Stats now loaded from Supabase, no need to update from local photos
-  }, [photos]);
+    // Stats now loaded from Supabase, no need to update from local photos
+  }, [photos])
 
   useEffect(() => {
-    updateUserStats();
-  }, [updateUserStats]);
+    updateUserStats()
+  }, [updateUserStats])
 
   const loadUserStatsData = async (): Promise<void> => {
-    const stats = await loadUserStats();
-    setUserStats(stats);
-  };
+    const stats = await loadUserStats()
+    setUserStats(stats)
+  }
 
   const checkWelcomeStatus = async (): Promise<void> => {
     try {
-      const hasSeenWelcome = await AsyncStorage.getItem("hasSeenWelcome");
+      const hasSeenWelcome = await AsyncStorage.getItem("hasSeenWelcome")
       if (hasSeenWelcome === "true") {
-        setShowWelcome(false);
+        setShowWelcome(false)
       }
     } catch (error) {
-      console.error("Error checking welcome status:", error);
+      console.error("Error checking welcome status:", error)
     }
-  };
+  }
 
   const handleGetStarted = async (): Promise<void> => {
     try {
-      await AsyncStorage.setItem("hasSeenWelcome", "true");
-      setShowWelcome(false);
+      await AsyncStorage.setItem("hasSeenWelcome", "true")
+      setShowWelcome(false)
     } catch (error) {
-      console.error("Error saving welcome status:", error);
+      console.error("Error saving welcome status:", error)
     }
-  };
+  }
 
   const getCameraPermission = async (): Promise<void> => {
-    if (cameraPermissionCheckedRef.current) return; // already checked this session
+    if (cameraPermissionCheckedRef.current) return // already checked this session
     try {
       // First see current status without prompting
-      const current = await Camera.getCameraPermissionsAsync();
-      if (current.status !== 'granted' && current.status !== 'denied') {
+      const current = await Camera.getCameraPermissionsAsync()
+      if (current.status !== "granted" && current.status !== "denied") {
         // Only request if it's undetermined
-        await Camera.requestCameraPermissionsAsync();
+        await Camera.requestCameraPermissionsAsync()
       }
       // Mark as checked to prevent repeated logs/requests
-      cameraPermissionCheckedRef.current = true;
+      cameraPermissionCheckedRef.current = true
       // (Optional one-time log — commented out to keep console clean)
       // console.log('[camera] permission:', (await Camera.getCameraPermissionsAsync()).status);
     } catch (err) {
-      console.error('Error requesting camera permission:', err);
+      console.error("Error requesting camera permission:", err)
     }
-  };
+  }
 
   // Camera/photo processing is handled in CameraScreen; Home no longer defines processNewPhoto.
-
 
   // uriToBase64 moved to CameraScreen where needed
 
   const saveGeneralNotifications = async (newNotifications: Notification[]): Promise<void> => {
     try {
-      await AsyncStorage.setItem("generalNotifications", JSON.stringify(newNotifications));
+      await AsyncStorage.setItem("generalNotifications", JSON.stringify(newNotifications))
     } catch (error) {
-      console.error("Error saving general notifications:", error);
+      console.error("Error saving general notifications:", error)
     }
-  };
+  }
 
   const loadGeneralNotifications = async (): Promise<Notification[]> => {
     try {
-      const storedNotifications = await AsyncStorage.getItem("generalNotifications");
-      return storedNotifications ? JSON.parse(storedNotifications) : [];
+      const storedNotifications = await AsyncStorage.getItem("generalNotifications")
+      return storedNotifications ? JSON.parse(storedNotifications) : []
     } catch (error) {
-      console.error("Error loading general notifications:", error);
-      return [];
+      console.error("Error loading general notifications:", error)
+      return []
     }
-  };
+  }
 
   const loadGeneralNotificationsData = async (): Promise<void> => {
-    const loadedNotifications = await loadGeneralNotifications();
-    setGeneralNotifications(loadedNotifications);
+    const loadedNotifications = await loadGeneralNotifications()
+    setGeneralNotifications(loadedNotifications)
     if (loadedNotifications.length === 0) {
       // Add a welcome notification if no notifications exist
       addGeneralNotification({
         message: "Welcome to CaptureFit Progress! Start by taking your first progress photo.",
         read: false,
-      });
+      })
     }
-  };
+  }
 
   const addGeneralNotification = async (notification: Omit<Notification, "id" | "timestamp">): Promise<void> => {
     const newNotification: Notification = {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
       ...notification,
-    };
-    const updatedNotifications = [...generalNotifications, newNotification];
-    setGeneralNotifications(updatedNotifications);
-    await saveGeneralNotifications(updatedNotifications);
+    }
+    const updatedNotifications = [...generalNotifications, newNotification]
+    setGeneralNotifications(updatedNotifications)
+    await saveGeneralNotifications(updatedNotifications)
     // Integrate push notification
     try {
-      const { sendImmediateSummary } = require('../utils/notifications');
-      await sendImmediateSummary();
+      const { sendImmediateSummary } = require("../utils/notifications")
+      await sendImmediateSummary()
     } catch (err) {
-      console.warn('Failed to send push notification:', err);
+      console.warn("Failed to send push notification:", err)
     }
-  };
+  }
 
   const markGeneralNotificationAsRead = async (id: string): Promise<void> => {
     const updatedNotifications = generalNotifications.map((notif) =>
       notif.id === id ? { ...notif, read: true } : notif,
-    );
-    setGeneralNotifications(updatedNotifications);
-    await saveGeneralNotifications(updatedNotifications);
-  };
-
+    )
+    setGeneralNotifications(updatedNotifications)
+    await saveGeneralNotifications(updatedNotifications)
+  }
 
   // duplicate loadUserData removed; using the stable useCallback version defined earlier
 
   // savePhotos removed from HomeScreen; CameraScreen owns photo persistence
 
   const generateWeekDays = (): { day: string; date: number; isToday: boolean; fullDate: Date; hasPhoto: boolean }[] => {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const today = new Date();
-    const currentDay = today.getDay();
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    const today = new Date()
+    const currentDay = today.getDay()
 
     return days.map((day, index) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() - currentDay + index);
+      const date = new Date(today)
+      date.setDate(today.getDate() - currentDay + index)
 
       return {
         day,
@@ -433,40 +444,64 @@ export default function HomeScreen({
         isToday: index === currentDay,
         fullDate: date,
         hasPhoto: hasPhotoOnDate(photos, date),
-      };
-    });
-  };
+      }
+    })
+  }
 
-  const weekDays = generateWeekDays();
-  const firstRowDays = isLandscape ? weekDays.slice(0,4) : weekDays;
-  const secondRowDays = isLandscape ? weekDays.slice(4) : [];
+  const weekDays = generateWeekDays()
+  const firstRowDays = isLandscape ? weekDays.slice(0, 4) : weekDays
+  const secondRowDays = isLandscape ? weekDays.slice(4) : []
 
   const toggleModal = () => {
-    setModalVisible(!isModalVisible);
-  };
+    setModalVisible(!isModalVisible)
+  }
 
   const NotificationModal = () => {
-
     return (
       <Modal animationType="fade" transparent={true} visible={isModalVisible} onRequestClose={toggleModal}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' }}>
-          <SafeAreaView style={[styles.modalContainer, { justifyContent: 'center', alignItems: 'center', width: '100%' }]}> 
-            <View style={[styles.modalContent, { maxHeight: '80%', width: '90%', padding: 16, borderRadius: 18, backgroundColor: 'white', elevation: 10 }]}> 
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center" }}>
+          <SafeAreaView
+            style={[styles.modalContainer, { justifyContent: "center", alignItems: "center", width: "100%" }]}
+          >
+            <View
+              style={[
+                styles.modalContent,
+                {
+                  maxHeight: "80%",
+                  width: "90%",
+                  padding: 16,
+                  borderRadius: 18,
+                  backgroundColor: "white",
+                  elevation: 10,
+                },
+              ]}
+            >
               <Text style={[styles.modalTitle, { marginBottom: 12 }]}>Notifications</Text>
-              <ScrollView style={[styles.notificationScrollView, { maxHeight: 320 }]} contentContainerStyle={{ paddingBottom: 16 }}>
+              <ScrollView
+                style={[styles.notificationScrollView, { maxHeight: 320 }]}
+                contentContainerStyle={{ paddingBottom: 16 }}
+              >
                 {generalNotifications.length === 0 ? (
                   <Text style={styles.noNotificationsText}>No notifications yet.</Text>
                 ) : (
                   generalNotifications.map((notif) => (
-                    <View key={notif.id} style={[styles.notificationItem, !notif.read && styles.unreadNotification, { marginBottom: 10, borderRadius: 10, backgroundColor: '#F3F4F6', padding: 10 }]}> 
+                    <View
+                      key={notif.id}
+                      style={[
+                        styles.notificationItem,
+                        !notif.read && styles.unreadNotification,
+                        { marginBottom: 10, borderRadius: 10, backgroundColor: "#F3F4F6", padding: 10 },
+                      ]}
+                    >
                       <View style={styles.notificationTextContent}>
                         <Text style={styles.notificationMessage}>{notif.message}</Text>
-                        <Text style={styles.notificationTimestamp}>
-                          {new Date(notif.timestamp).toLocaleString()}
-                        </Text>
+                        <Text style={styles.notificationTimestamp}>{new Date(notif.timestamp).toLocaleString()}</Text>
                       </View>
                       {!notif.read && (
-                        <TouchableOpacity onPress={() => markGeneralNotificationAsRead(notif.id)} style={styles.markReadButton}>
+                        <TouchableOpacity
+                          onPress={() => markGeneralNotificationAsRead(notif.id)}
+                          style={styles.markReadButton}
+                        >
                           <Feather name="check-circle" size={20} color="#10B981" />
                         </TouchableOpacity>
                       )}
@@ -474,15 +509,28 @@ export default function HomeScreen({
                   ))
                 )}
               </ScrollView>
-              <TouchableOpacity onPress={toggleModal} style={[styles.closeButton, { marginTop: 10, alignSelf: 'center', backgroundColor: '#a8e6cf', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 8 }]}> 
-                <Text style={[styles.closeButtonText, { color: '#333', fontWeight: 'bold' }]}>Close</Text>
+              <TouchableOpacity
+                onPress={toggleModal}
+                style={[
+                  styles.closeButton,
+                  {
+                    marginTop: 10,
+                    alignSelf: "center",
+                    backgroundColor: "#a8e6cf",
+                    borderRadius: 20,
+                    paddingHorizontal: 24,
+                    paddingVertical: 8,
+                  },
+                ]}
+              >
+                <Text style={[styles.closeButtonText, { color: "#333", fontWeight: "bold" }]}>Close</Text>
               </TouchableOpacity>
             </View>
           </SafeAreaView>
         </View>
       </Modal>
-    );
-  };
+    )
+  }
 
   // Welcome Screen
   if (showWelcome) {
@@ -515,13 +563,13 @@ export default function HomeScreen({
           </TouchableOpacity>
         </View>
       </View>
-    );
+    )
   }
 
   // Main Home Screen
   return (
     <SafeAreaView style={styles.container}>
-  <StatusBar barStyle={barStyle} backgroundColor={barBg} />
+      <StatusBar barStyle={barStyle} backgroundColor={barBg} />
       <NotificationModal />
       {/* Header */}
       <View style={styles.header}>
@@ -532,11 +580,11 @@ export default function HomeScreen({
                 <Image
                   source={{ uri: normalizeAvatarUri(user.avatar) || undefined }}
                   style={styles.avatarImage}
-                  onLoad={() => console.log('Header avatar loaded:', user?.avatar)}
+                  onLoad={() => console.log("Header avatar loaded:", user?.avatar)}
                   onError={(e) => {
-                    console.error('Header avatar failed to load', e.nativeEvent || e);
+                    console.error("Header avatar failed to load", e.nativeEvent || e)
                     // Fallback: show initial or icon if image fails
-                    setUser((prev) => prev ? { ...prev, avatar: null } : prev);
+                    setUser((prev) => (prev ? { ...prev, avatar: null } : prev))
                   }}
                 />
               ) : user?.fullName ? (
@@ -549,29 +597,38 @@ export default function HomeScreen({
               <Text style={styles.greeting}>{user?.fullName || "CaptureFit Progress"}</Text>
               <Text style={styles.date}>
                 {user?.email || "Today "}
-                {user?.email ? "" : currentDate.toLocaleDateString("en-US", {
-                  day: "numeric",
-                  month: "short",
-                })}
+                {user?.email
+                  ? ""
+                  : currentDate.toLocaleDateString("en-US", {
+                      day: "numeric",
+                      month: "short",
+                    })}
               </Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.notificationButton} onPress={toggleModal} activeOpacity={0.9} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={toggleModal}
+            activeOpacity={0.9}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <MaterialCommunityIcons
               name="bell"
               size={24}
               color={isDarkMode ? theme.colors.text : theme.colors.primary}
               style={styles.notificationIcon}
             />
-            {generalNotifications.filter((notif) => !notif.read).length > 0 && (
-              <View style={styles.notificationDot} />
-            )}
+            {generalNotifications.filter((notif) => !notif.read).length > 0 && <View style={styles.notificationDot} />}
           </TouchableOpacity>
         </View>
       </View>
 
-  {/* Main Home Screen */}
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      {/* Main Home Screen */}
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* AI Analysis Challenge Card */}
         <View style={styles.challengeCard}>
           <LinearGradient
@@ -620,7 +677,11 @@ export default function HomeScreen({
           {firstRowDays.map((dayInfo, index) => (
             <TouchableOpacity
               key={`r1-${index}`}
-              style={[styles.dayButton, dayInfo.isToday && styles.dayButtonActive, isLandscape && styles.dayButtonLandscape]}
+              style={[
+                styles.dayButton,
+                dayInfo.isToday && styles.dayButtonActive,
+                isLandscape && styles.dayButtonLandscape,
+              ]}
             >
               <Text style={[styles.dayText, dayInfo.isToday && styles.dayTextActive]}>{dayInfo.day}</Text>
               <View
@@ -632,9 +693,7 @@ export default function HomeScreen({
               />
             </TouchableOpacity>
           ))}
-          {isLandscape && (
-            <View style={styles.calendarRowBreak} />
-          )}
+          {isLandscape && <View style={styles.calendarRowBreak} />}
           {secondRowDays.map((dayInfo, index) => (
             <TouchableOpacity
               key={`r2-${index}`}
@@ -656,10 +715,13 @@ export default function HomeScreen({
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
         </View>
-        
+
         <View style={styles.planGrid}>
           {/* Capture Progress Card */}
-          <TouchableOpacity style={[styles.planCard, styles.captureCard]} onPress={() => navigation?.navigate("aicoach")}>
+          <TouchableOpacity
+            style={[styles.planCard, styles.captureCard]}
+            onPress={() => navigation?.navigate("aicoach")}
+          >
             <View style={styles.planCardHeader}>
               <Feather name="camera" size={20} color="white" />
               <Text style={styles.planCardLabel}>Capture</Text>
@@ -680,7 +742,10 @@ export default function HomeScreen({
           </TouchableOpacity>
 
           {/* View Analysis Card */}
-          <TouchableOpacity style={[styles.planCard, styles.analysisCard]} onPress={() => navigation?.navigate("progress")}>
+          <TouchableOpacity
+            style={[styles.planCard, styles.analysisCard]}
+            onPress={() => navigation?.navigate("progress")}
+          >
             <View style={styles.planCardHeader}>
               <Feather name="trending-up" size={20} color="white" />
               <Text style={styles.planCardLabel}>Analysis</Text>
@@ -702,9 +767,7 @@ export default function HomeScreen({
             {userStats.totalPhotos > 0 && (
               <View style={styles.progressVisualization}>
                 <View style={styles.progressBar}>
-                  <View
-                    style={[styles.progressFill, { width: `${Math.min(userStats.totalPhotos * 10, 100)}%` }]}
-                  />
+                  <View style={[styles.progressFill, { width: `${Math.min(userStats.totalPhotos * 10, 100)}%` }]} />
                 </View>
               </View>
             )}
@@ -766,21 +829,21 @@ export default function HomeScreen({
         )}
       </ScrollView>
 
-  {/* Removed loading overlay card */}
+      {/* Removed loading overlay card */}
     </SafeAreaView>
-  );
+  )
 }
 
 function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBreakpoint>, isLandscape: boolean): any {
-  const width = bp.width;
-  const baseHorizontal = bp.isSmallPhone ? 16 : 20;
-  const cardGap = 12;
-  const calcPlanCardWidth = width ? (width - (baseHorizontal * 2) - cardGap) / 2 : 160;
-  const fullWidthCard = width ? (width - (baseHorizontal * 2)) : calcPlanCardWidth;
-  const titleFont = normalizeFont(bp.isTablet ? 26 : 24);
-  const sectionFont = normalizeFont(bp.isTablet ? 24 : 22);
-  const smallFont = normalizeFont(11);
-  const bodyFont = normalizeFont(14);
+  const width = bp.width
+  const baseHorizontal = bp.isSmallPhone ? 16 : 20
+  const cardGap = 12
+  const calcPlanCardWidth = width ? (width - baseHorizontal * 2 - cardGap) / 2 : 160
+  const fullWidthCard = width ? width - baseHorizontal * 2 : calcPlanCardWidth
+  const titleFont = normalizeFont(bp.isTablet ? 26 : 24)
+  const sectionFont = normalizeFont(bp.isTablet ? 24 : 22)
+  const smallFont = normalizeFont(11)
+  const bodyFont = normalizeFont(14)
   if (!isDarkMode) {
     // Exact LIGHT mode styles as provided
     return StyleSheet.create({
@@ -909,10 +972,10 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         width: 44,
         height: 44,
         borderRadius: 22,
-        resizeMode: 'cover',
+        resizeMode: "cover",
         borderWidth: 2,
-        borderColor: isDarkMode ? '#F3F4F6' : theme.colors.border,
-        backgroundColor: isDarkMode ? '#F3F4F6' : theme.colors.card,
+        borderColor: isDarkMode ? "#F3F4F6" : theme.colors.border,
+        backgroundColor: isDarkMode ? "#F3F4F6" : theme.colors.card,
       },
       greetingContainer: {
         flex: 1,
@@ -1121,8 +1184,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontWeight: "500",
       },
       planGrid: {
-        flexDirection: bp.isSmallPhone ? 'column' : 'row',
-        justifyContent: bp.isSmallPhone ? 'flex-start' : 'space-between',
+        flexDirection: bp.isSmallPhone ? "column" : "row",
+        justifyContent: bp.isSmallPhone ? "flex-start" : "space-between",
         marginBottom: 20,
         gap: 12,
       },
@@ -1292,14 +1355,14 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         lineHeight: 16,
       },
       calendarContainerLandscape: {
-        flexWrap: 'wrap',
+        flexWrap: "wrap",
         rowGap: 8,
       },
       dayButtonLandscape: {
-        width: '22%',
+        width: "22%",
       },
       calendarRowBreak: {
-        width: '100%',
+        width: "100%",
         height: 0,
       },
       viewButton: {
@@ -1415,7 +1478,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontWeight: "bold",
         color: "white",
       },
-    });
+    })
   }
 
   // DARK mode styles (theme-driven)
@@ -1529,7 +1592,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       alignItems: "center",
       paddingHorizontal: 16,
       paddingVertical: 12,
-  // No background here to avoid nested mismatch in dark mode; header provides background
+      // No background here to avoid nested mismatch in dark mode; header provides background
     },
     userProfile: {
       flexDirection: "row",
@@ -1602,13 +1665,13 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
     challengeTitle: {
       fontSize: 24,
       fontWeight: "bold",
-  color: theme.colors.text,
+      color: theme.colors.text,
       lineHeight: 28,
       marginBottom: 4,
     },
     challengeSubtitle: {
       fontSize: 14,
-  color: theme.colors.text,
+      color: theme.colors.text,
       marginBottom: 16,
     },
     progressIndicators: {
@@ -1677,8 +1740,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       alignItems: "center",
       marginBottom: 16,
     },
-  sectionTitle: {
-  fontSize: sectionFont,
+    sectionTitle: {
+      fontSize: sectionFont,
       fontWeight: "bold",
       color: theme.colors.text,
     },
@@ -1688,8 +1751,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       fontWeight: "500",
     },
     planGrid: {
-      flexDirection: bp.isSmallPhone ? 'column' : 'row',
-      justifyContent: bp.isSmallPhone ? 'flex-start' : 'space-between',
+      flexDirection: bp.isSmallPhone ? "column" : "row",
+      justifyContent: bp.isSmallPhone ? "flex-start" : "space-between",
       marginBottom: 20,
       gap: 12,
     },
@@ -1859,14 +1922,14 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       lineHeight: 16,
     },
     calendarContainerLandscape: {
-      flexWrap: 'wrap',
+      flexWrap: "wrap",
       rowGap: 8,
     },
     dayButtonLandscape: {
-      width: '22%',
+      width: "22%",
     },
     calendarRowBreak: {
-      width: '100%',
+      width: "100%",
       height: 0,
     },
     viewButton: {
@@ -2029,7 +2092,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: theme.colors.card,
+      backgroundColor: isDarkMode ? "#374151" : theme.colors.card,
       justifyContent: "center",
       alignItems: "center",
       shadowColor: theme.colors.text,
@@ -2042,5 +2105,14 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       fontWeight: "bold",
       color: theme.colors.text,
     },
-  });
+    avatarImage: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      resizeMode: "cover",
+      borderWidth: 2,
+      borderColor: isDarkMode ? "#374151" : theme.colors.border,
+      backgroundColor: isDarkMode ? "#374151" : theme.colors.card,
+    },
+  })
 }

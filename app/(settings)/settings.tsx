@@ -356,12 +356,6 @@ export default function SettingsScreen() {
             subtitle="Permanently remove your account"
             onPress={handleDeleteAccount}
           />
-            <TouchableOpacity
-              style={{ marginVertical: 10, padding: 12, backgroundColor: '#eee', borderRadius: 8 }}
-              onPress={handleLogAccessToken}
-            >
-              <Text style={{ color: '#333', textAlign: 'center' }}>Log Access Token to Console</Text>
-            </TouchableOpacity>
           <SettingsItem
             icon="shield-checkmark-outline"
             title="Privacy & Security"
