@@ -8,18 +8,16 @@
     "scheme": "capturefit",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "ios": {
       "bundleIdentifier": "com.addyde.capturefit",
-      "buildNumber": "1.0.0",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "We use the camera to capture progress photos.",
         "NSPhotoLibraryUsageDescription": "We need access to your photos so you can select and analyze progress images.",
-        "NSPhotoLibraryAddUsageDescription": "We save processed images to your library when you choose to export."
+        "NSPhotoLibraryAddUsageDescription": "We save processed images to your library when you choose to export.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/capturefit-logo.png",
@@ -28,13 +26,11 @@
       "edgeToEdgeEnabled": true,
       "package": "com.addyde.capturefit"
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/capturefit-logo.png"
     },
-
     "plugins": [
       "expo-router",
       [
@@ -47,18 +43,21 @@
         }
       ]
     ],
-
-    "experiments": { "typedRoutes": true },
-
+    "experiments": {
+      "typedRoutes": true
+    },
     "splash": {
       "image": "./assets/images/capturefit-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
-
     "extra": {
       "router": {},
-      "eas": { "projectId": "18a9772b-423c-4760-a845-bfd539cc2988" }
+      "eas": {
+        "projectId": "18a9772b-423c-4760-a845-bfd539cc2988"
+      },
+      "SUPABASE_URL": "${SUPABASE_URL}",
+      "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}"
     }
   }
 }
