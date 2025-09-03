@@ -26,23 +26,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+
       - name: Deploy aicoach function
-        run: |
-          npx supabase@latest functions deploy aicoach --project-ref ${SUPABASE_PROJECT_REF} --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          npx supabase@latest functions deploy aicoach --project-ref $SUPABASE_PROJECT_REF --no-verify-jwt
 
       - name: Deploy delete-account function
-        run: |
-          npx supabase@latest functions deploy delete-account --project-ref ${SUPABASE_PROJECT_REF} --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          npx supabase@latest functions deploy delete-account --project-ref $SUPABASE_PROJECT_REF --no-verify-jwt
 
       - name: Set function secrets (OPENAI & service role) on project
-        run: |
-          npx supabase@latest secrets set OPENAI_API_KEY=${OPENAI_API_KEY} SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY} SUPABASE_URL=${SUPABASE_URL} --project-ref ${SUPABASE_PROJECT_REF}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          npx supabase@latest secrets set OPENAI_API_KEY=$OPENAI_API_KEY SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY SUPABASE_URL=$SUPABASE_URL --project-ref $SUPABASE_PROJECT_REF
 
       - name: Verify functions
         run: |
