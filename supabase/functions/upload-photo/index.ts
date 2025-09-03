@@ -2,6 +2,7 @@
 import { decode } from "https://deno.land/std@0.208.0/encoding/base64.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
+
 // --- CORS HEADERS ---
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,7 +67,7 @@ Deno.serve(async (req: Request) => {
       id: crypto.randomUUID(), // ensure unique id
       url: publicUrl,
       user_id: userId,
-      created_at: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
     })
 
     if (dbError) {

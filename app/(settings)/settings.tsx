@@ -312,28 +312,33 @@ export default function SettingsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       {/* User Profile Section - No redundant header, works with existing navigation */}
   <View style={[styles.userSection, { backgroundColor: colors.primary, paddingTop: 40 }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={{
-            position: 'absolute',
-            top: 16,
-            right:16,
-            zIndex: 1,
-            padding: 2,
-          }}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <View style={styles.userContent}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user?.fullName?.charAt(0)?.toUpperCase() || 'U'}</Text>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.fullName || 'User'}</Text>
-            <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
-          </View>
-        </View>
+    <TouchableOpacity
+      onPress={() => router.back()}
+      style={{
+        position: 'absolute',
+        top: 16,
+        right:16,
+        zIndex: 1,
+        padding: 2,
+      }}
+    >
+      <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+    </TouchableOpacity>
+    <View style={styles.userContent}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{user?.fullName?.charAt(0)?.toUpperCase() || 'U'}</Text>
       </View>
+      <View style={styles.userInfo}>
+        {/* Only show name/email if user is signed in */}
+        {user?.email && user?.email !== 'user@example.com' ? (
+          <>
+            <Text style={styles.userName}>{user?.fullName || 'User'}</Text>
+            <Text style={styles.userEmail}>{user?.email}</Text>
+          </>
+        ) : null}
+      </View>
+    </View>
+  </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Account Settings */}
@@ -525,39 +530,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userSection: {
-    paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    paddingBottom: 24,
   },
   userContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 24,
+    marginTop: 8,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
   avatarText: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#A855F7',
   },
   userInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   userName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#1F2937',
   },
   userEmail: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    color: '#6B7280',
     marginTop: 2,
   },
   content: {

@@ -3,20 +3,19 @@
 import { AuthContext } from "@/app/_layout"
 import { Colors } from "@/constants/Colors"
 import { useTheme } from "@/contexts/ThemeContext"
-import { useBreakpoint } from "@/utils/responsive"
 import { supabase } from "@/utils/supabase"
-import { useContext, useMemo, useState, useCallback, useEffect } from "react"
+import { memo, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  FlatList,
   Image,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from "react-native"
 import Layout, { ModernCard, ModernHeader, SectionHeader } from "./Layout"
 
@@ -29,99 +28,144 @@ interface Photo {
 
 const { width } = Dimensions.get("window")
 
-// Calculate current streak (consecutive days with photos)
-const getCurrentStreak = (photoList: Photo[]): number => {
-  if (photoList.length === 0) return 0
-  let streak = 0
+const PhotoItem = memo(({ photo, onPress }: { photo: Photo; onPress?: () => void }) => {
+  return (
+    <TouchableOpacity onPress={onPress} style={styles.photoContainer}>
+      <Image
+        source={{ uri: photo.url }}
+        style={styles.photo}
+        onError={() => console.log("Failed to load image:", photo.url)}
+        resizeMode="cover"
+        fadeDuration={200}
+      />
+    </TouchableOpacity>
+  )
+})
+PhotoItem.displayName = "PhotoItem"
+
+const StatsCard = memo(({ value, label, color }: { value: number; label: string; color: string }) => {
+  return (
+    <ModernCard>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color }]}>{label}</Text>
+    </ModernCard>
+  )
+})
+StatsCard.displayName = "StatsCard"
+
+const WeeklyChart = memo(({ weeklyPhotoCounts, maxWeeklyPhotos, primary, sub, theme }: any) => {
+  const maxBarHeight = 80
+
+  return (
+    <View style={[styles.chartContainer, { backgroundColor: theme.colors.card }]}>
+      {weeklyPhotoCounts.map((day: any, index: number) => (
+        <View key={index} style={styles.barWrapper}>
+          <View
+            style={[styles.bar, { height: (day.value / maxWeeklyPhotos) * maxBarHeight, backgroundColor: primary }]}
+          />
+          <Text style={[styles.barLabel, { color: sub }]}>{day.day}</Text>
+        </View>
+      ))}
+    </View>
+  )
+})
+WeeklyChart.displayName = "WeeklyChart"
+
+const calculateStats = (photos: Photo[]) => {
+  if (photos.length === 0) {
+    return {
+      currentStreak: 0,
+      daysTracked: 0,
+      weeklyPhotoCounts: Array.from({ length: 7 }, (_, i) => ({
+        day: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", { weekday: "short" }),
+        value: 0,
+      })),
+    }
+  }
+
+  // Calculate current streak more efficiently
+  let currentStreak = 0
   const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const photoDates = new Set(photos.map((photo) => new Date(photo.created_at).toDateString()))
+
   for (let i = 0; i < 365; i++) {
     const checkDate = new Date(today)
     checkDate.setDate(today.getDate() - i)
-    const hasPhotoOnDate = photoList.some((photo) => {
-      const photoDate = new Date(photo.created_at)
-      return photoDate.toDateString() === checkDate.toDateString()
-    })
-    if (hasPhotoOnDate) {
-      streak++
+    if (photoDates.has(checkDate.toDateString())) {
+      currentStreak++
     } else {
       break
     }
   }
-  return streak
-}
 
-// Calculate days tracked (unique days with photos)
-const getDaysTracked = (photoList: Photo[]): number => {
-  const uniqueDays = new Set<string>()
-  photoList.forEach((photo) => {
-    const photoDate = new Date(photo.created_at).toDateString()
-    uniqueDays.add(photoDate)
-  })
-  return uniqueDays.size
-}
+  // Calculate days tracked (already optimized with Set)
+  const daysTracked = photoDates.size
 
-// Show last 7 days (rolling window)
-const getWeeklyPhotoCounts = (photoList: Photo[]) => {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const days = []
-  const counts: { day: string; value: number }[] = []
-  for (let i = 6; i >= 0; i--) {
+  // Calculate weekly photo counts more efficiently
+  const weeklyPhotoCounts = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(today)
-    date.setDate(today.getDate() - i)
-    days.push(date)
-    counts.push({
+    date.setDate(today.getDate() - (6 - i))
+    return {
       day: date.toLocaleDateString("en-US", { weekday: "short" }),
       value: 0,
-    })
-  }
-
-  photoList.forEach((photo) => {
-    const photoDate = new Date(photo.created_at)
-    photoDate.setHours(0, 0, 0, 0)
-    const dayIndex = days.findIndex((d) => d.getTime() === photoDate.getTime())
-    if (dayIndex !== -1) {
-      counts[dayIndex].value++
     }
   })
 
-  return counts
+  const oneWeekAgo = new Date(today)
+  oneWeekAgo.setDate(today.getDate() - 6)
+
+  photos.forEach((photo) => {
+    const photoDate = new Date(photo.created_at)
+    photoDate.setHours(0, 0, 0, 0)
+
+    if (photoDate >= oneWeekAgo && photoDate <= today) {
+      const daysDiff = Math.floor((today.getTime() - photoDate.getTime()) / (24 * 60 * 60 * 1000))
+      if (daysDiff >= 0 && daysDiff < 7) {
+        weeklyPhotoCounts[6 - daysDiff].value++
+      }
+    }
+  })
+
+  return { currentStreak, daysTracked, weeklyPhotoCounts }
 }
 
 export default function ProgressScreen() {
-  // Use local state for photos
-  const [photos, setPhotos] = useState<any[]>([])
+  const [photos, setPhotos] = useState<Photo[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
   const auth = useContext(AuthContext)
   const { token } = auth || {}
-  // Get session from Supabase
   const [session, setSession] = useState<any>(null)
+
   useEffect(() => {
+    let mounted = true
     async function getSession() {
       const { data } = await supabase.auth.getSession()
-      setSession(data?.session)
+      if (mounted) {
+        setSession(data?.session)
+      }
     }
     getSession()
+    return () => {
+      mounted = false
+    }
   }, [token])
+
   const { isDarkMode, theme } = useTheme()
   const palette = isDarkMode ? Colors.dark : Colors.light
   const primary = palette.primary
   const sub = palette.textSecondary
-  const border = theme.colors.border
-  const totalPhotos = photos.length
-  const maxBarHeight = 80
 
-  const [displayedPhotos, setDisplayedPhotos] = useState<any[]>([])
-  const [photosPerPage] = useState(20)
-  const [currentPage, setCurrentPage] = useState(1)
+  const stats = useMemo(() => calculateStats(photos), [photos])
+  const maxWeeklyPhotos = useMemo(
+    () => Math.max(...stats.weeklyPhotoCounts.map((d) => d.value), 1),
+    [stats.weeklyPhotoCounts],
+  )
 
-  const currentStreak = useMemo(() => getCurrentStreak(photos), [photos])
-  const daysTracked = useMemo(() => getDaysTracked(photos), [photos])
-  const weeklyPhotoCounts = useMemo(() => getWeeklyPhotoCounts(photos), [photos])
-  const maxWeeklyPhotos = useMemo(() => Math.max(...weeklyPhotoCounts.map((d) => d.value), 1), [weeklyPhotoCounts])
-
-  // Always fetch photos from Supabase and update local state, stable reference
   const fetchPhotosFromDB = useCallback(async (userId: string, showLoading = true) => {
     if (showLoading) setLoading(true)
     setError(null)
@@ -129,14 +173,13 @@ export default function ProgressScreen() {
     try {
       const { data, error } = await supabase
         .from("photos")
-        .select("id, url, user_id, created_at")
+        .select("id, url, created_at")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
+        .limit(100) // Limit initial load for better performance
 
       if (error) throw error
-
       setPhotos(data || [])
-      setCurrentPage(1) // Reset pagination
     } catch (err: any) {
       setError(err.message)
       setPhotos([])
@@ -145,20 +188,20 @@ export default function ProgressScreen() {
     }
   }, [])
 
-  // Fetch photos on screen focus
   useEffect(() => {
     if (session?.user?.id) {
       fetchPhotosFromDB(session.user.id)
     }
   }, [session?.user?.id, fetchPhotosFromDB])
 
-  useEffect(() => {
-    const startIndex = 0
-    const endIndex = currentPage * photosPerPage
-    setDisplayedPhotos(photos.slice(startIndex, endIndex))
-  }, [photos, currentPage, photosPerPage])
+  const handleRefresh = useCallback(async () => {
+    if (!session?.user?.id) return
+    setRefreshing(true)
+    await fetchPhotosFromDB(session.user.id, false)
+    setRefreshing(false)
+  }, [session?.user?.id, fetchPhotosFromDB])
 
-  const resetProgress = async () => {
+  const resetProgress = useCallback(async () => {
     Alert.alert(
       "Reset Progress",
       "Are you sure you want to delete all your progress photos? This action cannot be undone.",
@@ -172,12 +215,11 @@ export default function ProgressScreen() {
 
             setLoading(true)
             try {
-              for (const photo of photos) {
-                // Extract path from URL (remove the base URL part)
+              const deletePromises = photos.map(async (photo) => {
                 const urlParts = photo.url.split("/photos/")
                 const path = urlParts.length > 1 ? urlParts[1] : photo.url
 
-                const res = await fetch("https://vpnitpweduycfmndmxsf.supabase.co/functions/v1/delete-photo-storage", {
+                return fetch("https://vpnitpweduycfmndmxsf.supabase.co/functions/v1/delete-photo-storage", {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
@@ -188,23 +230,16 @@ export default function ProgressScreen() {
                     path: path,
                   }),
                 })
+              })
 
-                if (!res.ok) {
-                  const errorData = await res.json()
-                  throw new Error(`Failed to delete photo ${photo.id}: ${errorData.error || "Unknown error"}`)
-                }
-              }
-
-              // Clear local state immediately for better UX
+              await Promise.all(deletePromises)
               setPhotos([])
-              setDisplayedPhotos([])
 
               if (auth?.resetProgress) {
                 await auth.resetProgress()
               }
             } catch (err: any) {
               setError(err.message)
-              // Refresh to get current state if deletion failed
               fetchPhotosFromDB(session.user.id, false)
             } finally {
               setLoading(false)
@@ -213,24 +248,31 @@ export default function ProgressScreen() {
         },
       ],
     )
-  }
+  }, [session, photos, auth, fetchPhotosFromDB])
 
-  useBreakpoint()
-  useWindowDimensions()
+  // useBreakpoint()
+  // useWindowDimensions()
 
-  const loadMorePhotos = () => {
-    if (displayedPhotos.length < photos.length) {
-      setCurrentPage((prev) => prev + 1)
-    }
-  }
+  const renderPhotoItem = useCallback(({ item }: { item: Photo }) => <PhotoItem photo={item} />, [])
+
+  const getItemLayout = useCallback(
+    (data: any, index: number) => ({
+      length: width / 3,
+      offset: (width / 3) * index,
+      index,
+    }),
+    [],
+  )
 
   if (loading) {
     return (
       <View
-        style={[
-          styles.container,
-          { backgroundColor: palette.background, justifyContent: "center", alignItems: "center" },
-        ]}
+        style={{
+          flex: 1,
+          backgroundColor: palette.background,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
       >
         <ActivityIndicator size="large" color={primary} />
       </View>
@@ -240,10 +282,12 @@ export default function ProgressScreen() {
   if (error) {
     return (
       <View
-        style={[
-          styles.container,
-          { backgroundColor: palette.background, justifyContent: "center", alignItems: "center" },
-        ]}
+        style={{
+          flex: 1,
+          backgroundColor: palette.background,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
       >
         <Text style={{ color: palette.text }}>Error: {error}</Text>
       </View>
@@ -253,60 +297,49 @@ export default function ProgressScreen() {
   return (
     <Layout>
       <ModernHeader title="Your Progress" />
-      <ScrollView style={styles.container}>
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingBottom: 40,
+        }}
+      >
         <View style={styles.statsContainer}>
-          <ModernCard>
-            <Text style={[styles.statValue, { color: primary }]}>{totalPhotos}</Text>
-            <Text style={[styles.statLabel, { color: sub }]}>Total Photos</Text>
-          </ModernCard>
-          <ModernCard>
-            <Text style={[styles.statValue, { color: primary }]}>{currentStreak}</Text>
-            <Text style={[styles.statLabel, { color: sub }]}>Current Streak</Text>
-          </ModernCard>
-          <ModernCard>
-            <Text style={[styles.statValue, { color: primary }]}>{daysTracked}</Text>
-            <Text style={[styles.statLabel, { color: sub }]}>Days Tracked</Text>
-          </ModernCard>
+          <StatsCard value={photos.length} label="Total Photos" color={primary} />
+          <StatsCard value={stats.currentStreak} label="Current Streak" color={primary} />
+          <StatsCard value={stats.daysTracked} label="Days Tracked" color={primary} />
         </View>
 
         <SectionHeader title="Weekly Activity" />
-        <View style={[styles.chartContainer, { backgroundColor: theme.colors.card }]}>
-          {weeklyPhotoCounts.map((day, index) => (
-            <View key={index} style={styles.barWrapper}>
-              <View
-                style={[styles.bar, { height: (day.value / maxWeeklyPhotos) * maxBarHeight, backgroundColor: primary }]}
-              />
-              <Text style={[styles.barLabel, { color: sub }]}>{day.day}</Text>
-            </View>
-          ))}
-        </View>
+        <WeeklyChart
+          weeklyPhotoCounts={stats.weeklyPhotoCounts}
+          maxWeeklyPhotos={maxWeeklyPhotos}
+          primary={primary}
+          sub={sub}
+          theme={theme}
+        />
 
         <SectionHeader title="All Photos" />
         <TouchableOpacity
-          onPress={() => session?.user?.id && fetchPhotosFromDB(session.user.id)}
+          onPress={handleRefresh}
           style={[styles.refreshButton, { backgroundColor: primary }]}
-          disabled={loading}
+          disabled={refreshing}
         >
-          <Text style={styles.refreshButtonText}>{loading ? "Refreshing..." : "Refresh"}</Text>
+          <Text style={styles.refreshButtonText}>{refreshing ? "Refreshing..." : "Refresh"}</Text>
         </TouchableOpacity>
 
-        <View style={styles.photoGrid}>
-          {displayedPhotos.map((photo, index) => (
-            <TouchableOpacity key={photo.id || index} style={styles.photoContainer}>
-              <Image
-                source={{ uri: photo.url }}
-                style={styles.photo}
-                onError={() => console.log("Failed to load image:", photo.url)}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {displayedPhotos.length < photos.length && (
-          <TouchableOpacity onPress={loadMorePhotos} style={[styles.loadMoreButton, { backgroundColor: primary }]}>
-            <Text style={styles.loadMoreButtonText}>Load More Photos</Text>
-          </TouchableOpacity>
-        )}
+        <FlatList
+          data={photos}
+          renderItem={renderPhotoItem}
+          keyExtractor={(item) => item.id}
+          numColumns={3}
+          getItemLayout={getItemLayout}
+          initialNumToRender={21} // 7 rows of 3 photos
+          maxToRenderPerBatch={21}
+          windowSize={10}
+          removeClippedSubviews={true}
+          scrollEnabled={false} // Disable scroll since it's inside ScrollView
+          contentContainerStyle={styles.photoGrid}
+        />
 
         <TouchableOpacity onPress={resetProgress} style={styles.resetButton} disabled={loading}>
           <Text style={styles.resetButtonText}>{loading ? "Resetting..." : "Reset Progress"}</Text>

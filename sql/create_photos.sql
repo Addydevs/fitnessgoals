@@ -3,8 +3,10 @@ CREATE TABLE IF NOT EXISTS photos (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
     url text NOT NULL,
-    timestamp timestamptz NOT NULL DEFAULT now(),
+    "timestamp" timestamptz NOT NULL DEFAULT now(),
     analysis text,
+    file_name text,
+    file_size integer,
     -- Add more fields as needed
     created_at timestamptz DEFAULT now()
 );
