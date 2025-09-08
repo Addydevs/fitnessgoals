@@ -4,6 +4,7 @@ import { AuthContext } from "@/app/_layout"
 import { Colors } from "@/constants/Colors"
 import { useTheme } from "@/contexts/ThemeContext"
 import { supabase } from "@/utils/supabase"
+import { Ionicons } from "@expo/vector-icons"
 import { memo, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
@@ -28,9 +29,55 @@ interface Photo {
 
 const { width } = Dimensions.get("window")
 
-const PhotoItem = memo(({ photo, onPress }: { photo: Photo; onPress?: () => void }) => {
+// Helper function to format date
+const formatPhotoDate = (dateString: string) => {
+  const date = new Date(dateString)
+  const now = new Date()
+  
+  // Set time to start of day for accurate day comparison
+  const photoDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  
+  const diffTime = today.getTime() - photoDate.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  
+  if (diffDays === 0) {
+    return "Today"
+  } else if (diffDays === 1) {
+    return "Yesterday"
+  } else if (diffDays <= 6) {
+    return `${diffDays} days ago`
+  } else if (diffDays <= 30) {
+    return `${Math.floor(diffDays / 7)} ${Math.floor(diffDays / 7) === 1 ? 'week' : 'weeks'} ago`
+  } else {
+    return date.toLocaleDateString("en-US", { 
+      month: "short", 
+      day: "numeric",
+      year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined
+    })
+  }
+}
+
+const PhotoItem = memo(({ photo, onPress, onLongPress, isSelected, editMode, isDragged, reorderMode }: { 
+  photo: Photo; 
+  onPress?: () => void; 
+  onLongPress?: () => void;
+  isSelected?: boolean;
+  editMode?: boolean;
+  isDragged?: boolean;
+  reorderMode?: boolean;
+}) => {
   return (
-    <TouchableOpacity onPress={onPress} style={styles.photoContainer}>
+    <TouchableOpacity 
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={[
+        styles.photoContainer,
+        isSelected && styles.selectedPhoto,
+        isDragged && styles.draggedPhoto,
+        reorderMode && styles.reorderPhoto
+      ]}
+    >
       <Image
         source={{ uri: photo.url }}
         style={styles.photo}
@@ -38,6 +85,31 @@ const PhotoItem = memo(({ photo, onPress }: { photo: Photo; onPress?: () => void
         resizeMode="cover"
         fadeDuration={200}
       />
+      
+      {/* Date overlay - always visible */}
+      <View style={styles.dateOverlay}>
+        <Text style={styles.dateText}>{formatPhotoDate(photo.created_at)}</Text>
+      </View>
+
+      {(editMode || reorderMode) && (
+        <View style={styles.photoOverlay}>
+          {editMode && isSelected && (
+            <View style={styles.checkmark}>
+              <Ionicons name="checkmark" size={16} color="white" />
+            </View>
+          )}
+          {reorderMode && (
+            <View style={styles.reorderIcon}>
+              <Ionicons name="move" size={16} color="white" />
+            </View>
+          )}
+          {isDragged && (
+            <View style={styles.dragIndicator}>
+              <Text style={styles.dragText}>Drop to reorder</Text>
+            </View>
+          )}
+        </View>
+      )}
     </TouchableOpacity>
   )
 })
@@ -136,6 +208,10 @@ export default function ProgressScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set())
+  const [reorderMode, setReorderMode] = useState(false)
+  const [draggedPhoto, setDraggedPhoto] = useState<Photo | null>(null)
 
   const auth = useContext(AuthContext)
   const { token } = auth || {}
@@ -201,6 +277,119 @@ export default function ProgressScreen() {
     setRefreshing(false)
   }, [session?.user?.id, fetchPhotosFromDB])
 
+  const toggleEditMode = useCallback(() => {
+    setEditMode(!editMode)
+    setSelectedPhotos(new Set())
+    setReorderMode(false)
+    setDraggedPhoto(null)
+  }, [editMode])
+
+  const toggleReorderMode = useCallback(() => {
+    setReorderMode(!reorderMode)
+    setEditMode(false)
+    setSelectedPhotos(new Set())
+    setDraggedPhoto(null)
+  }, [reorderMode])
+
+  const togglePhotoSelection = useCallback((photoId: string) => {
+    setSelectedPhotos(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(photoId)) {
+        newSet.delete(photoId)
+      } else {
+        newSet.add(photoId)
+      }
+      return newSet
+    })
+  }, [])
+
+  const handlePhotoLongPress = useCallback((photo: Photo) => {
+    if (reorderMode) {
+      setDraggedPhoto(photo)
+    } else if (!editMode) {
+      setEditMode(true)
+    }
+  }, [reorderMode, editMode])
+
+  const handlePhotoPress = useCallback((photo: Photo) => {
+    if (editMode) {
+      togglePhotoSelection(photo.id)
+    } else if (reorderMode && draggedPhoto) {
+      // Reorder photos
+      const fromIndex = photos.findIndex(p => p.id === draggedPhoto.id)
+      const toIndex = photos.findIndex(p => p.id === photo.id)
+      
+      if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
+        const newPhotos = [...photos]
+        const [moved] = newPhotos.splice(fromIndex, 1)
+        newPhotos.splice(toIndex, 0, moved)
+        setPhotos(newPhotos)
+      }
+      setDraggedPhoto(null)
+    }
+  }, [editMode, reorderMode, draggedPhoto, photos, togglePhotoSelection])
+
+  const selectAllPhotos = useCallback(() => {
+    if (selectedPhotos.size === photos.length) {
+      setSelectedPhotos(new Set())
+    } else {
+      setSelectedPhotos(new Set(photos.map(p => p.id)))
+    }
+  }, [selectedPhotos.size, photos])
+
+  const deleteSelectedPhotos = useCallback(async () => {
+    if (selectedPhotos.size === 0) return
+
+    Alert.alert(
+      "Delete Photos",
+      `Are you sure you want to delete ${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''}? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            if (!session?.user?.id) return
+
+            setLoading(true)
+            try {
+              const photosToDelete = photos.filter(p => selectedPhotos.has(p.id))
+              const deletePromises = photosToDelete.map(async (photo) => {
+                const urlParts = photo.url.split("/photos/")
+                const path = urlParts.length > 1 ? urlParts[1] : photo.url
+
+                return fetch("https://vpnitpweduycfmndmxsf.supabase.co/functions/v1/delete-photo-storage", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${session.access_token}`,
+                  },
+                  body: JSON.stringify({
+                    photoId: photo.id,
+                    path: path,
+                  }),
+                })
+              })
+
+              await Promise.all(deletePromises)
+              
+              // Remove deleted photos from state
+              setPhotos(prev => prev.filter(p => !selectedPhotos.has(p.id)))
+              setSelectedPhotos(new Set())
+              setEditMode(false)
+
+            } catch (err: any) {
+              setError(err.message)
+              fetchPhotosFromDB(session.user.id, false)
+            } finally {
+              setLoading(false)
+            }
+          },
+        },
+      ],
+    )
+  }, [selectedPhotos, photos, session, fetchPhotosFromDB])
+
   const resetProgress = useCallback(async () => {
     Alert.alert(
       "Reset Progress",
@@ -253,7 +442,18 @@ export default function ProgressScreen() {
   // useBreakpoint()
   // useWindowDimensions()
 
-  const renderPhotoItem = useCallback(({ item }: { item: Photo }) => <PhotoItem photo={item} />, [])
+  const renderPhotoItem = useCallback(({ item }: { item: Photo }) => 
+    <PhotoItem 
+      photo={item} 
+      onPress={() => handlePhotoPress(item)}
+      onLongPress={() => handlePhotoLongPress(item)}
+      isSelected={selectedPhotos.has(item.id)}
+      editMode={editMode}
+      isDragged={draggedPhoto?.id === item.id}
+      reorderMode={reorderMode}
+    />, 
+    [editMode, reorderMode, selectedPhotos, draggedPhoto, handlePhotoPress, handlePhotoLongPress]
+  )
 
   const getItemLayout = useCallback(
     (data: any, index: number) => ({
@@ -319,6 +519,82 @@ export default function ProgressScreen() {
         />
 
         <SectionHeader title="All Photos" />
+        
+        {photos.length > 0 && (
+          <View style={styles.editToolbar}>
+            {!editMode && !reorderMode ? (
+              <>
+                <TouchableOpacity
+                  onPress={toggleEditMode}
+                  style={[styles.editButton, styles.editButtonSelect]}
+                >
+                  <Ionicons name="create-outline" size={16} color="white" />
+                  <Text style={[styles.editButtonText, { color: 'white' }]}>Edit</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={toggleReorderMode}
+                  style={[styles.editButton, { backgroundColor: '#FF9500' }]}
+                >
+                  <Ionicons name="swap-vertical-outline" size={16} color="white" />
+                  <Text style={[styles.editButtonText, { color: 'white' }]}>Reorder</Text>
+                </TouchableOpacity>
+              </>
+            ) : editMode ? (
+              <>
+                <TouchableOpacity
+                  onPress={selectAllPhotos}
+                  style={[styles.editButton, styles.editButtonSelect]}
+                >
+                  <Ionicons 
+                    name={selectedPhotos.size === photos.length ? "checkbox" : "square-outline"} 
+                    size={16} 
+                    color="white" 
+                  />
+                  <Text style={[styles.editButtonText, { color: 'white' }]}>
+                    {selectedPhotos.size === photos.length ? 'Deselect All' : 'Select All'}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={deleteSelectedPhotos}
+                  style={[styles.editButton, styles.editButtonDelete]}
+                  disabled={selectedPhotos.size === 0}
+                >
+                  <Ionicons name="trash-outline" size={16} color="white" />
+                  <Text style={[styles.editButtonText, { color: 'white' }]}>
+                    Delete ({selectedPhotos.size})
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={toggleEditMode}
+                  style={[styles.editButton, styles.editButtonCancel]}
+                >
+                  <Ionicons name="close-outline" size={16} color="white" />
+                  <Text style={[styles.editButtonText, { color: 'white' }]}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={[styles.editButtonText, { color: '#FF9500', fontWeight: 'bold' }]}>
+                    {draggedPhoto ? 'Tap a photo to reorder' : 'Long press a photo to start'}
+                  </Text>
+                </View>
+                
+                <TouchableOpacity
+                  onPress={toggleReorderMode}
+                  style={[styles.editButton, styles.editButtonCancel]}
+                >
+                  <Ionicons name="close-outline" size={16} color="white" />
+                  <Text style={[styles.editButtonText, { color: 'white' }]}>Done</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
+
         <TouchableOpacity
           onPress={handleRefresh}
           style={[styles.refreshButton, { backgroundColor: primary }]}
@@ -396,6 +672,61 @@ const styles = StyleSheet.create({
     width: width / 3 - 2,
     height: width / 3 - 2,
     margin: 1,
+    position: 'relative',
+  },
+  selectedPhoto: {
+    borderWidth: 3,
+    borderColor: '#007AFF',
+  },
+  draggedPhoto: {
+    opacity: 0.5,
+    transform: [{ scale: 1.1 }],
+  },
+  reorderPhoto: {
+    borderWidth: 2,
+    borderColor: '#FF9500',
+    borderStyle: 'dashed',
+  },
+  photoOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    padding: 4,
+  },
+  checkmark: {
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reorderIcon: {
+    backgroundColor: '#FF9500',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dragIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 5,
+    padding: 5,
+    transform: [{ translateX: -50 }, { translateY: -10 }],
+  },
+  dragText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   photo: {
     flex: 1,
@@ -433,5 +764,50 @@ const styles = StyleSheet.create({
   loadMoreButtonText: {
     color: "white",
     fontWeight: "bold",
+  },
+  editToolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    margin: 10,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 8,
+    minWidth: 80,
+    justifyContent: 'center',
+  },
+  editButtonText: {
+    marginLeft: 5,
+    fontWeight: '600',
+  },
+  editButtonDelete: {
+    backgroundColor: '#ff3b30',
+  },
+  editButtonCancel: {
+    backgroundColor: '#8e8e93',
+  },
+  editButtonSelect: {
+    backgroundColor: '#007AFF',
+  },
+  dateOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  dateText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 })
