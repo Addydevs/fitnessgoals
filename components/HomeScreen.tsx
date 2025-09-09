@@ -189,58 +189,141 @@ export default function HomeScreen({
   // Track if we've already handled camera permission to avoid spammy logs/requests
   const cameraPermissionCheckedRef = React.useRef<boolean>(false)
 
-  useFocusEffect(() => {
-    getCameraPermission()
-    checkWelcomeStatus()
-    loadGeneralNotificationsData()
-    // Fetch user and photos from Supabase
-    ;(async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user?.id) {
-        setUser(null)
-        setUserPhotos([])
-        setUserStats({
-          totalPhotos: 0,
-          currentStreak: 0,
-          photosThisWeek: 0,
-          lastPhotoDate: null,
-          startDate: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-        return
+  // 1) Memoize the helpers used by the focus effect
+  const getCameraPermission = React.useCallback(async (): Promise<void> => {
+    if (cameraPermissionCheckedRef.current) return;
+    try {
+      const current = await Camera.getCameraPermissionsAsync();
+      if (current.status !== "granted" && current.status !== "denied") {
+        await Camera.requestCameraPermissionsAsync();
       }
-      // Fetch profile info from Supabase (if you have a profiles table)
-      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-      setUser({
-        fullName: profileData?.full_name || "User",
-        email: profileData?.email || "",
-        avatar: profileData?.avatar_url || null,
-      })
-      // Fetch photos from Supabase
-      const { data: photosData } = await supabase
-        .from("photos")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("timestamp", { ascending: true })
-      setUserPhotos(photosData || [])
-      // Compute stats
-      const totalPhotos = photosData?.length || 0
-      const lastPhotoDate = totalPhotos > 0 ? photosData[totalPhotos - 1].timestamp : null
-      const startDate = totalPhotos > 0 ? photosData[0].timestamp : new Date().toISOString()
-      const currentStreak = getCurrentStreak(photosData || [])
-      const photosThisWeek = getPhotosThisWeek(photosData || [])
-      setUserStats({
-        totalPhotos,
-        lastPhotoDate,
-        startDate,
-        currentStreak,
-        photosThisWeek,
-        updatedAt: new Date().toISOString(),
-      })
-    })()
-  })
+      cameraPermissionCheckedRef.current = true;
+    } catch (err) {
+      console.error("Error requesting camera permission:", err);
+    }
+  }, []);
+
+  const checkWelcomeStatus = React.useCallback(async (): Promise<void> => {
+    try {
+      const hasSeenWelcome = await AsyncStorage.getItem("hasSeenWelcome");
+      setShowWelcome(hasSeenWelcome !== "true");
+    } catch (error) {
+      console.error("Error checking welcome status:", error);
+    }
+  }, []);
+
+  const loadGeneralNotificationsData = React.useCallback(async (): Promise<void> => {
+    try {
+      const stored = await AsyncStorage.getItem("generalNotifications");
+      const loaded: Notification[] = stored ? JSON.parse(stored) : [];
+      setGeneralNotifications(loaded);
+      if (loaded.length === 0) {
+        // seed once (no async re-entry)
+        const seed: Notification = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          message: "Welcome to CaptureFit Progress! Start by taking your first progress photo.",
+          read: false,
+        };
+        const next = [seed];
+        setGeneralNotifications(next);
+        await AsyncStorage.setItem("generalNotifications", JSON.stringify(next));
+      }
+    } catch (e) {
+      console.error("Error loading notifications:", e);
+    }
+  }, []);
+
+// 2) Proper useFocusEffect: memoized callback + cancel guard
+  useFocusEffect(
+      React.useCallback(() => {
+        let cancelled = false;
+
+        const run = async () => {
+          try {
+            // do the lightweight stuff
+            await getCameraPermission();
+            await checkWelcomeStatus();
+            await loadGeneralNotificationsData();
+
+            // fetch user just once per focus
+            const { data: { user } } = await supabase.auth.getUser();
+            if (cancelled) return;
+
+            if (!user?.id) {
+              setUser(null);
+              setUserPhotos([]);
+              setUserStats({
+                totalPhotos: 0,
+                currentStreak: 0,
+                photosThisWeek: 0,
+                lastPhotoDate: null,
+                startDate: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              });
+              return;
+            }
+
+            // profile
+            const { data: profileData } = await supabase
+                .from("profiles")
+                .select("full_name,email,avatar_url,weekStreak")
+                .eq("id", user.id)
+                .single();
+            if (cancelled) return;
+
+            setUser(prev => {
+              const next = {
+                fullName: profileData?.full_name || "User",
+                email: profileData?.email || "",
+                avatar: profileData?.avatar_url || null,
+              };
+              // avoid unnecessary re-renders
+              if (prev && prev.fullName === next.fullName && prev.email === next.email && prev.avatar === next.avatar) {
+                return prev;
+              }
+              return next;
+            });
+
+            // photos
+            const { data: photosData } = await supabase
+                .from("photos")
+                .select("id,timestamp,analysis,url,user_id")
+                .eq("user_id", user.id)
+                .order("timestamp", { ascending: true });
+
+            if (cancelled) return;
+
+            setUserPhotos(photosData || []);
+
+            const totalPhotos = photosData?.length || 0;
+            const lastPhotoDate = totalPhotos > 0 ? photosData![totalPhotos - 1].timestamp : null;
+            const startDate = totalPhotos > 0 ? photosData![0].timestamp : new Date().toISOString();
+            const currentStreak = getCurrentStreak(photosData || []);
+            const photosThisWeek = getPhotosThisWeek(photosData || []);
+
+            setUserStats({
+              totalPhotos,
+              lastPhotoDate,
+              startDate,
+              currentStreak,
+              photosThisWeek,
+              updatedAt: new Date().toISOString(),
+            });
+          } catch (e) {
+            console.warn("Home focus load failed:", e);
+          }
+        };
+
+        run();
+
+        // cleanup when screen blurs/unmounts
+        return () => {
+          cancelled = true;
+        };
+      }, [getCameraPermission, checkWelcomeStatus, loadGeneralNotificationsData])
+  );
+
 
   // Subscribe to external user updates (from ProfileScreen)
   // loadUserData needs to be stable for effects; define above as useCallback
@@ -327,16 +410,16 @@ export default function HomeScreen({
     setUserStats(stats)
   }
 
-  const checkWelcomeStatus = async (): Promise<void> => {
-    try {
-      const hasSeenWelcome = await AsyncStorage.getItem("hasSeenWelcome")
-      if (hasSeenWelcome === "true") {
-        setShowWelcome(false)
-      }
-    } catch (error) {
-      console.error("Error checking welcome status:", error)
-    }
-  }
+  // const checkWelcomeStatus = async (): Promise<void> => {
+  //   try {
+  //     const hasSeenWelcome = await AsyncStorage.getItem("hasSeenWelcome")
+  //     if (hasSeenWelcome === "true") {
+  //       setShowWelcome(false)
+  //     }
+  //   } catch (error) {
+  //     console.error("Error checking welcome status:", error)
+  //   }
+  // }
 
   const handleGetStarted = async (): Promise<void> => {
     try {
@@ -347,23 +430,23 @@ export default function HomeScreen({
     }
   }
 
-  const getCameraPermission = async (): Promise<void> => {
-    if (cameraPermissionCheckedRef.current) return // already checked this session
-    try {
-      // First see current status without prompting
-      const current = await Camera.getCameraPermissionsAsync()
-      if (current.status !== "granted" && current.status !== "denied") {
-        // Only request if it's undetermined
-        await Camera.requestCameraPermissionsAsync()
-      }
-      // Mark as checked to prevent repeated logs/requests
-      cameraPermissionCheckedRef.current = true
-      // (Optional one-time log — commented out to keep console clean)
-      // console.log('[camera] permission:', (await Camera.getCameraPermissionsAsync()).status);
-    } catch (err) {
-      console.error("Error requesting camera permission:", err)
-    }
-  }
+  // const getCameraPermission = async (): Promise<void> => {
+  //   if (cameraPermissionCheckedRef.current) return // already checked this session
+  //   try {
+  //     // First see current status without prompting
+  //     const current = await Camera.getCameraPermissionsAsync()
+  //     if (current.status !== "granted" && current.status !== "denied") {
+  //       // Only request if it's undetermined
+  //       await Camera.requestCameraPermissionsAsync()
+  //     }
+  //     // Mark as checked to prevent repeated logs/requests
+  //     cameraPermissionCheckedRef.current = true
+  //     // (Optional one-time log — commented out to keep console clean)
+  //     // console.log('[camera] permission:', (await Camera.getCameraPermissionsAsync()).status);
+  //   } catch (err) {
+  //     console.error("Error requesting camera permission:", err)
+  //   }
+  // }
 
   // Camera/photo processing is handled in CameraScreen; Home no longer defines processNewPhoto.
 
@@ -387,17 +470,17 @@ export default function HomeScreen({
     }
   }
 
-  const loadGeneralNotificationsData = async (): Promise<void> => {
-    const loadedNotifications = await loadGeneralNotifications()
-    setGeneralNotifications(loadedNotifications)
-    if (loadedNotifications.length === 0) {
-      // Add a welcome notification if no notifications exist
-      addGeneralNotification({
-        message: "Welcome to CaptureFit Progress! Start by taking your first progress photo.",
-        read: false,
-      })
-    }
-  }
+  // const loadGeneralNotificationsData = async (): Promise<void> => {
+  //   const loadedNotifications = await loadGeneralNotifications()
+  //   setGeneralNotifications(loadedNotifications)
+  //   if (loadedNotifications.length === 0) {
+  //     // Add a welcome notification if no notifications exist
+  //     addGeneralNotification({
+  //       message: "Welcome to CaptureFit Progress! Start by taking your first progress photo.",
+  //       read: false,
+  //     })
+  //   }
+  // }
 
   const addGeneralNotification = async (notification: Omit<Notification, "id" | "timestamp">): Promise<void> => {
     const newNotification: Notification = {

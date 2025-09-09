@@ -6,7 +6,7 @@ import { Tabs } from "expo-router";
 import React, { createContext, useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { requestPermissions, scheduleDailySummary } from '../../utils/notifications';
-import { supabase } from '../../utils/supabase';
+import { supabase, getCachedUser } from '../../utils/supabase';
 
 export type RootStackParamList = {
   homepage: undefined;
@@ -43,6 +43,7 @@ export const PhotoContext = createContext<{
 export default function TabLayout() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);
+  const ranOnceRef = React.useRef(false);
   const insets = useSafeAreaInsets();
   const { isDarkMode, theme } = useTheme();
   const themeColors = isDarkMode ? Colors.dark : Colors.light;
@@ -57,9 +58,11 @@ export default function TabLayout() {
   };
 
   useEffect(() => {
+    if (ranOnceRef.current) return;
+    ranOnceRef.current = true;
     const synchronizeStorageAndDatabase = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getCachedUser();
         if (!user) return;
 
         // 1. Get all files from Storage
@@ -176,13 +179,10 @@ export default function TabLayout() {
   const loadPhotos = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setPhotos([]);
-        return;
-      }
+      const user = await getCachedUser();
+      if (!user) { setPhotos([]); return; }
 
-      // Fetch photo metadata from the 'photos' table
+      // Fetch photo metadata from the 'photos' tab
       const { data, error } = await supabase
         .from('photos')
         .select('*')
@@ -220,6 +220,7 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarShowLabel: false,
+          // lazy: true,
           tabBarActiveTintColor: activeTint,
           tabBarInactiveTintColor: inactiveTint,
           tabBarStyle: {
