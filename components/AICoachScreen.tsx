@@ -5,19 +5,19 @@ import * as ImagePicker from "expo-image-picker"
 import { LinearGradient } from "expo-linear-gradient"
 import { useEffect, useRef, useState } from "react"
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useColorScheme,
-  View
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Dimensions,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View
 } from "react-native"
 import { useTheme } from "../contexts/ThemeContext"
 import { ImageAnalysis } from "../utils/imageAnalysis"
@@ -608,7 +608,7 @@ export default function AICoachScreen() {
       <ScrollView
         ref={scrollViewRef}
         style={[styles.messagesContainer, { minHeight: 0, flexGrow: 1, backgroundColor: isDarkMode ? theme.colors.background : theme.colors.card }]}
-        contentContainerStyle={[styles.messagesContent, { paddingBottom: 70, minHeight: 0, flexGrow: 1 }]}
+        contentContainerStyle={[styles.messagesContent, { paddingBottom: 140, minHeight: 0, flexGrow: 1 }]}
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
         showsVerticalScrollIndicator={false}
       >

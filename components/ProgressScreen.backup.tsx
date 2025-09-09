@@ -6,17 +6,16 @@ import { useTheme } from "@/contexts/ThemeContext"
 import { supabase } from "@/utils/supabase"
 import { memo, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    FlatList,
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native"
 import Layout, { ModernCard, ModernHeader, SectionHeader } from "./Layout"
 
@@ -29,35 +28,7 @@ interface Photo {
 
 const { width } = Dimensions.get("window")
 
-const PhotoItem = memo(({ photo, onPress, onDelete, isEditMode }: { photo: Photo; onPress?: () => void; onDelete?: () => void; isEditMode?: boolean }) => {
-  const getTimeAgo = (dateString: string) => {
-    const now = new Date()
-    const photoDate = new Date(dateString)
-    const diffInMs = now.getTime() - photoDate.getTime()
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
-    
-    if (diffInDays < 1) {
-      return "Today"
-    } else if (diffInDays === 1) {
-      return "1 day ago"
-    } else if (diffInDays < 7) {
-      return `${diffInDays} days ago`
-    } else if (diffInDays < 14) {
-      return "1 week ago"
-    } else if (diffInDays < 30) {
-      const weeks = Math.floor(diffInDays / 7)
-      return `${weeks} weeks ago`
-    } else if (diffInDays < 60) {
-      return "1 month ago"
-    } else if (diffInDays < 365) {
-      const months = Math.floor(diffInDays / 30)
-      return `${months} months ago`
-    } else {
-      const years = Math.floor(diffInDays / 365)
-      return years === 1 ? "1 year ago" : `${years} years ago`
-    }
-  }
-
+const PhotoItem = memo(({ photo, onPress }: { photo: Photo; onPress?: () => void }) => {
   return (
     <TouchableOpacity onPress={onPress} style={styles.photoContainer}>
       <Image
@@ -67,26 +38,6 @@ const PhotoItem = memo(({ photo, onPress, onDelete, isEditMode }: { photo: Photo
         resizeMode="cover"
         fadeDuration={200}
       />
-      
-      {/* Time ago overlay */}
-      <View style={styles.dateOverlay}>
-        <Text style={styles.dateOverlayText}>{getTimeAgo(photo.created_at)}</Text>
-      </View>
-      
-      {/* Edit mode overlay with subtle delete option */}
-      {isEditMode && (
-        <View style={styles.editModeOverlay}>
-          <TouchableOpacity 
-            style={styles.subtleDeleteButton} 
-            onPress={(e) => {
-              e.stopPropagation()
-              onDelete?.()
-            }}
-          >
-            <Text style={styles.subtleDeleteText}>−</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </TouchableOpacity>
   )
 })
@@ -185,10 +136,6 @@ export default function ProgressScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [deletingPhoto, setDeletingPhoto] = useState<string | null>(null)
-  const [isEditMode, setIsEditMode] = useState(false)
 
   const auth = useContext(AuthContext)
   const { token } = auth || {}
@@ -254,58 +201,6 @@ export default function ProgressScreen() {
     setRefreshing(false)
   }, [session?.user?.id, fetchPhotosFromDB])
 
-  const deletePhoto = useCallback(async (photo: Photo) => {
-    Alert.alert(
-      "Delete Photo",
-      "Are you sure you want to delete this progress photo?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            if (!session?.user?.id) return
-
-            setDeletingPhoto(photo.id)
-            try {
-              const urlParts = photo.url.split("/photos/")
-              const path = urlParts.length > 1 ? urlParts[1] : photo.url
-
-              const response = await fetch("https://vpnitpweduycfmndmxsf.supabase.co/functions/v1/delete-photo-storage", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({
-                  photoId: photo.id,
-                  path: path,
-                }),
-              })
-
-              if (response.ok) {
-                setPhotos(prev => prev.filter(p => p.id !== photo.id))
-                setModalVisible(false)
-              } else {
-                throw new Error('Failed to delete photo')
-              }
-            } catch (err: any) {
-              setError(err.message)
-              Alert.alert("Error", "Failed to delete photo. Please try again.")
-            } finally {
-              setDeletingPhoto(null)
-            }
-          },
-        },
-      ],
-    )
-  }, [session])
-
-  const openPhotoModal = useCallback((photo: Photo) => {
-    setSelectedPhoto(photo)
-    setModalVisible(true)
-  }, [])
-
   const resetProgress = useCallback(async () => {
     Alert.alert(
       "Reset Progress",
@@ -358,14 +253,7 @@ export default function ProgressScreen() {
   // useBreakpoint()
   // useWindowDimensions()
 
-  const renderPhotoItem = useCallback(({ item }: { item: Photo }) => (
-    <PhotoItem 
-      photo={item} 
-      onPress={isEditMode ? () => deletePhoto(item) : () => openPhotoModal(item)}
-      onDelete={() => deletePhoto(item)}
-      isEditMode={isEditMode}
-    />
-  ), [openPhotoModal, deletePhoto, isEditMode])
+  const renderPhotoItem = useCallback(({ item }: { item: Photo }) => <PhotoItem photo={item} />, [])
 
   const getItemLayout = useCallback(
     (data: any, index: number) => ({
@@ -431,22 +319,13 @@ export default function ProgressScreen() {
         />
 
         <SectionHeader title="All Photos" />
-        <View style={styles.photoActionsRow}>
-          <TouchableOpacity
-            onPress={handleRefresh}
-            style={[styles.refreshButton, { backgroundColor: primary }]}
-            disabled={refreshing}
-          >
-            <Text style={styles.refreshButtonText}>{refreshing ? "Refreshing..." : "Refresh"}</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={() => setIsEditMode(!isEditMode)}
-            style={[styles.editButton, { backgroundColor: isEditMode ? "#ff3b30" : primary }]}
-          >
-            <Text style={styles.editButtonText}>{isEditMode ? "Done" : "Edit"}</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={handleRefresh}
+          style={[styles.refreshButton, { backgroundColor: primary }]}
+          disabled={refreshing}
+        >
+          <Text style={styles.refreshButtonText}>{refreshing ? "Refreshing..." : "Refresh"}</Text>
+        </TouchableOpacity>
 
         <FlatList
           data={photos}
@@ -466,60 +345,6 @@ export default function ProgressScreen() {
           <Text style={styles.resetButtonText}>{loading ? "Resetting..." : "Reset Progress"}</Text>
         </TouchableOpacity>
       </ScrollView>
-
-      {/* Photo Detail Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
-            {selectedPhoto && (
-              <>
-                <View style={styles.modalHeader}>
-                  <TouchableOpacity 
-                    style={styles.closeButton}
-                    onPress={() => setModalVisible(false)}
-                  >
-                    <Text style={[styles.closeButtonText, { color: palette.text }]}>×</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <Image 
-                  source={{ uri: selectedPhoto.url }} 
-                  style={styles.modalImage}
-                  resizeMode="contain"
-                />
-                
-                <View style={styles.modalInfo}>
-                  <Text style={[styles.modalDate, { color: palette.text }]}>
-                    {new Date(selectedPhoto.created_at).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </Text>
-                  
-                  <TouchableOpacity 
-                    style={[styles.modalDeleteButton, { opacity: deletingPhoto === selectedPhoto.id ? 0.5 : 1 }]}
-                    onPress={() => deletePhoto(selectedPhoto)}
-                    disabled={deletingPhoto === selectedPhoto.id}
-                  >
-                    <Text style={styles.modalDeleteButtonText}>
-                      {deletingPhoto === selectedPhoto.id ? "Deleting..." : "Delete Photo"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
     </Layout>
   )
 }
@@ -589,27 +414,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   refreshButton: {
+    margin: 10,
+    alignSelf: "flex-end",
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   refreshButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  photoActionsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginHorizontal: 10,
-    marginBottom: 10,
-  },
-  editButton: {
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  editButtonText: {
     color: "#fff",
     fontWeight: "bold",
   },
@@ -621,128 +432,6 @@ const styles = StyleSheet.create({
   },
   loadMoreButtonText: {
     color: "white",
-    fontWeight: "bold",
-  },
-  deleteButton: {
-    position: "absolute",
-    top: 5,
-    right: 5,
-    backgroundColor: "rgba(255, 59, 48, 0.9)",
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  deleteButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-    lineHeight: 20,
-  },
-  dateOverlay: {
-    position: "absolute",
-    bottom: 5,
-    left: 5,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  dateOverlayText: {
-    color: "white",
-    fontSize: 10,
-    fontWeight: "600",
-  },
-  editModeOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  subtleDeleteButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  subtleDeleteText: {
-    color: "#ff3b30",
-    fontSize: 24,
-    fontWeight: "300",
-    lineHeight: 24,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "90%",
-    maxHeight: "90%",
-    borderRadius: 20,
-    padding: 20,
-    alignItems: "center",
-  },
-  modalHeader: {
-    width: "100%",
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginBottom: 10,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  closeButtonText: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "white",
-  },
-  modalImage: {
-    width: "100%",
-    height: 300,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-  modalInfo: {
-    width: "100%",
-    alignItems: "center",
-  },
-  modalDate: {
-    fontSize: 16,
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  modalDeleteButton: {
-    backgroundColor: "#ff3b30",
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    borderRadius: 25,
-    alignItems: "center",
-  },
-  modalDeleteButtonText: {
-    color: "white",
-    fontSize: 16,
     fontWeight: "bold",
   },
 })

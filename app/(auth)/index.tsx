@@ -132,7 +132,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: "center",
-    marginBottom: 40,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
   pagination: {
     flexDirection: "row",

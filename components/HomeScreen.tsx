@@ -24,7 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context"
 
 import { useTheme } from "@/contexts/ThemeContext"
 import { normalizeFont, useBreakpoint } from "@/utils/responsive"
-import type { Photo, RootStackParamList } from "../app/(tabs)/_layout" // Import Photo and RootStackParamList from _layout.tsx
+import type { Photo, RootStackParamList } from "../app/(tabs)/_layout"; // Import Photo and RootStackParamList from _layout.tsx
 import { supabase } from "../utils/supabase"
 import { onUserChange } from "../utils/userEvents"
 
@@ -59,6 +59,17 @@ interface UserType {
   fullName: string
   email: string
   avatar?: string | null
+}
+
+// Daily Check-in interface
+interface DailyCheckIn {
+  id: string
+  date: string
+  energyLevel: number
+  workoutCompleted: boolean
+  progressFeeling: number
+  createdAt: string
+  updatedAt: string
 }
 
 // screenWidth replaced by hook-driven width
@@ -188,6 +199,11 @@ export default function HomeScreen({
   const [userPhotos, setUserPhotos] = useState<Photo[]>([])
   // Track if we've already handled camera permission to avoid spammy logs/requests
   const cameraPermissionCheckedRef = React.useRef<boolean>(false)
+
+  // Daily Check-in state
+  const [todayCheckIn, setTodayCheckIn] = useState<DailyCheckIn | null>(null)
+  const [yesterdayCheckIn, setYesterdayCheckIn] = useState<DailyCheckIn | null>(null)
+  const [isCheckInModalVisible, setCheckInModalVisible] = useState(false)
 
   // 1) Memoize the helpers used by the focus effect
   const getCameraPermission = React.useCallback(async (): Promise<void> => {
@@ -430,6 +446,102 @@ export default function HomeScreen({
     }
   }
 
+  // Daily Check-in Functions
+  const getTodayDateString = (): string => {
+    return new Date().toISOString().split('T')[0]
+  }
+
+  const getYesterdayDateString = (): string => {
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    return yesterday.toISOString().split('T')[0]
+  }
+
+  const loadDailyCheckIns = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.id) return
+
+      const today = getTodayDateString()
+      const yesterday = getYesterdayDateString()
+
+      // Load today's check-in
+      const { data: todayData } = await supabase
+        .from('daily_checkins')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .single()
+
+      // Load yesterday's check-in
+      const { data: yesterdayData } = await supabase
+        .from('daily_checkins')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('date', yesterday)
+        .single()
+
+      setTodayCheckIn(todayData || null)
+      setYesterdayCheckIn(yesterdayData || null)
+    } catch (error) {
+      console.error('Error loading daily check-ins:', error)
+    }
+  }, [])
+
+  const submitDailyCheckIn = useCallback(async (energyLevel: number, workoutCompleted: boolean, progressFeeling: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.id) return
+
+      const today = getTodayDateString()
+      const now = new Date().toISOString()
+
+      const checkInData = {
+        user_id: user.id,
+        date: today,
+        energy_level: energyLevel,
+        workout_completed: workoutCompleted,
+        progress_feeling: progressFeeling,
+        updated_at: now
+      }
+
+      if (todayCheckIn) {
+        // Update existing check-in
+        const { data, error } = await supabase
+          .from('daily_checkins')
+          .update(checkInData)
+          .eq('id', todayCheckIn.id)
+          .select()
+          .single()
+
+        if (error) throw error
+        setTodayCheckIn(data)
+      } else {
+        // Create new check-in
+        const { data, error } = await supabase
+          .from('daily_checkins')
+          .insert({
+            ...checkInData,
+            created_at: now
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+        setTodayCheckIn(data)
+      }
+
+      setCheckInModalVisible(false)
+    } catch (error) {
+      console.error('Error submitting daily check-in:', error)
+    }
+  }, [todayCheckIn])
+
+  // Load check-ins when component mounts
+  useEffect(() => {
+    loadDailyCheckIns()
+  }, [loadDailyCheckIns])
+
   // const getCameraPermission = async (): Promise<void> => {
   //   if (cameraPermissionCheckedRef.current) return // already checked this session
   //   try {
@@ -649,6 +761,261 @@ export default function HomeScreen({
     )
   }
 
+  // Daily Check-in Card Component
+  const DailyCheckInCard = () => {
+    const getStatusColor = () => {
+      if (todayCheckIn) return '#4CAF50' // Green for completed
+      return theme.colors.border // Neutral for pending
+    }
+
+    const getStatusText = () => {
+      if (todayCheckIn) return 'Check-in Complete'
+      if (yesterdayCheckIn && !todayCheckIn) return "Yesterday's check-in available"
+      return 'Complete Today\'s Check-in'
+    }
+
+    const renderStars = (rating: number, onPress?: (rating: number) => void) => {
+      return (
+        <View style={styles.starsContainer}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <TouchableOpacity 
+              key={star} 
+              onPress={() => onPress?.(star)}
+              disabled={!onPress}
+            >
+              <MaterialCommunityIcons
+                name={star <= rating ? 'star' : 'star-outline'}
+                size={20}
+                color={star <= rating ? '#FFD700' : '#ccc'}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )
+    }
+
+    const renderProgressScale = (feeling: number, onPress?: (feeling: number) => void) => {
+      const labels = ['Meh', 'Good', 'Great']
+      return (
+        <View style={styles.progressScaleContainer}>
+          {[1, 2, 3].map((level) => (
+            <TouchableOpacity
+              key={level}
+              style={[
+                styles.progressScaleItem,
+                level === feeling && styles.progressScaleItemActive
+              ]}
+              onPress={() => onPress?.(level)}
+              disabled={!onPress}
+            >
+              <Text
+                style={[styles.progressScaleText, level === feeling && styles.progressScaleTextActive]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {labels[level - 1]}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )
+    }
+
+    return (
+      <View style={[styles.checkInCard, { borderLeftColor: getStatusColor() }]}>
+        <View style={styles.checkInHeader}>
+          <Text style={styles.checkInTitle}>Today's Check-in</Text>
+          <View style={[styles.statusIndicator, { backgroundColor: getStatusColor() }]}>
+            {todayCheckIn && <MaterialCommunityIcons name="check" size={12} color="white" />}
+          </View>
+        </View>
+        
+        <Text style={styles.checkInSubtitle}>{getStatusText()}</Text>
+
+        {todayCheckIn ? (
+          // Completed state
+          <View style={styles.checkInCompleted}>
+            <View style={styles.checkInRow}>
+              <Text style={styles.checkInLabel}>Energy Level:</Text>
+              {renderStars(todayCheckIn.energyLevel)}
+            </View>
+            <View style={styles.checkInRow}>
+              <Text style={styles.checkInLabel}>Workout:</Text>
+              <Text style={styles.checkInValue}>
+                {todayCheckIn.workoutCompleted ? 'Completed' : 'Not today'}
+              </Text>
+            </View>
+            <View style={styles.checkInRow}>
+              <Text style={styles.checkInLabel}>Progress feeling:</Text>
+              <View style={styles.progressScaleContainer}>
+                {[1, 2, 3].map((level) => (
+                  <View
+                    key={level}
+                    style={[styles.progressScaleItem, level === todayCheckIn.progressFeeling && styles.progressScaleItemActive]}
+                  >
+                    <Text
+                      style={[styles.progressScaleText, level === todayCheckIn.progressFeeling && styles.progressScaleTextActive]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {['Meh', 'Good', 'Great'][level - 1]}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={styles.updateButton}
+              onPress={() => setCheckInModalVisible(true)}
+            >
+              <Text style={styles.updateButtonText}>Update</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          // Incomplete state
+          <TouchableOpacity 
+            style={styles.completeButton}
+            onPress={() => setCheckInModalVisible(true)}
+          >
+            <Text style={styles.completeButtonText}>Complete Check-in</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    )
+  }
+
+  // Check-in Modal Component
+  const CheckInModal = () => {
+    const [energyLevel, setEnergyLevel] = useState(todayCheckIn?.energyLevel || 3)
+    const [workoutCompleted, setWorkoutCompleted] = useState(todayCheckIn?.workoutCompleted || false)
+    const [progressFeeling, setProgressFeeling] = useState(todayCheckIn?.progressFeeling || 2)
+
+    const handleSubmit = () => {
+      submitDailyCheckIn(energyLevel, workoutCompleted, progressFeeling)
+    }
+
+    const renderStars = (rating: number, onPress: (rating: number) => void) => {
+      return (
+        <View style={styles.modalStarsContainer}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <TouchableOpacity key={star} onPress={() => onPress(star)}>
+              <MaterialCommunityIcons
+                name={star <= rating ? 'star' : 'star-outline'}
+                size={32}
+                color={star <= rating ? '#FFD700' : '#ccc'}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )
+    }
+
+    const renderProgressScale = (feeling: number, onPress: (feeling: number) => void) => {
+      const labels = ['Meh', 'Good', 'Great']
+      return (
+        <View style={styles.modalProgressContainer}>
+          {[1, 2, 3].map((level) => (
+            <TouchableOpacity
+              key={level}
+              style={[
+                styles.modalProgressItem,
+                level === feeling && styles.modalProgressItemActive
+              ]}
+              onPress={() => onPress(level)}
+            >
+              <Text style={[
+                styles.modalProgressText,
+                level === feeling && styles.modalProgressTextActive
+              ]}>
+                {labels[level - 1]}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )
+    }
+
+    return (
+      <Modal
+        visible={isCheckInModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setCheckInModalVisible(false)}
+      >
+        <View style={styles.checkInModalOverlay}>
+          <View style={[styles.checkInModalContent, { backgroundColor: theme.colors.card }]}>
+            <View style={styles.checkInModalHeader}>
+              <Text style={styles.checkInModalTitle}>Daily Check-in</Text>
+              <TouchableOpacity 
+                onPress={() => setCheckInModalVisible(false)}
+                style={styles.checkInModalCloseButton}
+              >
+                <MaterialCommunityIcons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.checkInModalBody}>
+              <View style={styles.checkInModalSection}>
+                <Text style={styles.checkInModalSectionTitle}>How's your energy level today?</Text>
+                {renderStars(energyLevel, setEnergyLevel)}
+              </View>
+
+              <View style={styles.checkInModalSection}>
+                <Text style={styles.checkInModalSectionTitle}>Did you complete a workout?</Text>
+                <View style={styles.workoutToggleContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.workoutToggleOption,
+                      workoutCompleted && styles.workoutToggleOptionActive
+                    ]}
+                    onPress={() => setWorkoutCompleted(true)}
+                  >
+                    <Text style={[
+                      styles.workoutToggleText,
+                      workoutCompleted && styles.workoutToggleTextActive
+                    ]}>
+                      Yes
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.workoutToggleOption,
+                      !workoutCompleted && styles.workoutToggleOptionActive
+                    ]}
+                    onPress={() => setWorkoutCompleted(false)}
+                  >
+                    <Text style={[
+                      styles.workoutToggleText,
+                      !workoutCompleted && styles.workoutToggleTextActive
+                    ]}>
+                      Not today
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.checkInModalSection}>
+                <Text style={styles.checkInModalSectionTitle}>How are you feeling about your progress?</Text>
+                {renderProgressScale(progressFeeling, setProgressFeeling)}
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={styles.submitButton}
+                onPress={handleSubmit}
+              >
+                <Text style={styles.submitButtonText}>
+                  {todayCheckIn ? 'Update Check-in' : 'Complete Check-in'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    )
+  }
+
   // Main Home Screen
   return (
     <SafeAreaView style={styles.container}>
@@ -794,6 +1161,9 @@ export default function HomeScreen({
           ))}
         </View>
 
+        {/* Daily Check-in Card */}
+        <DailyCheckInCard />
+
         {/* Quick Actions Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -913,6 +1283,9 @@ export default function HomeScreen({
       </ScrollView>
 
       {/* Removed loading overlay card */}
+      
+      {/* Daily Check-in Modal */}
+      <CheckInModal />
     </SafeAreaView>
   )
 }
@@ -1561,6 +1934,223 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontWeight: "bold",
         color: "white",
       },
+      // Daily Check-in Card Styles
+      checkInCard: {
+        backgroundColor: "white",
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
+        borderLeftWidth: 4,
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      checkInHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 8,
+      },
+      checkInTitle: {
+        fontSize: 18,
+        fontWeight: "600",
+        color: "#1F2937",
+      },
+      checkInSubtitle: {
+        fontSize: 14,
+        color: "#6B7280",
+        marginBottom: 16,
+      },
+      statusIndicator: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      checkInCompleted: {
+        gap: 12,
+      },
+      checkInRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 4,
+      },
+      checkInLabel: {
+        fontSize: 14,
+        color: "#374151",
+        fontWeight: "500",
+      },
+      checkInValue: {
+        fontSize: 14,
+        color: "#6B7280",
+        flexShrink: 1,
+        flex: 1,
+      },
+      starsContainer: {
+        flexDirection: "row",
+        gap: 4,
+      },
+      progressScaleContainer: {
+        flexDirection: "row",
+        gap: 8,
+      },
+      progressScaleItem: {
+        flex: 1,
+        paddingHorizontal: 8, // Increased padding for better fit
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: "#F3F4F6",
+        borderWidth: 1,
+        borderColor: "#E5E7EB",
+        alignItems: "center",
+      },
+      progressScaleText: {
+        fontSize: 10, // Increased font size for readability
+        color: "#6B7280",
+        fontWeight: "500",
+        textAlign: "center",
+      },
+      completeButton: {
+        backgroundColor: "#A855F7",
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: "center",
+      },
+      completeButtonText: {
+        color: "white",
+        fontSize: 16,
+        fontWeight: "600",
+      },
+      updateButton: {
+        backgroundColor: "#F3F4F6",
+        paddingVertical: 8,
+        borderRadius: 6,
+        alignItems: "center",
+        marginTop: 8,
+      },
+      updateButtonText: {
+        color: "#6B7280",
+        fontSize: 14,
+        fontWeight: "500",
+      },
+      // Check-in Modal Styles
+      checkInModalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      checkInModalContent: {
+        width: "90%",
+        maxHeight: "80%",
+        borderRadius: 16,
+        padding: 0,
+      },
+      checkInModalHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: "#E5E7EB",
+      },
+      checkInModalTitle: {
+        fontSize: 20,
+        fontWeight: "600",
+        color: "#1F2937",
+      },
+      checkInModalCloseButton: {
+        padding: 4,
+      },
+      checkInModalBody: {
+        padding: 20,
+      },
+      checkInModalSection: {
+        marginBottom: 24,
+      },
+      checkInModalSectionTitle: {
+        fontSize: 16,
+        fontWeight: "500",
+        color: "#374151",
+        marginBottom: 12,
+      },
+      modalStarsContainer: {
+        flexDirection: "row",
+        justifyContent: "center",
+        gap: 8,
+      },
+      workoutToggleContainer: {
+        flexDirection: "row",
+        gap: 12,
+      },
+      workoutToggleOption: {
+        flex: 1,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        backgroundColor: "#F3F4F6",
+        borderWidth: 2,
+        borderColor: "#E5E7EB",
+        alignItems: "center",
+      },
+      workoutToggleOptionActive: {
+        backgroundColor: "#A855F7" + "20",
+        borderColor: "#A855F7",
+      },
+      workoutToggleText: {
+        fontSize: 16,
+        color: "#6B7280",
+        fontWeight: "500",
+      },
+      workoutToggleTextActive: {
+        color: "#A855F7",
+      },
+      modalProgressContainer: {
+        flexDirection: "row",
+        gap: 8,
+      },
+      modalProgressItem: {
+        flex: 1,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        backgroundColor: "#F3F4F6",
+        borderWidth: 2,
+        borderColor: "#E5E7EB",
+        alignItems: "center",
+      },
+      modalProgressItemActive: {
+        backgroundColor: "#A855F7" + "20",
+        borderColor: "#A855F7",
+      },
+      modalProgressText: {
+        fontSize: 14,
+        color: "#6B7280",
+        fontWeight: "500",
+      },
+      modalProgressTextActive: {
+        color: "#A855F7",
+      },
+      modalFooter: {
+        padding: 20,
+        borderTopWidth: 1,
+        borderTopColor: "#E5E7EB",
+      },
+      submitButton: {
+        backgroundColor: "#A855F7",
+        paddingVertical: 14,
+        borderRadius: 8,
+        alignItems: "center",
+      },
+      submitButtonText: {
+        color: "white",
+        fontSize: 16,
+        fontWeight: "600",
+      },
     })
   }
 
@@ -1660,7 +2250,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
 
     // Main App Styles
     container: {
-      flex: 1,
+      flex:  1,
       backgroundColor: theme.colors.background,
     },
     header: {
@@ -1670,7 +2260,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       paddingBottom: 16,
     },
     headerContent: {
-      flexDirection: "row",
+           flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
       paddingHorizontal: 16,
@@ -1678,7 +2268,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       // No background here to avoid nested mismatch in dark mode; header provides background
     },
     userProfile: {
-      flexDirection: "row",
+           flexDirection: "row",
       alignItems: "center",
     },
     greetingContainer: {
@@ -2196,6 +2786,224 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       borderWidth: 2,
       borderColor: isDarkMode ? "#374151" : theme.colors.border,
       backgroundColor: isDarkMode ? "#374151" : theme.colors.card,
+    },
+    // Daily Check-in Card Styles (Dark Mode)
+    checkInCard: {
+      backgroundColor: theme.colors.card,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+      borderLeftWidth: 4,
+      elevation: 2,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    checkInHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    checkInTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.colors.text,
+    },
+    checkInSubtitle: {
+  fontSize: 14,
+  color: theme.colors.text + "AA",
+  flexShrink: 1,
+      marginBottom: 16,
+    },
+    statusIndicator: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    checkInCompleted: {
+      gap: 12,
+    },
+    checkInRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 4,
+    },
+    checkInLabel: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontWeight: "500",
+    },
+    checkInValue: {
+      fontSize: 14,
+      color: theme.colors.text + "AA",
+      flexShrink: 1,
+      flex: 1,
+    },
+    starsContainer: {
+      flexDirection: "row",
+      gap: 4,
+    },
+    progressScaleContainer: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    progressScaleItem: {
+        flex: 1,
+        paddingHorizontal: 8, // Increased padding for better fit
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: "#F3F4F6",
+        borderWidth: 1,
+        borderColor: "#E5E7EB",
+        alignItems: "center",
+      },
+      progressScaleText: {
+        fontSize: 10, // Increased font size for readability
+        color: "#6B7280",
+        fontWeight: "500",
+        textAlign: "center",
+      },
+    completeButton: {
+      backgroundColor: "#A855F7",
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    completeButtonText: {
+      color: "white",
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    updateButton: {
+      backgroundColor: theme.colors.background,
+      paddingVertical: 8,
+      borderRadius: 6,
+      alignItems: "center",
+      marginTop: 8,
+    },
+    updateButtonText: {
+      color: theme.colors.text + "AA",
+      fontSize: 14,
+      fontWeight: "500",
+    },
+    // Check-in Modal Styles (Dark Mode)
+    checkInModalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.7)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    checkInModalContent: {
+      width: "90%",
+      maxHeight: "80%",
+      borderRadius: 16,
+      padding: 0,
+    },
+    checkInModalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    checkInModalTitle: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: theme.colors.text,
+    },
+    checkInModalCloseButton: {
+      padding: 4,
+    },
+    checkInModalBody: {
+      padding: 20,
+    },
+    checkInModalSection: {
+      marginBottom: 24,
+    },
+    checkInModalSectionTitle: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: theme.colors.text,
+      marginBottom: 12,
+    },
+    modalStarsContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      gap: 8,
+    },
+    workoutToggleContainer: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    workoutToggleOption: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      backgroundColor: theme.colors.background,
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+      alignItems: "center",
+    },
+    workoutToggleOptionActive: {
+      backgroundColor: "#A855F7" + "20",
+      borderColor: "#A855F7",
+    },
+    workoutToggleText: {
+      fontSize: 16,
+      color: theme.colors.text + "AA",
+      fontWeight: "500",
+    },
+    workoutToggleTextActive: {
+      color: "#A855F7",
+    },
+    modalProgressContainer: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    modalProgressItem: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: theme.colors.background,
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+      alignItems: "center",
+    },
+    modalProgressItemActive: {
+      backgroundColor: "#A855F7" + "20",
+      borderColor: "#A855F7",
+    },
+    modalProgressText: {
+      fontSize: 14,
+      color: theme.colors.text + "AA",
+      fontWeight: "500",
+    },
+    modalProgressTextActive: {
+      color: "#A855F7",
+    },
+    modalFooter: {
+      padding: 20,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    submitButton: {
+      backgroundColor: "#A855F7",
+      paddingVertical: 14,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    submitButtonText: {
+      color: "white",
+      fontSize: 16,
+      fontWeight: "600",
     },
   })
 }

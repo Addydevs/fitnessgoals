@@ -5,10 +5,10 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, {
-  createContext,
-  useEffect,
-  useMemo,
-  useState,
+    createContext,
+    useEffect,
+    useMemo,
+    useState,
 } from "react";
 import { useColorScheme, View } from "react-native";
 import "react-native-reanimated";
@@ -89,8 +89,13 @@ export default function RootLayout() {
       signOut: async () => {
   try {
     // clear only auth-related keys; preserve progressPhotos and other local data
+    // Keep hasEverLoggedIn and lastUsedEmail to maintain smart routing for returning users
     const allKeys = await AsyncStorage.getAllKeys();
-    const keysToRemove = allKeys.filter((k) => k === 'userToken' || k === 'user' || k === 'session');
+    const keysToRemove = allKeys.filter((k) => 
+      k === 'userToken' || 
+      k === 'user' || 
+      k === 'session'
+    );
     if (keysToRemove.length > 0) {
       await AsyncStorage.multiRemove(keysToRemove);
     }
