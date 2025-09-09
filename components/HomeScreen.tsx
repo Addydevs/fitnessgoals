@@ -1995,12 +1995,14 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         gap: 4,
       },
       progressScaleContainer: {
+        flex: 1,
         flexDirection: "row",
         gap: 8,
+        justifyContent: "space-between",
       },
       progressScaleItem: {
         flex: 1,
-        paddingHorizontal: 8, // Increased padding for better fit
+        paddingHorizontal: 4,
         paddingVertical: 6,
         borderRadius: 16,
         backgroundColor: "#F3F4F6",
@@ -2009,7 +2011,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         alignItems: "center",
       },
       progressScaleText: {
-        fontSize: 10, // Increased font size for readability
+        fontSize: 12,
         color: "#6B7280",
         fontWeight: "500",
         textAlign: "center",
@@ -2110,13 +2112,15 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         color: "#A855F7",
       },
       modalProgressContainer: {
+        flex: 1,
         flexDirection: "row",
         gap: 8,
+        justifyContent: "space-between",
       },
       modalProgressItem: {
         flex: 1,
         paddingVertical: 12,
-        paddingHorizontal: 16,
+        paddingHorizontal: 8,
         borderRadius: 8,
         backgroundColor: "#F3F4F6",
         borderWidth: 2,
@@ -2849,25 +2853,27 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       gap: 4,
     },
     progressScaleContainer: {
+      flex: 1,
       flexDirection: "row",
       gap: 8,
+      justifyContent: "space-between",
     },
     progressScaleItem: {
-        flex: 1,
-        paddingHorizontal: 8, // Increased padding for better fit
-        paddingVertical: 6,
-        borderRadius: 16,
-        backgroundColor: "#F3F4F6",
-        borderWidth: 1,
-        borderColor: "#E5E7EB",
-        alignItems: "center",
-      },
-      progressScaleText: {
-        fontSize: 10, // Increased font size for readability
-        color: "#6B7280",
-        fontWeight: "500",
-        textAlign: "center",
-      },
+      flex: 1,
+      paddingHorizontal: 4,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: "#F3F4F6",
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      alignItems: "center",
+    },
+    progressScaleText: {
+      fontSize: 12,
+      color: "#6B7280",
+      fontWeight: "500",
+      textAlign: "center",
+    },
     completeButton: {
       backgroundColor: "#A855F7",
       paddingVertical: 12,
@@ -2964,13 +2970,15 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       color: "#A855F7",
     },
     modalProgressContainer: {
+      flex: 1,
       flexDirection: "row",
       gap: 8,
+      justifyContent: "space-between",
     },
     modalProgressItem: {
       flex: 1,
       paddingVertical: 12,
-      paddingHorizontal: 16,
+      paddingHorizontal: 8,
       borderRadius: 8,
       backgroundColor: theme.colors.background,
       borderWidth: 2,
