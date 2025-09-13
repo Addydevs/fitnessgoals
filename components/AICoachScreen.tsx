@@ -5,19 +5,21 @@ import * as ImagePicker from "expo-image-picker"
 import { LinearGradient } from "expo-linear-gradient"
 import { useEffect, useRef, useState } from "react"
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useColorScheme,
-    View
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View
 } from "react-native"
 import { useTheme } from "../contexts/ThemeContext"
 import { ImageAnalysis } from "../utils/imageAnalysis"
@@ -94,7 +96,7 @@ export default function AICoachScreen() {
         }),
       ]),
     ).start()
-  }
+  }  
 
   const initializeCoach = async () => {
     try {
@@ -111,9 +113,9 @@ export default function AICoachScreen() {
       // Initialize TensorFlow.js
       await imageAnalysis.current.initialize()
 
-      console.log("[v0] AI Coach initialized successfully")
+      console.log("AI Coach initialized successfully")
     } catch (error) {
-      console.error("[v0] AI Coach initialization failed:", error)
+      console.error("AI Coach initialization failed:", error)
     }
   }
 
@@ -131,7 +133,7 @@ export default function AICoachScreen() {
         })
       }
     } catch (error) {
-      console.error("[v0] Failed to load user profile:", error)
+      console.error("Failed to load user profile:", error)
     }
   }
 
@@ -167,7 +169,7 @@ export default function AICoachScreen() {
       const payload = await preparePayload(text)
       await sendToAIWithStreaming(payload, streamingMessage.id)
     } catch (error) {
-      console.error("[v0] Failed to send message:", error)
+      console.error("Failed to send message:", error)
       setIsStreaming(false)
 
       const errorMessage: Message = {
@@ -204,7 +206,7 @@ export default function AICoachScreen() {
       // Simulate streaming effect
       await simulateStreamingText(responseText, messageId)
     } catch (error) {
-      console.error("[v0] AI request failed:", error)
+      console.error("AI request failed:", error)
       setIsStreaming(false)
       throw error
     }
@@ -259,24 +261,24 @@ export default function AICoachScreen() {
 
   const handlePhotoUpload = async () => {
     try {
-      console.log("[v0] === Starting photo upload process ===")
+      console.log(" Starting photo upload process ===")
 
-      console.log("[v0] Requesting media library permissions...")
+      console.log("Requesting media library permissions...")
       const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync()
 
-      console.log("[v0] Requesting camera permissions...")
+      console.log("Requesting camera permissions...")
       const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync()
 
-      console.log("[v0] Media library permission:", mediaStatus)
-      console.log("[v0] Camera permission:", cameraStatus)
+      console.log("Media library permission:", mediaStatus)
+      console.log("Camera permission:", cameraStatus)
 
       if (mediaStatus !== "granted") {
-        console.log("[v0] Media library permission denied")
+        console.log("Media library permission denied")
         Alert.alert("Permission needed", "We need access to your photos to analyze your fitness progress.")
         return
       }
 
-      console.log("[v0] Launching image picker with enhanced options...")
+      console.log("Launching image picker with enhanced options...")
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -288,7 +290,7 @@ export default function AICoachScreen() {
         base64: true, // Request base64 directly from ImagePicker
       })
 
-      console.log("[v0] Image picker result:", {
+      console.log("Image picker result:", {
         canceled: result.canceled,
         assetsLength: result.assets?.length,
         firstAsset: result.assets?.[0]
@@ -305,12 +307,12 @@ export default function AICoachScreen() {
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0]
-        console.log("[v0] ✓ Image selected successfully:", asset.uri)
-        console.log("[v0] Image dimensions:", asset.width, "x", asset.height)
-        console.log("[v0] File size:", asset.fileSize, "bytes")
+        console.log("✓ Image selected successfully:", asset.uri)
+        console.log("Image dimensions:", asset.width, "x", asset.height)
+        console.log("File size:", asset.fileSize, "bytes")
 
         if (!asset.base64) {
-          console.error("[v0] ❌ No base64 data available from ImagePicker")
+          console.error("❌ No base64 data available from ImagePicker")
           Alert.alert("Upload Error", "Failed to process image data. Please try again.")
           return
         }
@@ -318,17 +320,17 @@ export default function AICoachScreen() {
         setIsAnalyzing(true)
 
         try {
-          console.log("[v0] Getting current user...")
+          console.log("Getting current user...")
           const user = await SupabaseService.getCurrentUser()
           if (!user) {
-            console.log("[v0] ❌ User not authenticated")
+            console.log("❌ User not authenticated")
             Alert.alert("Authentication Error", "Please sign in to upload photos.")
             setIsAnalyzing(false)
             return
           }
-          console.log("[v0] ✓ User authenticated:", user.id)
+          console.log("✓ User authenticated:", user.id)
 
-          console.log("[v0] Fetching previous photos for comparison...")
+          console.log("Fetching previous photos for comparison...")
           const { data: lastPhoto, error: fetchError } = await supabase
             .from("photos")
             .select("*")
@@ -340,18 +342,18 @@ export default function AICoachScreen() {
           let previousPhotoUrl = null
           if (!fetchError && lastPhoto) {
             previousPhotoUrl = lastPhoto.url || SupabaseService.getPhotoUrl(lastPhoto.file_name)
-            console.log("[v0] ✓ Found previous photo for comparison:", previousPhotoUrl)
+            console.log("✓ Found previous photo for comparison:", previousPhotoUrl)
           } else {
-            console.log("[v0] No previous photo found, this will be the first photo")
+            console.log("No previous photo found, this will be the first photo")
             if (fetchError && fetchError.code !== "PGRST116") {
-              console.log("[v0] Previous photo fetch error:", fetchError)
+              console.log("Previous photo fetch error:", fetchError)
             }
           }
 
           const fileName = `${user.id}/${Date.now()}_progress.jpg`
-          console.log("[v0] Preparing file upload via Edge Function:", fileName)
+          console.log("Preparing file upload via Edge Function:", fileName)
 
-          console.log("[v0] ✓ Base64 data available from ImagePicker, length:", asset.base64.length)
+          console.log("✓ Base64 data available from ImagePicker, length:", asset.base64.length)
 
           const uploadPayload = {
             userId: user.id,
@@ -360,7 +362,7 @@ export default function AICoachScreen() {
             contentType: "image/jpeg",
           }
 
-          console.log("[v0] Invoking upload-photo Edge Function with payload structure:", {
+          console.log("Invoking upload-photo Edge Function with payload structure:", {
             userId: uploadPayload.userId,
             fileName: uploadPayload.fileName,
             contentType: uploadPayload.contentType,
@@ -372,14 +374,14 @@ export default function AICoachScreen() {
           })
 
           if (uploadError) {
-            console.error("[v0] ❌ Upload-photo Edge Function error:", uploadError)
+            console.error("❌ Upload-photo Edge Function error:", uploadError)
             throw new Error(`Edge Function upload failed: ${uploadError.message}`)
           }
 
-          console.log("[v0] Edge Function response:", uploadData)
+          console.log("Edge Function response:", uploadData)
 
           if (!uploadData?.publicUrl) {
-            console.error("[v0] ❌ No public URL returned from Edge Function:", uploadData)
+            console.error("❌ No public URL returned from Edge Function:", uploadData)
             throw new Error("Edge Function did not return a valid public URL")
           }
 
@@ -440,7 +442,7 @@ export default function AICoachScreen() {
 
           setMessages((prev) => [...prev, userMessage])
           setIsAnalyzing(false)
-          console.log("[v0] ✓ Photo upload and analysis completed successfully")
+          console.log("✓ Photo upload and analysis completed successfully")
 
           // Send analysis to AI coach with streaming
           const payload = await preparePayload(photoMessage)
@@ -457,7 +459,7 @@ export default function AICoachScreen() {
           setMessages((prev) => [...prev, streamingMessage])
           await sendToAIWithStreaming(payload, streamingMessage.id)
         } catch (error) {
-          console.error("[v0] ❌ Photo analysis failed:", error)
+          console.error("❌ Photo analysis failed:", error)
           setIsAnalyzing(false)
 
           let errorMessage = "Failed to analyze photo. Please try again."
@@ -472,10 +474,10 @@ export default function AICoachScreen() {
           Alert.alert("Analysis Error", errorMessage)
         }
       } else {
-        console.log("[v0] Image picker was canceled or no image selected")
+        console.log("Image picker was canceled or no image selected")
       }
     } catch (error) {
-      console.error("[v0] ❌ Photo upload failed:", error)
+      console.error("❌ Photo upload failed:", error)
 
       let errorMessage = "Failed to upload photo. Please try again."
       if (error.message?.includes("permission")) {
@@ -573,167 +575,173 @@ export default function AICoachScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      {statusMessage ? (
-        <View style={{ padding: 12, backgroundColor: theme.colors.card, borderRadius: 10, margin: 10, marginTop: 60 }}>
-          <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 15 }}>{statusMessage}</Text>
-        </View>
-      ) : null}
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-
-      <LinearGradient
-        colors={isDarkMode ? [theme.colors.background, theme.colors.background] : ["#fff", "#fff"]}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, { color: isDarkMode ? theme.colors.text : theme.colors.primary }]}>AI Fitness Coach</Text>
-          <View style={[styles.statusBadge, { backgroundColor: isDarkMode ? theme.colors.primary : theme.colors.accent }]}>
-            <View style={[styles.statusDot, { backgroundColor: isDarkMode ? theme.colors.background : theme.colors.primary }]} />
-            <Text style={[styles.statusText, { color: isDarkMode ? theme.colors.background : theme.colors.primary }]}>Online</Text>
-          </View>
-        </View>
-
-        {progressData.currentPhoto && (
-          <View style={styles.progressIndicator}>
-            <Ionicons name="trending-up" size={16} color="white" />
-            <Text style={styles.progressText}>
-              {progressData.comparisonResults
-                ? `Progress Score: ${progressData.comparisonResults.progressScore}/100`
-                : "Ready for comparison"}
-            </Text>
-          </View>
-        )}
-      </LinearGradient>
-
-      <ScrollView
-        ref={scrollViewRef}
-        style={[styles.messagesContainer, { minHeight: 0, flexGrow: 1, backgroundColor: isDarkMode ? theme.colors.background : theme.colors.card }]}
-        contentContainerStyle={[styles.messagesContent, { paddingBottom: 140, minHeight: 0, flexGrow: 1 }]}
-        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-        showsVerticalScrollIndicator={false}
-      >
-        {messages.map((message) => (
-          <View key={message.id} style={[styles.messageContainer, message.type === "user" ? styles.userMessage : styles.aiMessage]}>
-            <View
-              style={[
-                styles.messageBubble,
-                {
-                  backgroundColor: message.type === "user"
-                    ? (isDarkMode ? theme.colors.primary : theme.colors.primary)
-                    : (isDarkMode ? theme.colors.surface : theme.colors.card),
-                  minHeight: undefined, // Remove forced minHeight
-                  maxHeight: undefined, // Remove forced maxHeight
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.messageText,
-                  {
-                    color: message.type === "user"
-                      ? (isDarkMode ? theme.colors.background : theme.colors.background)
-                      : (isDarkMode ? theme.colors.text : theme.colors.text),
-                  },
-                ]}
-              >
-                {message.text}
-              </Text>
-              {/* ...existing code for analysisData, streaming, timestamp... */}
-            </View>
-          </View>
-        ))}
-
-        {isAnalyzing && (
-          <View style={styles.analyzingContainer}>
-            <View style={styles.analyzingBubble}>
-              <ActivityIndicator size="small" color={isDark ? "#64FFDA" : "#007AFF"} />
-              <Text style={styles.analyzingText}>Analyzing your photo with AI... 🔍</Text>
-            </View>
-          </View>
-        )}
-
-        {isStreaming || isAnalyzing ? (
-          <View style={{ alignItems: 'center', marginTop: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderRadius: 16, padding: 10 }}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-              <Text style={{ marginLeft: 10, color: theme.colors.text, fontWeight: 'bold' }}>
-                {isAnalyzing ? 'AI is analyzing your photo...' : 'AI is thinking...'}
-              </Text>
-            </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        {statusMessage ? (
+          <View style={{ padding: 12, backgroundColor: theme.colors.card, borderRadius: 10, margin: 10, marginTop: 60 }}>
+            <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 15 }}>{statusMessage}</Text>
           </View>
         ) : null}
-      </ScrollView>
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
-      <View style={styles.inputContainer}>
-        <View style={styles.inputRow}>
-          <TouchableOpacity
-            style={[styles.photoButton, { backgroundColor: isDarkMode ? theme.colors.surface : theme.colors.card }]}
-            onPress={handlePhotoUpload}
-          >
-            <Ionicons name="camera" size={24} color={isDarkMode ? theme.colors.primary : theme.colors.accent} />
-          </TouchableOpacity>
-          <TextInput
-            style={[
-              styles.textInput,
-              {
-                backgroundColor: isDarkMode ? theme.colors.surface : theme.colors.background,
-                color: theme.colors.text,
-                borderColor: theme.colors.border,
-                fontSize: 15,
-                minHeight: 36,
-                maxHeight: 60,
-                paddingVertical: 6,
-              },
-            ]}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Ask about training, nutrition, or upload a photo..."
-            placeholderTextColor={isDarkMode ? theme.colors.textSecondary : theme.colors.subtitle}
-            multiline
-            maxLength={2000}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              { backgroundColor: isDarkMode ? theme.colors.primary : theme.colors.accent },
-              (!inputText.trim() || isStreaming) && styles.sendButtonDisabled,
-            ]}
-            onPress={handleSendMessage}
-            disabled={!inputText.trim() || isStreaming}
-          >
-            <Ionicons name="send" size={20} color={isDarkMode ? theme.colors.background : theme.colors.primary} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.quickActions}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {quickActionButtons.map((action, index) => (
-              <TouchableOpacity
-                key={index}
+        <LinearGradient
+          colors={isDarkMode ? [theme.colors.background, theme.colors.background] : ["#fff", "#fff"]}
+          style={styles.header}
+        >
+          <View style={styles.headerContent}>
+            <Text style={[styles.headerTitle, { color: isDarkMode ? theme.colors.text : theme.colors.primary }]}>AI Fitness Coach</Text>
+            <View style={[styles.statusBadge, { backgroundColor: isDarkMode ? theme.colors.primary : theme.colors.accent }]}>
+              <View style={[styles.statusDot, { backgroundColor: isDarkMode ? theme.colors.background : theme.colors.primary }]} />
+              <Text style={[styles.statusText, { color: isDarkMode ? theme.colors.background : theme.colors.primary }]}>Online</Text>
+            </View>
+          </View>
+
+          {progressData.currentPhoto && (
+            <View style={styles.progressIndicator}>
+              <Ionicons name="trending-up" size={16} color="white" />
+              <Text style={styles.progressText}>
+                {progressData.comparisonResults
+                  ? `Progress Score: ${progressData.comparisonResults.progressScore}/100`
+                  : "Ready for comparison"}
+              </Text>
+            </View>
+          )}
+        </LinearGradient>
+
+        <ScrollView
+          ref={scrollViewRef}
+          style={[styles.messagesContainer, { minHeight: 0, flexGrow: 1, backgroundColor: isDarkMode ? theme.colors.background : theme.colors.card }]}
+          contentContainerStyle={[styles.messagesContent, { paddingBottom: 140, minHeight: 0, flexGrow: 1 }]}
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          showsVerticalScrollIndicator={false}
+        >
+          {messages.map((message) => (
+            <View key={message.id} style={[styles.messageContainer, message.type === "user" ? styles.userMessage : styles.aiMessage]}>
+              <View
                 style={[
-                  styles.quickActionButton,
+                  styles.messageBubble,
                   {
-                    backgroundColor: isDarkMode ? theme.colors.surface : theme.colors.card,
-                    borderColor: theme.colors.border,
+                    backgroundColor: message.type === "user"
+                      ? (isDarkMode ? theme.colors.primary : theme.colors.primary)
+                      : (isDarkMode ? theme.colors.surface : theme.colors.card),
+                    minHeight: undefined, // Remove forced minHeight
+                    maxHeight: undefined, // Remove forced maxHeight
                   },
                 ]}
-                onPress={() => setInputText(action.text)}
               >
                 <Text
                   style={[
-                    styles.quickActionText,
+                    styles.messageText,
                     {
-                      color: isDarkMode ? theme.colors.primary : theme.colors.primary,
+                      color: message.type === "user"
+                        ? (isDarkMode ? theme.colors.background : theme.colors.background)
+                        : (isDarkMode ? theme.colors.text : theme.colors.text),
                     },
                   ]}
                 >
-                  {action.icon} {action.label}
+                  {message.text}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+                {/* ...existing code for analysisData, streaming, timestamp... */}
+              </View>
+            </View>
+          ))}
+
+          {isAnalyzing && (
+            <View style={styles.analyzingContainer}>
+              <View style={styles.analyzingBubble}>
+                <ActivityIndicator size="small" color={isDark ? "#64FFDA" : "#007AFF"} />
+                <Text style={styles.analyzingText}>Analyzing your photo with AI... 🔍</Text>
+              </View>
+            </View>
+          )}
+
+          {isStreaming || isAnalyzing ? (
+            <View style={{ alignItems: 'center', marginTop: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderRadius: 16, padding: 10 }}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text style={{ marginLeft: 10, color: theme.colors.text, fontWeight: 'bold' }}>
+                  {isAnalyzing ? 'AI is analyzing your photo...' : 'AI is thinking...'}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+        </ScrollView>
+
+        <View style={styles.inputContainer}>
+          <View style={styles.inputRow}>
+            <TouchableOpacity
+              style={[styles.photoButton, { backgroundColor: isDarkMode ? theme.colors.surface : theme.colors.card }]}
+              onPress={handlePhotoUpload}
+            >
+              <Ionicons name="camera" size={24} color={isDarkMode ? theme.colors.primary : theme.colors.accent} />
+            </TouchableOpacity>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: isDarkMode ? theme.colors.surface : theme.colors.background,
+                  color: theme.colors.text,
+                  borderColor: theme.colors.border,
+                  fontSize: 15,
+                  minHeight: 36,
+                  maxHeight: 60,
+                  paddingVertical: 6,
+                },
+              ]}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Ask about training, nutrition, or upload a photo..."
+              placeholderTextColor={isDarkMode ? theme.colors.textSecondary : theme.colors.subtitle}
+              multiline
+              maxLength={2000}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                { backgroundColor: isDarkMode ? theme.colors.primary : theme.colors.accent },
+                (!inputText.trim() || isStreaming) && styles.sendButtonDisabled,
+              ]}
+              onPress={handleSendMessage}
+              disabled={!inputText.trim() || isStreaming}
+            >
+              <Ionicons name="send" size={20} color={isDarkMode ? theme.colors.background : theme.colors.primary} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.quickActions}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {quickActionButtons.map((action, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.quickActionButton,
+                    {
+                      backgroundColor: isDarkMode ? theme.colors.surface : theme.colors.card,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
+                  onPress={() => setInputText(action.text)}
+                >
+                  <Text
+                    style={[
+                      styles.quickActionText,
+                      {
+                        color: isDarkMode ? theme.colors.primary : theme.colors.primary,
+                      },
+                    ]}
+                  >
+                    {action.icon} {action.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   )
 }
 

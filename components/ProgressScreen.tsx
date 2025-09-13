@@ -1,10 +1,9 @@
-"use client"
-
-import { AuthContext } from "@/app/_layout"
-import { Colors } from "@/constants/Colors"
-import { useTheme } from "@/contexts/ThemeContext"
-import { supabase } from "@/utils/supabase"
-import { memo, useCallback, useContext, useEffect, useMemo, useState } from "react"
+import { AuthContext } from "@/app/_layout";
+import { Colors } from "@/constants/Colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import { supabase } from "@/utils/supabase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { memo, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -17,8 +16,29 @@ import {
     Text,
     TouchableOpacity,
     View,
-} from "react-native"
-import Layout, { ModernCard, ModernHeader, SectionHeader } from "./Layout"
+} from "react-native";
+import Layout, { ModernCard, ModernHeader, SectionHeader } from "./Layout";
+
+// Helper to push notification to AsyncStorage
+async function pushNotification(message: string) {
+  try {
+    const stored = await AsyncStorage.getItem("generalNotifications");
+    let loaded = stored ? JSON.parse(stored) : [];
+    const newNotif = {
+      id: `${Date.now()}-${Math.random()}`,
+      message,
+      timestamp: new Date().toISOString(),
+      read: false,
+    };
+    loaded.unshift(newNotif);
+    await AsyncStorage.setItem("generalNotifications", JSON.stringify(loaded));
+  } catch {
+    // fail silently
+  }
+}
+
+
+
 
 // Define the Photo type locally if it's not easily importable
 interface Photo {
@@ -232,14 +252,18 @@ export default function ProgressScreen() {
         .limit(100) // Limit initial load for better performance
 
       if (error) throw error
-      setPhotos(data || [])
+      const prevCount = photos.length;
+      setPhotos(data || []);
+      if (data && data.length > prevCount) {
+        await pushNotification('You uploaded a new progress photo!');
+      }
     } catch (err: any) {
       setError(err.message)
       setPhotos([])
     } finally {
       if (showLoading) setLoading(false)
     }
-  }, [])
+  }, [photos.length])
 
   useEffect(() => {
     if (session?.user?.id) {

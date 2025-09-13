@@ -118,50 +118,9 @@ const hasPhotoOnDate = (photos: Photo[], targetDate: Date): boolean => {
   })
 }
 
-const saveUserStats = async (photos: Photo[]): Promise<UserStats | null> => {
-  const stats: UserStats = {
-    totalPhotos: photos.length,
-    lastPhotoDate: photos.length > 0 ? photos[photos.length - 1].timestamp : null,
-    startDate: photos.length > 0 ? photos[0].timestamp : new Date().toISOString(),
-    currentStreak: getCurrentStreak(photos),
-    photosThisWeek: getPhotosThisWeek(photos),
-    updatedAt: new Date().toISOString(),
-  }
+// Removed unused saveUserStats function
 
-  try {
-    await AsyncStorage.setItem("userStats", JSON.stringify(stats))
-    return stats
-  } catch (error) {
-    console.error("Error saving user stats:", error)
-    return null
-  }
-}
-
-const loadUserStats = async (): Promise<UserStats> => {
-  try {
-    const stats = await AsyncStorage.getItem("userStats")
-    return stats
-      ? JSON.parse(stats)
-      : {
-          totalPhotos: 0,
-          lastPhotoDate: null,
-          startDate: new Date().toISOString(),
-          currentStreak: 0,
-          photosThisWeek: 0,
-          updatedAt: new Date().toISOString(),
-        }
-  } catch (error) {
-    console.error("Error loading user stats:", error)
-    return {
-      totalPhotos: 0,
-      lastPhotoDate: null,
-      startDate: new Date().toISOString(),
-      currentStreak: 0,
-      photosThisWeek: 0,
-      updatedAt: new Date().toISOString(),
-    }
-  }
-}
+// Removed unused loadUserStats function
 
 // extractProgressScore removed (not used in this file)
 
@@ -196,7 +155,7 @@ export default function HomeScreen({
     startDate: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   })
-  const [userPhotos, setUserPhotos] = useState<Photo[]>([])
+  // Removed unused userPhotos state
   // Track if we've already handled camera permission to avoid spammy logs/requests
   const cameraPermissionCheckedRef = React.useRef<boolean>(false)
 
@@ -231,24 +190,57 @@ export default function HomeScreen({
   const loadGeneralNotificationsData = React.useCallback(async (): Promise<void> => {
     try {
       const stored = await AsyncStorage.getItem("generalNotifications");
-      const loaded: Notification[] = stored ? JSON.parse(stored) : [];
-      setGeneralNotifications(loaded);
-      if (loaded.length === 0) {
-        // seed once (no async re-entry)
-        const seed: Notification = {
-          id: Date.now().toString(),
-          timestamp: new Date().toISOString(),
-          message: "Welcome to CaptureFit Progress! Start by taking your first progress photo.",
+      let loaded: Notification[] = stored ? JSON.parse(stored) : [];
+
+      // Remove all static notifications
+      loaded = loaded.filter(n => !n.id.startsWith('reminder-') && !n.id.startsWith('tip-') && !n.id.startsWith('achievement-'));
+
+      // Dynamic: Reminder if no photo today
+      const today = new Date();
+      const hasPhotoToday = hasPhotoOnDate(photos, today);
+      if (!hasPhotoToday) {
+        loaded.push({
+          id: `reminder-${today.toISOString().split('T')[0]}`,
+          timestamp: today.toISOString(),
+          message: "Don't forget to take your daily progress photo!",
           read: false,
-        };
-        const next = [seed];
-        setGeneralNotifications(next);
-        await AsyncStorage.setItem("generalNotifications", JSON.stringify(next));
+        });
       }
+
+      // Dynamic: Congratulate on streaks (3, 7, 14, 30 days)
+      const streak = userStats.currentStreak;
+      const streakMilestones = [3, 7, 14, 30, 100];
+      streakMilestones.forEach((milestone) => {
+        if (streak === milestone && !loaded.some(n => n.id === `achievement-${milestone}`)) {
+          loaded.push({
+            id: `achievement-${milestone}`,
+            timestamp: today.toISOString(),
+            message: `Congrats! You hit a ${milestone}-day streak. Keep it up!`,
+            read: false,
+          });
+        }
+      });
+
+      // Dynamic: Tip if missed check-in yesterday
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+      if (!hasPhotoOnDate(photos, yesterday)) {
+        if (!loaded.some(n => n.id === `tip-${yesterday.toISOString().split('T')[0]}`)) {
+          loaded.push({
+            id: `tip-${yesterday.toISOString().split('T')[0]}`,
+            timestamp: today.toISOString(),
+            message: "Tip: Consistency is key! Try to check in every day for best results.",
+            read: false,
+          });
+        }
+      }
+
+      setGeneralNotifications(loaded);
+      await AsyncStorage.setItem("generalNotifications", JSON.stringify(loaded));
     } catch (e) {
       console.error("Error loading notifications:", e);
     }
-  }, []);
+  }, [photos, userStats.currentStreak]);
 
 // 2) Proper useFocusEffect: memoized callback + cancel guard
   useFocusEffect(
@@ -415,16 +407,13 @@ export default function HomeScreen({
 
   const updateUserStats = useCallback(async () => {
     // Stats now loaded from Supabase, no need to update from local photos
-  }, [photos])
+  }, []) // Removed unnecessary dependency
 
   useEffect(() => {
     updateUserStats()
   }, [updateUserStats])
 
-  const loadUserStatsData = async (): Promise<void> => {
-    const stats = await loadUserStats()
-    setUserStats(stats)
-  }
+  // Removed unused loadUserStatsData function
 
   // const checkWelcomeStatus = async (): Promise<void> => {
   //   try {
@@ -488,6 +477,31 @@ export default function HomeScreen({
     }
   }, [])
 
+  // Helper to push a dynamic notification
+  const pushNotification = async (type: 'checkin-update' | 'checkin-complete', details?: { energyLevel?: number; workoutCompleted?: boolean; progressFeeling?: number }) => {
+    try {
+      const stored = await AsyncStorage.getItem("generalNotifications");
+      let loaded: Notification[] = stored ? JSON.parse(stored) : [];
+      let message = '';
+      if (type === 'checkin-update') {
+        message = `Check-in updated: Energy ${details?.energyLevel}/5, Workout: ${details?.workoutCompleted ? 'Yes' : 'No'}, Feeling: ${['Meh','Good','Great'][(details?.progressFeeling||2)-1]}`;
+      } else if (type === 'checkin-complete') {
+        message = `Check-in complete! Energy: ${details?.energyLevel}/5, Workout: ${details?.workoutCompleted ? 'Yes' : 'No'}, Feeling: ${['Meh','Good','Great'][(details?.progressFeeling||2)-1]}`;
+      }
+      const newNotif: Notification = {
+        id: `${Date.now()}-${Math.random()}`,
+        message,
+        timestamp: new Date().toISOString(),
+        read: false,
+      };
+      loaded.unshift(newNotif);
+      await AsyncStorage.setItem("generalNotifications", JSON.stringify(loaded));
+      setGeneralNotifications(loaded);
+    } catch (e) {
+      // fail silently
+    }
+  };
+
   const submitDailyCheckIn = useCallback(async (energyLevel: number, workoutCompleted: boolean, progressFeeling: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -516,6 +530,7 @@ export default function HomeScreen({
 
         if (error) throw error
         setTodayCheckIn(data)
+        await pushNotification('checkin-update', { energyLevel, workoutCompleted, progressFeeling })
       } else {
         // Create new check-in
         const { data, error } = await supabase
@@ -529,6 +544,7 @@ export default function HomeScreen({
 
         if (error) throw error
         setTodayCheckIn(data)
+        await pushNotification('checkin-complete', { energyLevel, workoutCompleted, progressFeeling })
       }
 
       setCheckInModalVisible(false)
@@ -572,15 +588,7 @@ export default function HomeScreen({
     }
   }
 
-  const loadGeneralNotifications = async (): Promise<Notification[]> => {
-    try {
-      const storedNotifications = await AsyncStorage.getItem("generalNotifications")
-      return storedNotifications ? JSON.parse(storedNotifications) : []
-    } catch (error) {
-      console.error("Error loading general notifications:", error)
-      return []
-    }
-  }
+  // Removed unused loadGeneralNotifications function
 
   // const loadGeneralNotificationsData = async (): Promise<void> => {
   //   const loadedNotifications = await loadGeneralNotifications()
@@ -594,23 +602,7 @@ export default function HomeScreen({
   //   }
   // }
 
-  const addGeneralNotification = async (notification: Omit<Notification, "id" | "timestamp">): Promise<void> => {
-    const newNotification: Notification = {
-      id: Date.now().toString(),
-      timestamp: new Date().toISOString(),
-      ...notification,
-    }
-    const updatedNotifications = [...generalNotifications, newNotification]
-    setGeneralNotifications(updatedNotifications)
-    await saveGeneralNotifications(updatedNotifications)
-    // Integrate push notification
-    try {
-      const { sendImmediateSummary } = require("../utils/notifications")
-      await sendImmediateSummary()
-    } catch (err) {
-      console.warn("Failed to send push notification:", err)
-    }
-  }
+  // Removed unused addGeneralNotification function and forbidden require()
 
   const markGeneralNotificationAsRead = async (id: string): Promise<void> => {
     const updatedNotifications = generalNotifications.map((notif) =>
@@ -666,7 +658,7 @@ export default function HomeScreen({
                   width: "90%",
                   padding: 16,
                   borderRadius: 18,
-                  backgroundColor: "white",
+                  backgroundColor: theme.colors.card,
                   elevation: 10,
                 },
               ]}
@@ -685,12 +677,27 @@ export default function HomeScreen({
                       style={[
                         styles.notificationItem,
                         !notif.read && styles.unreadNotification,
-                        { marginBottom: 10, borderRadius: 10, backgroundColor: "#F3F4F6", padding: 10 },
+                        {
+                          marginBottom: 14,
+                          borderRadius: 16,
+                          backgroundColor: notif.read
+                            ? (isDarkMode ? '#23272f' : '#f4f6fa')
+                            : (isDarkMode ? '#2d3a5a' : '#e3edfa'),
+                          padding: 16,
+                          borderWidth: 0,
+                          shadowColor: isDarkMode ? '#11131a' : '#b6c2d1',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.10,
+                          shadowRadius: 10,
+                          elevation: 3,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                        },
                       ]}
                     >
                       <View style={styles.notificationTextContent}>
-                        <Text style={styles.notificationMessage}>{notif.message}</Text>
-                        <Text style={styles.notificationTimestamp}>{new Date(notif.timestamp).toLocaleString()}</Text>
+                        <Text style={[styles.notificationMessage, { color: theme.colors.text, fontWeight: notif.read ? '400' : '600', fontSize: 15 }]}>{notif.message}</Text>
+                        <Text style={[styles.notificationTimestamp, { color: theme.colors.subtitle }]}>{new Date(notif.timestamp).toLocaleString()}</Text>
                       </View>
                       {!notif.read && (
                         <TouchableOpacity
@@ -747,12 +754,7 @@ export default function HomeScreen({
           <Text style={styles.welcomeSubtitle}>
             Capture progress photos and get AI-powered insights to achieve your fitness goals faster.
           </Text>
-          <View style={styles.pageIndicators}>
-            <View style={[styles.indicator, styles.indicatorActive]} />
-            <View style={styles.indicator} />
-            <View style={styles.indicator} />
-            <View style={styles.indicator} />
-          </View>
+          {/* Removed swipe dots because this image is not swipable */}
           <TouchableOpacity style={styles.getStartedButton} onPress={handleGetStarted} activeOpacity={0.9}>
             <Text style={styles.getStartedText}>Start Tracking</Text>
           </TouchableOpacity>
@@ -794,37 +796,12 @@ export default function HomeScreen({
       )
     }
 
-    const renderProgressScale = (feeling: number, onPress?: (feeling: number) => void) => {
-      const labels = ['Meh', 'Good', 'Great']
-      return (
-        <View style={styles.progressScaleContainer}>
-          {[1, 2, 3].map((level) => (
-            <TouchableOpacity
-              key={level}
-              style={[
-                styles.progressScaleItem,
-                level === feeling && styles.progressScaleItemActive
-              ]}
-              onPress={() => onPress?.(level)}
-              disabled={!onPress}
-            >
-              <Text
-                style={[styles.progressScaleText, level === feeling && styles.progressScaleTextActive]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {labels[level - 1]}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )
-    }
+    // Removed unused renderProgressScale function
 
     return (
       <View style={[styles.checkInCard, { borderLeftColor: getStatusColor() }]}>
         <View style={styles.checkInHeader}>
-          <Text style={styles.checkInTitle}>Today's Check-in</Text>
+          <Text style={styles.checkInTitle}>Today&apos;s Check-in</Text>
           <View style={[styles.statusIndicator, { backgroundColor: getStatusColor() }]}>
             {todayCheckIn && <MaterialCommunityIcons name="check" size={12} color="white" />}
           </View>
@@ -956,7 +933,7 @@ export default function HomeScreen({
 
             <ScrollView style={styles.checkInModalBody}>
               <View style={styles.checkInModalSection}>
-                <Text style={styles.checkInModalSectionTitle}>How's your energy level today?</Text>
+                <Text style={styles.checkInModalSectionTitle}>How&apos;s your energy level today?</Text>
                 {renderStars(energyLevel, setEnergyLevel)}
               </View>
 
@@ -2730,15 +2707,20 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
     },
     notificationItem: {
       flexDirection: "row",
-      justifyContent: "space-between",
       alignItems: "center",
-      padding: 10,
-      backgroundColor: theme.colors.background,
-      borderRadius: 5,
-      marginBottom: 5,
+      backgroundColor: '#f4f6fa',
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 14,
+      shadowColor: '#b6c2d1',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.10,
+      shadowRadius: 10,
+      elevation: 3,
     },
     unreadNotification: {
-      backgroundColor: theme.colors.notification,
+      backgroundColor: '#e3edfa',
+      borderWidth: 0,
     },
     notificationTextContent: {
       flex: 1,
