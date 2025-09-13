@@ -4,6 +4,7 @@ import { AuthContext } from "@/app/_layout"
 import { Colors } from "@/constants/Colors"
 import { useTheme } from "@/contexts/ThemeContext"
 import { supabase } from "@/utils/supabase"
+import { Ionicons } from "@expo/vector-icons"
 import { memo, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import {
     ActivityIndicator,
@@ -59,7 +60,16 @@ const PhotoItem = memo(({ photo, onPress, onDelete, isEditMode }: { photo: Photo
   }
 
   return (
-    <TouchableOpacity onPress={onPress} style={styles.photoContainer}>
+    <TouchableOpacity 
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={[
+        styles.photoContainer,
+        isSelected && styles.selectedPhoto,
+        isDragged && styles.draggedPhoto,
+        reorderMode && styles.reorderPhoto
+      ]}
+    >
       <Image
         source={{ uri: photo.url }}
         style={styles.photo}
@@ -571,6 +581,61 @@ const styles = StyleSheet.create({
     width: width / 3 - 2,
     height: width / 3 - 2,
     margin: 1,
+    position: 'relative',
+  },
+  selectedPhoto: {
+    borderWidth: 3,
+    borderColor: '#007AFF',
+  },
+  draggedPhoto: {
+    opacity: 0.5,
+    transform: [{ scale: 1.1 }],
+  },
+  reorderPhoto: {
+    borderWidth: 2,
+    borderColor: '#FF9500',
+    borderStyle: 'dashed',
+  },
+  photoOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    padding: 4,
+  },
+  checkmark: {
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reorderIcon: {
+    backgroundColor: '#FF9500',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dragIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 5,
+    padding: 5,
+    transform: [{ translateX: -50 }, { translateY: -10 }],
+  },
+  dragText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   photo: {
     flex: 1,
