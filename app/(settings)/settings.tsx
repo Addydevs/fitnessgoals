@@ -207,7 +207,7 @@ export default function SettingsScreen() {
     } catch (err) {
       console.warn('Error clearing storage on logout, preserving progressPhotos', err);
     } finally {
-      router.replace('/(auth)/login');
+  router.replace('/(auth)/auth');
     }
   };
 
@@ -235,7 +235,7 @@ export default function SettingsScreen() {
             }
             await AsyncStorage.clear();
             Alert.alert('Account Deleted', 'Your account has been deleted.');
-            router.replace('/(auth)/login');
+            router.replace('/(auth)/auth');
           } catch (err: any) {
             Alert.alert('Error', err.message || 'Failed to delete account.');
           }

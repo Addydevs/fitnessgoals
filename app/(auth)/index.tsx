@@ -44,10 +44,10 @@ export default function IntroScreen() {
     } else {
       try {
         await AsyncStorage.setItem("onboarded", "true");
-        router.replace("/(auth)/login");
+  router.replace("/(auth)/auth");
       } catch (e) {
         console.log("Error onboarding, fallback to login", e);
-        router.replace("/(auth)/login");
+        router.replace("/(auth)/auth");
       }
     }
   };
@@ -63,7 +63,7 @@ export default function IntroScreen() {
           } catch (e) {
             console.log("Error setting onboarded flag", e);
           }
-          router.replace("/(auth)/login");
+          router.replace("/(auth)/auth");
         }}
         style={styles.skip}
       >
