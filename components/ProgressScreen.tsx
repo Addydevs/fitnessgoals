@@ -1,20 +1,9 @@
-<<<<<<< HEAD
-"use client"
-
 import { AuthContext } from "@/app/_layout"
 import { Colors } from "@/constants/Colors"
 import { useTheme } from "@/contexts/ThemeContext"
 import { supabase } from "@/utils/supabase"
-import { Ionicons } from "@expo/vector-icons"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 import { memo, useCallback, useContext, useEffect, useMemo, useState } from "react"
-=======
-import { AuthContext } from "@/app/_layout";
-import { Colors } from "@/constants/Colors";
-import { useTheme } from "@/contexts/ThemeContext";
-import { supabase } from "@/utils/supabase";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { memo, useCallback, useContext, useEffect, useMemo, useState } from "react";
->>>>>>> develop
 import {
     ActivityIndicator,
     Alert,
@@ -92,13 +81,7 @@ const PhotoItem = memo(({ photo, onPress, onDelete, isEditMode }: { photo: Photo
   return (
     <TouchableOpacity 
       onPress={onPress}
-      onLongPress={onLongPress}
-      style={[
-        styles.photoContainer,
-        isSelected && styles.selectedPhoto,
-        isDragged && styles.draggedPhoto,
-        reorderMode && styles.reorderPhoto
-      ]}
+      style={styles.photoContainer}
     >
       <Image
         source={{ uri: photo.url }}

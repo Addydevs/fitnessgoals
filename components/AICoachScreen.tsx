@@ -21,6 +21,7 @@ import {
   useColorScheme,
   View
 } from "react-native"
+import Markdown from "react-native-markdown-display"
 import { useTheme } from "../contexts/ThemeContext"
 import { ImageAnalysis } from "../utils/imageAnalysis"
 import { supabase, SupabaseService } from "../utils/supabase"
@@ -514,16 +515,40 @@ export default function AICoachScreen() {
             },
           ]}
         >
-          <Text
-            style={[
-              styles.messageText,
-              {
-                color: isUser ? theme.colors.background : theme.colors.text,
-              },
-            ]}
-          >
-            {message.text}
-          </Text>
+          {message.text ? (
+            isUser ? (
+              <Text
+                style={[
+                  styles.messageText,
+                  {
+                    color: theme.colors.background,
+                  },
+                ]}
+              >
+                {message.text}
+              </Text>
+            ) : (
+              <Markdown
+                style={{
+                  body: {
+                    color: theme.colors.text,
+                    fontSize: 15,
+                    lineHeight: 22,
+                  },
+                  heading1: { color: theme.colors.text, fontSize: 20, fontWeight: "bold", marginBottom: 6 },
+                  heading2: { color: theme.colors.text, fontSize: 18, fontWeight: "bold", marginBottom: 4 },
+                  bullet_list: { marginVertical: 6 },
+                  list_item: { color: theme.colors.text },
+                  strong: { fontWeight: "700" },
+                  paragraph: { marginTop: 4, marginBottom: 8 },
+                  code_inline: { backgroundColor: theme.colors.card, color: theme.colors.text },
+                  link: { color: theme.colors.primary },
+                }}
+              >
+                {message.text}
+              </Markdown>
+            )
+          ) : null}
 
           {/* Render all numerical analysis data if available */}
           {message.analysisData && (
@@ -633,18 +658,34 @@ export default function AICoachScreen() {
                   },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.messageText,
-                    {
-                      color: message.type === "user"
-                        ? (isDarkMode ? theme.colors.background : theme.colors.background)
-                        : (isDarkMode ? theme.colors.text : theme.colors.text),
-                    },
-                  ]}
-                >
-                  {message.text}
-                </Text>
+                {message.text ? (
+                  message.type === "user" ? (
+                    <Text
+                      style={[
+                        styles.messageText,
+                        { color: isDarkMode ? theme.colors.background : theme.colors.background },
+                      ]}
+                    >
+                      {message.text}
+                    </Text>
+                  ) : (
+                    <Markdown
+                      style={{
+                        body: { color: theme.colors.text, fontSize: 15, lineHeight: 22 },
+                        heading1: { color: theme.colors.text, fontSize: 20, fontWeight: "bold", marginBottom: 6 },
+                        heading2: { color: theme.colors.text, fontSize: 18, fontWeight: "bold", marginBottom: 4 },
+                        bullet_list: { marginVertical: 6 },
+                        list_item: { color: theme.colors.text },
+                        strong: { fontWeight: "700" },
+                        paragraph: { marginTop: 4, marginBottom: 8 },
+                        code_inline: { backgroundColor: theme.colors.card, color: theme.colors.text },
+                        link: { color: theme.colors.primary },
+                      }}
+                    >
+                      {message.text}
+                    </Markdown>
+                  )
+                ) : null}
                 {/* ...existing code for analysisData, streaming, timestamp... */}
               </View>
             </View>

@@ -114,8 +114,7 @@ export async function sendImmediateSummary(): Promise<void> {
 
   await Notifications.scheduleNotificationAsync({
     content: { title: 'Capture Fit — Status', body },
-    // undefined trigger -> immediate
-    trigger: undefined as unknown as Notifications.NotificationTriggerInput,
+    trigger: null,
   });
 }
 

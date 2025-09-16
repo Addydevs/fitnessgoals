@@ -814,12 +814,12 @@ export default function HomeScreen({
           <View style={styles.checkInCompleted}>
             <View style={styles.checkInRow}>
               <Text style={styles.checkInLabel}>Energy Level:</Text>
-              {renderStars(todayCheckIn.energyLevel)}
+              {renderStars(todayCheckIn.energy_level)}
             </View>
             <View style={styles.checkInRow}>
               <Text style={styles.checkInLabel}>Workout:</Text>
-              <Text style={styles.checkInValue}>
-                {todayCheckIn.workoutCompleted ? 'Completed' : 'Not today'}
+              <Text style={[styles.checkInValue, { color: '#FFD700' }]}>
+                {todayCheckIn.workout_completed ? 'Completed' : 'Not today'}
               </Text>
             </View>
             <View style={styles.checkInRow}>
@@ -828,10 +828,10 @@ export default function HomeScreen({
                 {[1, 2, 3].map((level) => (
                   <View
                     key={level}
-                    style={[styles.progressScaleItem, level === todayCheckIn.progressFeeling && styles.progressScaleItemActive]}
+                    style={[styles.progressScaleItem, level === todayCheckIn.progress_feeling && styles.progressScaleItemActive]}
                   >
                     <Text
-                      style={[styles.progressScaleText, level === todayCheckIn.progressFeeling && styles.progressScaleTextActive]}
+                      style={[styles.progressScaleText, level === todayCheckIn.progress_feeling && styles.progressScaleTextActive]}
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
@@ -863,9 +863,9 @@ export default function HomeScreen({
 
   // Check-in Modal Component
   const CheckInModal = () => {
-    const [energyLevel, setEnergyLevel] = useState(todayCheckIn?.energyLevel || 3)
-    const [workoutCompleted, setWorkoutCompleted] = useState(todayCheckIn?.workoutCompleted || false)
-    const [progressFeeling, setProgressFeeling] = useState(todayCheckIn?.progressFeeling || 2)
+    const [energyLevel, setEnergyLevel] = useState(todayCheckIn?.energy_level || 3)
+    const [workoutCompleted, setWorkoutCompleted] = useState(todayCheckIn?.workout_completed || false)
+    const [progressFeeling, setProgressFeeling] = useState(todayCheckIn?.progress_feeling || 2)
 
     const handleSubmit = () => {
       submitDailyCheckIn(energyLevel, workoutCompleted, progressFeeling)
@@ -1966,6 +1966,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         color: "#6B7280",
         flexShrink: 1,
         flex: 1,
+        textAlign: "right",
       },
       starsContainer: {
         flexDirection: "row",
@@ -1977,22 +1978,41 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         gap: 8,
         justifyContent: "space-between",
       },
+      progressPillsCompactContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        gap: 8,
+        justifyContent: 'space-between',
+      },
+      workoutPillsCompactContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        gap: 8,
+        justifyContent: 'space-between',
+      },
       progressScaleItem: {
         flex: 1,
         paddingHorizontal: 4,
         paddingVertical: 6,
         borderRadius: 16,
-        backgroundColor: "#F3F4F6",
-        borderWidth: 1,
-        borderColor: "#E5E7EB",
-        alignItems: "center",
-      },
-      progressScaleText: {
-        fontSize: 12,
-        color: "#6B7280",
-        fontWeight: "500",
-        textAlign: "center",
-      },
+      backgroundColor: "#F3F4F6",
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      alignItems: "center",
+    },
+    progressScaleItemActive: {
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
+    },
+    progressScaleText: {
+      fontSize: 12,
+      color: "#6B7280",
+      fontWeight: "500",
+      textAlign: "center",
+    },
+    progressScaleTextActive: {
+      color: "#FFD700",
+    },
       completeButton: {
         backgroundColor: "#A855F7",
         paddingVertical: 12,
@@ -2003,6 +2023,28 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         color: "white",
         fontSize: 16,
         fontWeight: "600",
+      },
+      workoutPillCompact: {
+        flex: 1,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: "#F3F4F6",
+        borderWidth: 1,
+        borderColor: "#E5E7EB",
+        alignItems: 'center',
+      },
+      workoutPillCompactActive: {
+        backgroundColor: "#FFD700" + "20",
+        borderColor: "#FFD700",
+      },
+      workoutPillTextCompact: {
+        fontSize: 12,
+        color: "#6B7280",
+        fontWeight: '500',
+      },
+      workoutPillTextCompactActive: {
+        color: "#FFD700",
       },
       updateButton: {
         backgroundColor: "#F3F4F6",
@@ -2077,8 +2119,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         alignItems: "center",
       },
       workoutToggleOptionActive: {
-        backgroundColor: "#A855F7" + "20",
-        borderColor: "#A855F7",
+        backgroundColor: "#FFD700" + "20",
+        borderColor: "#FFD700",
       },
       workoutToggleText: {
         fontSize: 16,
@@ -2086,7 +2128,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontWeight: "500",
       },
       workoutToggleTextActive: {
-        color: "#A855F7",
+        color: "#FFD700",
       },
       modalProgressContainer: {
         flex: 1,
@@ -2105,8 +2147,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         alignItems: "center",
       },
       modalProgressItemActive: {
-        backgroundColor: "#A855F7" + "20",
-        borderColor: "#A855F7",
+        backgroundColor: "#FFD700" + "20",
+        borderColor: "#FFD700",
       },
       modalProgressText: {
         fontSize: 14,
@@ -2114,7 +2156,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontWeight: "500",
       },
       modalProgressTextActive: {
-        color: "#A855F7",
+        color: "#FFD700",
       },
       modalFooter: {
         padding: 20,
@@ -2829,16 +2871,37 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       color: theme.colors.text + "AA",
       flexShrink: 1,
       flex: 1,
+      textAlign: "right",
     },
-    starsContainer: {
-      flexDirection: "row",
-      gap: 4,
-    },
+      starsContainer: {
+        flexDirection: "row",
+        gap: 4,
+      },
+      energyBadge: {
+        paddingVertical: 2,
+        paddingHorizontal: 8,
+        borderRadius: 10,
+        backgroundColor: "#FFD700" + "20",
+        borderWidth: 1,
+        borderColor: "#FFD700",
+      },
     progressScaleContainer: {
       flex: 1,
       flexDirection: "row",
       gap: 8,
       justifyContent: "space-between",
+    },
+    progressPillsCompactContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      gap: 8,
+      justifyContent: 'space-between',
+    },
+    workoutPillsCompactContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      gap: 8,
+      justifyContent: 'space-between',
     },
     progressScaleItem: {
       flex: 1,
@@ -2850,11 +2913,18 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       borderColor: "#E5E7EB",
       alignItems: "center",
     },
+    progressScaleItemActive: {
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
+    },
     progressScaleText: {
       fontSize: 12,
       color: "#6B7280",
       fontWeight: "500",
       textAlign: "center",
+    },
+    progressScaleTextActive: {
+      color: "#FFD700",
     },
     completeButton: {
       backgroundColor: "#A855F7",
@@ -2866,6 +2936,50 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       color: "white",
       fontSize: 16,
       fontWeight: "600",
+    },
+    workoutPillCompact: {
+      flex: 1,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+    },
+    workoutPillCompactActive: {
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
+    },
+    workoutPillTextCompact: {
+      fontSize: 12,
+      color: theme.colors.text + 'AA',
+      fontWeight: '500',
+    },
+    workoutPillTextCompactActive: {
+      color: "#FFD700",
+    },
+    progressPillCompact: {
+      flex: 1,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+    },
+    progressPillCompactActive: {
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
+    },
+    progressPillTextCompact: {
+      fontSize: 12,
+      color: theme.colors.text + 'AA',
+      fontWeight: '500',
+    },
+    progressPillTextCompactActive: {
+      color: "#FFD700",
     },
     updateButton: {
       backgroundColor: theme.colors.background,
@@ -2940,8 +3054,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       alignItems: "center",
     },
     workoutToggleOptionActive: {
-      backgroundColor: "#A855F7" + "20",
-      borderColor: "#A855F7",
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
     },
     workoutToggleText: {
       fontSize: 16,
@@ -2949,7 +3063,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       fontWeight: "500",
     },
     workoutToggleTextActive: {
-      color: "#A855F7",
+      color: "#FFD700",
     },
     modalProgressContainer: {
       flex: 1,
@@ -2968,8 +3082,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       alignItems: "center",
     },
     modalProgressItemActive: {
-      backgroundColor: "#A855F7" + "20",
-      borderColor: "#A855F7",
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
     },
     modalProgressText: {
       fontSize: 14,
@@ -2977,7 +3091,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       fontWeight: "500",
     },
     modalProgressTextActive: {
-      color: "#A855F7",
+      color: "#FFD700",
     },
     modalFooter: {
       padding: 20,
