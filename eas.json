@@ -13,6 +13,24 @@
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     },
+    "device-dev": {
+      "developmentClient": true,
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "ios": {

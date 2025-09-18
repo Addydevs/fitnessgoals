@@ -138,6 +138,7 @@ export default function HomeScreen({
   const dim = useWindowDimensions()
   const isLandscape = dim.width > dim.height
   const styles = getStyles(isDarkMode, theme, bp, isLandscape) as any
+  const contentMaxWidth = Math.min(dim.width - 32, 900)
   const barStyle = isDarkMode ? ("light-content" as const) : ("dark-content" as const)
   const barBg = isDarkMode ? theme.colors.background : "white"
 
@@ -1054,8 +1055,9 @@ export default function HomeScreen({
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { alignItems: 'center' }]}
       >
+        <View style={[styles.contentInner, { maxWidth: contentMaxWidth }]}>        
         {/* AI Analysis Challenge Card */}
         <View style={styles.challengeCard}>
           <LinearGradient
@@ -1065,8 +1067,8 @@ export default function HomeScreen({
             end={{ x: 1, y: 1 }}
           >
             <View style={styles.challengeContent}>
-              <Text style={styles.challengeTitle}>AI Analysis{"\n"}Ready</Text>
-              <Text style={styles.challengeSubtitle}>
+              <Text allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail" style={styles.challengeTitle}>AI Analysis{"\n"}Ready</Text>
+              <Text allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail" style={styles.challengeSubtitle}>
                 {userStats.totalPhotos === 0
                   ? "Take your first progress photo"
                   : `${userStats.totalPhotos} photos analyzed • 🔥 ${userStats.currentStreak} day streak`}
@@ -1098,7 +1100,7 @@ export default function HomeScreen({
             </View>
           </LinearGradient>
         </View>
-
+      
         {/* Photo Tracking Calendar */}
         <View style={[styles.calendarContainer, isLandscape && styles.calendarContainerLandscape]}>
           {firstRowDays.map((dayInfo, index) => (
@@ -1143,7 +1145,7 @@ export default function HomeScreen({
 
         {/* Quick Actions Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text allowFontScaling={false} style={styles.sectionTitle}>Quick Actions</Text>
         </View>
 
         <View style={styles.planGrid}>
@@ -1154,20 +1156,20 @@ export default function HomeScreen({
           >
             <View style={styles.planCardHeader}>
               <Feather name="camera" size={20} color="white" />
-              <Text style={styles.planCardLabel}>Capture</Text>
+              <Text allowFontScaling={false} style={styles.planCardLabel}>Capture</Text>
             </View>
             <View style={styles.planCardBody}>
-              <Text style={styles.planCardTitle}>Progress{"\n"}Photo</Text>
-              <Text style={styles.planCardSubtitle}>
+              <Text allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail" style={styles.planCardTitle}>Progress{"\n"}Photo</Text>
+              <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={styles.planCardSubtitle}>
                 {userStats.totalPhotos === 0 ? "Start your journey" : "Continue tracking"}
               </Text>
-              <Text style={styles.planCardDetail}>AI analysis included</Text>
+              <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={styles.planCardDetail}>AI analysis included</Text>
             </View>
             <View style={styles.planCardFooter}>
               <View style={styles.aiIcon}>
                 <Feather name="zap" size={12} color="#FFA726" />
               </View>
-              <Text style={styles.aiLabel}>AI Ready</Text>
+              <Text allowFontScaling={false} style={styles.aiLabel}>AI Ready</Text>
             </View>
           </TouchableOpacity>
 
@@ -1178,20 +1180,20 @@ export default function HomeScreen({
           >
             <View style={styles.planCardHeader}>
               <Feather name="trending-up" size={20} color="white" />
-              <Text style={styles.planCardLabel}>Analysis</Text>
+              <Text allowFontScaling={false} style={styles.planCardLabel}>Analysis</Text>
             </View>
             <View style={styles.planCardBody}>
-              <Text style={styles.planCardTitle}>Progress{"\n"}Report</Text>
-              <Text style={styles.planCardSubtitle}>
+              <Text allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail" style={styles.planCardTitle}>Progress{"\n"}Report</Text>
+              <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={styles.planCardSubtitle}>
                 {userStats.totalPhotos === 0 ? "No data yet" : `${userStats.totalPhotos} photos analyzed`}
               </Text>
-              <Text style={styles.planCardDetail}>AI insights & trends</Text>
+              <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={styles.planCardDetail}>AI insights & trends</Text>
             </View>
             <View style={styles.planCardFooter}>
               <View style={styles.analysisIcon}>
                 <Feather name="bar-chart-2" size={12} color="#7986CB" />
               </View>
-              <Text style={styles.aiLabel}>{userStats.totalPhotos === 0 ? "Waiting" : "View Report"}</Text>
+              <Text allowFontScaling={false} style={styles.aiLabel}>{userStats.totalPhotos === 0 ? "Waiting" : "View Report"}</Text>
             </View>
 
             {userStats.totalPhotos > 0 && (
@@ -1257,6 +1259,7 @@ export default function HomeScreen({
             </View>
           </View>
         )}
+        </View>
       </ScrollView>
 
       {/* Removed loading overlay card */}
@@ -1271,8 +1274,10 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
   const width = bp.width
   const baseHorizontal = bp.isSmallPhone ? 16 : 20
   const cardGap = 12
-  const calcPlanCardWidth = width ? (width - baseHorizontal * 2 - cardGap) / 2 : 160
-  const fullWidthCard = width ? width - baseHorizontal * 2 : calcPlanCardWidth
+  // Use percentage widths so cards respect parent max-width on iPad
+  const twoColWidth = '48%'
+  const oneColWidth = '100%'
+  const fullWidthCard = oneColWidth
   const titleFont = normalizeFont(bp.isTablet ? 26 : 24)
   const sectionFont = normalizeFont(bp.isTablet ? 24 : 22)
   const smallFont = normalizeFont(11)
@@ -1280,6 +1285,10 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
   if (!isDarkMode) {
     // Exact LIGHT mode styles as provided
     return StyleSheet.create({
+      contentInner: {
+        width: '100%',
+        alignSelf: 'center',
+      },
       // Welcome Screen Styles
       welcomeContainer: {
         flex: 1,
@@ -1469,7 +1478,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       },
       challengeGradient: {
         padding: 20,
-        height: 140,
+        minHeight: bp.isTablet ? 220 : 170,
         flexDirection: "row",
         justifyContent: "space-between",
         position: "relative",
@@ -1482,12 +1491,13 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontSize: titleFont,
         fontWeight: "bold",
         color: "white",
-        lineHeight: 28,
+        lineHeight: Math.round(titleFont * 1.2),
         marginBottom: 4,
       },
       challengeSubtitle: {
         fontSize: bodyFont,
         color: "rgba(255,255,255,0.9)",
+        lineHeight: Math.round(bodyFont * 1.3),
         marginBottom: 16,
       },
       progressIndicators: {
@@ -1619,12 +1629,13 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       planGrid: {
         flexDirection: bp.isSmallPhone ? "column" : "row",
         justifyContent: bp.isSmallPhone ? "flex-start" : "space-between",
+        alignSelf: 'stretch',
         marginBottom: 20,
         gap: 12,
       },
       planCard: {
-        width: bp.isSmallPhone ? fullWidthCard : calcPlanCardWidth,
-        height: 200,
+        width: bp.isSmallPhone ? oneColWidth : twoColWidth,
+        minHeight: bp.isTablet ? 240 : 200,
         borderRadius: 20,
         padding: 16,
         position: "relative",
@@ -1659,16 +1670,19 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontSize: normalizeFont(18),
         fontWeight: "bold",
         color: "white",
+        lineHeight: Math.round(normalizeFont(18) * 1.25),
         marginBottom: 8,
       },
       planCardSubtitle: {
         fontSize: normalizeFont(12),
         color: "rgba(255,255,255,0.9)",
+        lineHeight: Math.round(normalizeFont(12) * 1.3),
         marginBottom: 4,
       },
       planCardDetail: {
         fontSize: smallFont,
         color: "rgba(255,255,255,0.8)",
+        lineHeight: Math.round(smallFont * 1.3),
       },
       planCardFooter: {
         flexDirection: "row",
@@ -2276,6 +2290,10 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       flex:  1,
       backgroundColor: theme.colors.background,
     },
+    contentInner: {
+      width: '100%',
+      alignSelf: 'center',
+    },
     header: {
       backgroundColor: theme.colors.background,
       paddingRight: 55,
@@ -2353,7 +2371,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
     },
     challengeGradient: {
       padding: 20,
-      height: 140,
+      height: bp.isTablet ? 170 : 140,
       flexDirection: "row",
       justifyContent: "space-between",
       position: "relative",
@@ -2362,12 +2380,13 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       fontSize: 24,
       fontWeight: "bold",
       color: theme.colors.text,
-      lineHeight: 28,
+      lineHeight: 29,
       marginBottom: 4,
     },
     challengeSubtitle: {
       fontSize: 14,
       color: theme.colors.text,
+      lineHeight: Math.round(14 * 1.3),
       marginBottom: 16,
     },
     progressIndicators: {
@@ -2449,12 +2468,13 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
     planGrid: {
       flexDirection: bp.isSmallPhone ? "column" : "row",
       justifyContent: bp.isSmallPhone ? "flex-start" : "space-between",
+      alignSelf: 'stretch',
       marginBottom: 20,
       gap: 12,
     },
     planCard: {
-      width: bp.isSmallPhone ? fullWidthCard : calcPlanCardWidth,
-      height: 200,
+      width: bp.isSmallPhone ? oneColWidth : twoColWidth,
+      minHeight: bp.isTablet ? 240 : 200,
       borderRadius: 20,
       padding: 16,
       position: "relative",
@@ -2489,16 +2509,19 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       fontSize: normalizeFont(18),
       fontWeight: "bold",
       color: theme.colors.text,
+      lineHeight: Math.round(normalizeFont(18) * 1.25),
       marginBottom: 8,
     },
     planCardSubtitle: {
       fontSize: normalizeFont(12),
       color: theme.colors.text,
+      lineHeight: Math.round(normalizeFont(12) * 1.3),
       marginBottom: 4,
     },
     planCardDetail: {
       fontSize: smallFont,
       color: theme.colors.text,
+      lineHeight: Math.round(smallFont * 1.3),
     },
     planCardFooter: {
       flexDirection: "row",

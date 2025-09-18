@@ -79,6 +79,10 @@ export const PRIVACY_POLICY = [
   '- Privacy/Support: capturefit1@gmail.com',
   '- Response within 30 days',
   '',
+  '',
+  'AI Fitness Advice Disclaimer:',
+  'CaptureFit includes an AI chatbot that provides general fitness information and suggestions. This advice is for informational purposes only and does not constitute professional medical, fitness, or nutritional advice. Always consult with qualified healthcare professionals before starting any fitness program or making health-related decisions.',
+  '',
   'This policy is governed by US law.'
 ].join('\n');
 
