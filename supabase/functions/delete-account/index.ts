@@ -8,7 +8,7 @@ const serve: (handler: (req: Request) => Response | Promise<Response>) => void =
   (globalThis as any).serve ?? function (_handler) {};
 
 serve(async (req: Request) => {
-  console.log('delete-account function invoked');
+  // ...removed console.log...
 
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';

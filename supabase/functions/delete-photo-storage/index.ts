@@ -6,7 +6,7 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 serve(async (req) => {
-  console.log("delete-photo-storage function started");
+  // ...removed console.log...
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -46,7 +46,7 @@ serve(async (req) => {
 
     // Parse body
     const { photoId, path } = await req.json();
-    console.log("delete-photo-storage received:", { photoId, path });
+  // ...removed console.log...
 
     if (!photoId || !path) {
       return new Response(

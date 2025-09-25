@@ -17,6 +17,11 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmError, setConfirmError] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendError, setResendError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -36,7 +41,14 @@ export default function Auth() {
 
   const handlePasswordChange = (pwd: string) => {
     setPassword(pwd);
-    if (mode === 'signup') setPasswordError(validatePassword(pwd));
+    if (mode === 'signup') {
+      setPasswordError(validatePassword(pwd));
+      if (confirmPassword && pwd !== confirmPassword) {
+        setConfirmError("Passwords do not match.");
+      } else {
+        setConfirmError("");
+      }
+    }
   };
 
   const handleLogin = async () => {
@@ -54,16 +66,22 @@ export default function Auth() {
       router.replace('/(tabs)/homepage');
     } catch (error: any) {
       setFeedback(error.message || 'Network error. Please try again.');
-      console.log('❌ Login error:', error);
+  // ...removed console.log...
     }
   };
 
   const handleSignup = async () => {
-    setFeedback("");
-    if (validatePassword(password)) {
-      setFeedback(validatePassword(password));
-      return;
-    }
+  setFeedback("");
+  setResendError("");
+  if (validatePassword(password)) {
+    setFeedback(validatePassword(password));
+    return;
+  }
+  if (password !== confirmPassword) {
+    setConfirmError("Passwords do not match.");
+    setFeedback("Passwords do not match.");
+    return;
+  }
     try {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { fullName: name } } });
       if (error) throw error;
@@ -87,7 +105,7 @@ export default function Auth() {
           console.warn('Failed to upsert profile immediately after signup:', upsertErr);
         }
       } else {
-        console.log('No session available after signup; profile upsert skipped. User may need to confirm email.');
+  // ...removed console.log...
       }
       await AsyncStorage.setItem('user', JSON.stringify({ fullName: name, email }));
       try { emitUserChange({ fullName: name, email, avatar: null }); } catch (e) { console.warn('emitUserChange failed:', e); }
@@ -97,13 +115,27 @@ export default function Auth() {
         setFeedback('Signup successful!');
         router.replace('/(tabs)/homepage');
       } else {
-        setFeedback('Check your email to confirm your account before logging in.');
+        setShowConfirmModal(true);
         setMode('login');
       }
     } catch (error: any) {
       setFeedback(error.message || 'Network error. Please try again.');
-      console.log('❌ Signup error:', error);
+  // ...removed console.log...
     }
+  // Resend confirmation email
+  const handleResendEmail = async () => {
+    setResendLoading(true);
+    setResendError("");
+    try {
+      const { error } = await supabase.auth.resend({ type: 'signup', email });
+      if (error) throw error;
+      setResendError("Confirmation email resent! Check your inbox.");
+    } catch (err: any) {
+      setResendError(err.message || "Failed to resend email.");
+    } finally {
+      setResendLoading(false);
+    }
+  };
   };
 
   return (
@@ -130,34 +162,76 @@ export default function Auth() {
           </Pressable>
         </View>
         {mode === 'signup' && (
-          <TextInput
-            placeholder="Full Name"
-            value={name}
-            onChangeText={setName}
-            style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
-            placeholderTextColor={placeholderColor}
-          />
+        
+          <>
+            <TextInput
+              placeholder="Full Name"
+              value={name}
+              onChangeText={setName}
+              style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
+              placeholderTextColor={placeholderColor}
+            />
+            <TextInput
+              placeholder="Email Address"
+              value={email}
+              onChangeText={setEmail}
+              style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
+              placeholderTextColor={placeholderColor}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TextInput
+              placeholder="Password"
+              value={password}
+              onChangeText={handlePasswordChange}
+              style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
+              placeholderTextColor={placeholderColor}
+              secureTextEntry
+            />
+            <TextInput
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChangeText={text => {
+                setConfirmPassword(text);
+                if (password !== text) {
+                  setConfirmError("Passwords do not match.");
+                } else {
+                  setConfirmError("");
+                }
+              }}
+              style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
+              placeholderTextColor={placeholderColor}
+              secureTextEntry
+            />
+            {confirmError ? (
+              <Text style={{ color: 'red', marginBottom: 4 }}>{confirmError}</Text>
+            ) : null}
+            {passwordError ? (
+              <Text style={{ color: 'red', marginBottom: 4 }}>{passwordError}</Text>
+            ) : null}
+          </>
         )}
-        <TextInput
-          placeholder="Email Address"
-          value={email}
-          onChangeText={setEmail}
-          style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
-          placeholderTextColor={placeholderColor}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <TextInput
-          placeholder="Password"
-          value={password}
-          onChangeText={handlePasswordChange}
-          style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
-          placeholderTextColor={placeholderColor}
-          secureTextEntry
-        />
-        {mode === 'signup' && passwordError ? (
-          <Text style={{ color: 'red', marginBottom: 4 }}>{passwordError}</Text>
-        ) : null}
+        {mode === 'login' && (
+          <>
+            <TextInput
+              placeholder="Email Address"
+              value={email}
+              onChangeText={setEmail}
+              style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
+              placeholderTextColor={placeholderColor}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TextInput
+              placeholder="Password"
+              value={password}
+              onChangeText={handlePasswordChange}
+              style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor }]}
+              placeholderTextColor={placeholderColor}
+              secureTextEntry
+            />
+          </>
+        )}
         {mode === 'login' && (
           <Pressable onPress={() => setFeedback('Please contact support to reset your password.') /* Replace with real flow */}>
             <Text style={styles.forgotText}>Forgot password?</Text>
@@ -177,12 +251,78 @@ export default function Auth() {
             <>Already have an account? <Text style={styles.link} onPress={() => setMode('login')}>Login</Text></>
           )}
         </Text>
+        {/* Confirmation Modal */}
+        {showConfirmModal && (
+          <View style={styles.confirmModal}>
+            <Text style={styles.confirmTitle}>Confirm your email</Text>
+            <Text style={styles.confirmText}>
+              We&apos;ve sent a confirmation link to your email address. Please check your inbox and click the link to activate your account. After confirming, you can log in.
+            </Text>
+            <Pressable style={styles.resendButton} onPress={handleResendEmail} disabled={resendLoading}>
+              <Text style={styles.resendButtonText}>{resendLoading ? 'Resending...' : 'Resend confirmation email'}</Text>
+            </Pressable>
+            {resendError ? <Text style={{ color: resendError.includes('resent') ? 'green' : 'red', marginTop: 6 }}>{resendError}</Text> : null}
+            <Pressable style={styles.closeModalButton} onPress={() => setShowConfirmModal(false)}>
+              <Text style={styles.closeModalText}>Close</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  confirmModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    padding: 24,
+    borderRadius: 20,
+  },
+  confirmTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  confirmText: {
+    fontSize: 16,
+    color: '#fff',
+    marginBottom: 18,
+    textAlign: 'center',
+  },
+  resendButton: {
+    backgroundColor: '#4f46e5',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  resendButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  closeModalButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  closeModalText: {
+    color: '#4f46e5',
+    fontWeight: '600',
+    fontSize: 16,
+  },
   gradientBg: {
     flex: 1,
     justifyContent: 'center',

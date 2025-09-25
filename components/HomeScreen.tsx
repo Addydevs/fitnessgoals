@@ -138,6 +138,7 @@ export default function HomeScreen({
   const dim = useWindowDimensions()
   const isLandscape = dim.width > dim.height
   const styles = getStyles(isDarkMode, theme, bp, isLandscape) as any
+  const contentMaxWidth = Math.min(dim.width - 32, 900)
   const barStyle = isDarkMode ? ("light-content" as const) : ("dark-content" as const)
   const barBg = isDarkMode ? theme.colors.background : "white"
 
@@ -814,12 +815,12 @@ export default function HomeScreen({
           <View style={styles.checkInCompleted}>
             <View style={styles.checkInRow}>
               <Text style={styles.checkInLabel}>Energy Level:</Text>
-              {renderStars(todayCheckIn.energyLevel)}
+              {renderStars(todayCheckIn.energy_level)}
             </View>
             <View style={styles.checkInRow}>
               <Text style={styles.checkInLabel}>Workout:</Text>
-              <Text style={styles.checkInValue}>
-                {todayCheckIn.workoutCompleted ? 'Completed' : 'Not today'}
+              <Text style={[styles.checkInValue, { color: '#FFD700' }]}>
+                {todayCheckIn.workout_completed ? 'Completed' : 'Not today'}
               </Text>
             </View>
             <View style={styles.checkInRow}>
@@ -828,10 +829,10 @@ export default function HomeScreen({
                 {[1, 2, 3].map((level) => (
                   <View
                     key={level}
-                    style={[styles.progressScaleItem, level === todayCheckIn.progressFeeling && styles.progressScaleItemActive]}
+                    style={[styles.progressScaleItem, level === todayCheckIn.progress_feeling && styles.progressScaleItemActive]}
                   >
                     <Text
-                      style={[styles.progressScaleText, level === todayCheckIn.progressFeeling && styles.progressScaleTextActive]}
+                      style={[styles.progressScaleText, level === todayCheckIn.progress_feeling && styles.progressScaleTextActive]}
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
@@ -863,9 +864,9 @@ export default function HomeScreen({
 
   // Check-in Modal Component
   const CheckInModal = () => {
-    const [energyLevel, setEnergyLevel] = useState(todayCheckIn?.energyLevel || 3)
-    const [workoutCompleted, setWorkoutCompleted] = useState(todayCheckIn?.workoutCompleted || false)
-    const [progressFeeling, setProgressFeeling] = useState(todayCheckIn?.progressFeeling || 2)
+    const [energyLevel, setEnergyLevel] = useState(todayCheckIn?.energy_level || 3)
+    const [workoutCompleted, setWorkoutCompleted] = useState(todayCheckIn?.workout_completed || false)
+    const [progressFeeling, setProgressFeeling] = useState(todayCheckIn?.progress_feeling || 2)
 
     const handleSubmit = () => {
       submitDailyCheckIn(energyLevel, workoutCompleted, progressFeeling)
@@ -1054,8 +1055,9 @@ export default function HomeScreen({
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { alignItems: 'center' }]}
       >
+        <View style={[styles.contentInner, { maxWidth: contentMaxWidth }]}>        
         {/* AI Analysis Challenge Card */}
         <View style={styles.challengeCard}>
           <LinearGradient
@@ -1065,8 +1067,8 @@ export default function HomeScreen({
             end={{ x: 1, y: 1 }}
           >
             <View style={styles.challengeContent}>
-              <Text style={styles.challengeTitle}>AI Analysis{"\n"}Ready</Text>
-              <Text style={styles.challengeSubtitle}>
+              <Text allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail" style={styles.challengeTitle}>AI Analysis{"\n"}Ready</Text>
+              <Text allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail" style={styles.challengeSubtitle}>
                 {userStats.totalPhotos === 0
                   ? "Take your first progress photo"
                   : `${userStats.totalPhotos} photos analyzed • 🔥 ${userStats.currentStreak} day streak`}
@@ -1098,7 +1100,7 @@ export default function HomeScreen({
             </View>
           </LinearGradient>
         </View>
-
+      
         {/* Photo Tracking Calendar */}
         <View style={[styles.calendarContainer, isLandscape && styles.calendarContainerLandscape]}>
           {firstRowDays.map((dayInfo, index) => (
@@ -1143,7 +1145,7 @@ export default function HomeScreen({
 
         {/* Quick Actions Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text allowFontScaling={false} style={styles.sectionTitle}>Quick Actions</Text>
         </View>
 
         <View style={styles.planGrid}>
@@ -1154,20 +1156,20 @@ export default function HomeScreen({
           >
             <View style={styles.planCardHeader}>
               <Feather name="camera" size={20} color="white" />
-              <Text style={styles.planCardLabel}>Capture</Text>
+              <Text allowFontScaling={false} style={styles.planCardLabel}>Capture</Text>
             </View>
             <View style={styles.planCardBody}>
-              <Text style={styles.planCardTitle}>Progress{"\n"}Photo</Text>
-              <Text style={styles.planCardSubtitle}>
+              <Text allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail" style={styles.planCardTitle}>Progress{"\n"}Photo</Text>
+              <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={styles.planCardSubtitle}>
                 {userStats.totalPhotos === 0 ? "Start your journey" : "Continue tracking"}
               </Text>
-              <Text style={styles.planCardDetail}>AI analysis included</Text>
+              <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={styles.planCardDetail}>AI analysis included</Text>
             </View>
             <View style={styles.planCardFooter}>
               <View style={styles.aiIcon}>
                 <Feather name="zap" size={12} color="#FFA726" />
               </View>
-              <Text style={styles.aiLabel}>AI Ready</Text>
+              <Text allowFontScaling={false} style={styles.aiLabel}>AI Ready</Text>
             </View>
           </TouchableOpacity>
 
@@ -1178,20 +1180,20 @@ export default function HomeScreen({
           >
             <View style={styles.planCardHeader}>
               <Feather name="trending-up" size={20} color="white" />
-              <Text style={styles.planCardLabel}>Analysis</Text>
+              <Text allowFontScaling={false} style={styles.planCardLabel}>Analysis</Text>
             </View>
             <View style={styles.planCardBody}>
-              <Text style={styles.planCardTitle}>Progress{"\n"}Report</Text>
-              <Text style={styles.planCardSubtitle}>
+              <Text allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail" style={styles.planCardTitle}>Progress{"\n"}Report</Text>
+              <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={styles.planCardSubtitle}>
                 {userStats.totalPhotos === 0 ? "No data yet" : `${userStats.totalPhotos} photos analyzed`}
               </Text>
-              <Text style={styles.planCardDetail}>AI insights & trends</Text>
+              <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={styles.planCardDetail}>AI insights & trends</Text>
             </View>
             <View style={styles.planCardFooter}>
               <View style={styles.analysisIcon}>
                 <Feather name="bar-chart-2" size={12} color="#7986CB" />
               </View>
-              <Text style={styles.aiLabel}>{userStats.totalPhotos === 0 ? "Waiting" : "View Report"}</Text>
+              <Text allowFontScaling={false} style={styles.aiLabel}>{userStats.totalPhotos === 0 ? "Waiting" : "View Report"}</Text>
             </View>
 
             {userStats.totalPhotos > 0 && (
@@ -1257,6 +1259,7 @@ export default function HomeScreen({
             </View>
           </View>
         )}
+        </View>
       </ScrollView>
 
       {/* Removed loading overlay card */}
@@ -1271,8 +1274,10 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
   const width = bp.width
   const baseHorizontal = bp.isSmallPhone ? 16 : 20
   const cardGap = 12
-  const calcPlanCardWidth = width ? (width - baseHorizontal * 2 - cardGap) / 2 : 160
-  const fullWidthCard = width ? width - baseHorizontal * 2 : calcPlanCardWidth
+  // Use percentage widths so cards respect parent max-width on iPad
+  const twoColWidth = '48%'
+  const oneColWidth = '100%'
+  const fullWidthCard = oneColWidth
   const titleFont = normalizeFont(bp.isTablet ? 26 : 24)
   const sectionFont = normalizeFont(bp.isTablet ? 24 : 22)
   const smallFont = normalizeFont(11)
@@ -1280,6 +1285,10 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
   if (!isDarkMode) {
     // Exact LIGHT mode styles as provided
     return StyleSheet.create({
+      contentInner: {
+        width: '100%',
+        alignSelf: 'center',
+      },
       // Welcome Screen Styles
       welcomeContainer: {
         flex: 1,
@@ -1469,7 +1478,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       },
       challengeGradient: {
         padding: 20,
-        height: 140,
+        minHeight: bp.isTablet ? 220 : 170,
         flexDirection: "row",
         justifyContent: "space-between",
         position: "relative",
@@ -1482,12 +1491,13 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontSize: titleFont,
         fontWeight: "bold",
         color: "white",
-        lineHeight: 28,
+        lineHeight: Math.round(titleFont * 1.2),
         marginBottom: 4,
       },
       challengeSubtitle: {
         fontSize: bodyFont,
         color: "rgba(255,255,255,0.9)",
+        lineHeight: Math.round(bodyFont * 1.3),
         marginBottom: 16,
       },
       progressIndicators: {
@@ -1619,12 +1629,13 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       planGrid: {
         flexDirection: bp.isSmallPhone ? "column" : "row",
         justifyContent: bp.isSmallPhone ? "flex-start" : "space-between",
+        alignSelf: 'stretch',
         marginBottom: 20,
         gap: 12,
       },
       planCard: {
-        width: bp.isSmallPhone ? fullWidthCard : calcPlanCardWidth,
-        height: 200,
+        width: bp.isSmallPhone ? oneColWidth : twoColWidth,
+        minHeight: bp.isTablet ? 240 : 200,
         borderRadius: 20,
         padding: 16,
         position: "relative",
@@ -1659,16 +1670,19 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontSize: normalizeFont(18),
         fontWeight: "bold",
         color: "white",
+        lineHeight: Math.round(normalizeFont(18) * 1.25),
         marginBottom: 8,
       },
       planCardSubtitle: {
         fontSize: normalizeFont(12),
         color: "rgba(255,255,255,0.9)",
+        lineHeight: Math.round(normalizeFont(12) * 1.3),
         marginBottom: 4,
       },
       planCardDetail: {
         fontSize: smallFont,
         color: "rgba(255,255,255,0.8)",
+        lineHeight: Math.round(smallFont * 1.3),
       },
       planCardFooter: {
         flexDirection: "row",
@@ -1966,6 +1980,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         color: "#6B7280",
         flexShrink: 1,
         flex: 1,
+        textAlign: "right",
       },
       starsContainer: {
         flexDirection: "row",
@@ -1977,22 +1992,41 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         gap: 8,
         justifyContent: "space-between",
       },
+      progressPillsCompactContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        gap: 8,
+        justifyContent: 'space-between',
+      },
+      workoutPillsCompactContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        gap: 8,
+        justifyContent: 'space-between',
+      },
       progressScaleItem: {
         flex: 1,
         paddingHorizontal: 4,
         paddingVertical: 6,
         borderRadius: 16,
-        backgroundColor: "#F3F4F6",
-        borderWidth: 1,
-        borderColor: "#E5E7EB",
-        alignItems: "center",
-      },
-      progressScaleText: {
-        fontSize: 12,
-        color: "#6B7280",
-        fontWeight: "500",
-        textAlign: "center",
-      },
+      backgroundColor: "#F3F4F6",
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      alignItems: "center",
+    },
+    progressScaleItemActive: {
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
+    },
+    progressScaleText: {
+      fontSize: 12,
+      color: "#6B7280",
+      fontWeight: "500",
+      textAlign: "center",
+    },
+    progressScaleTextActive: {
+      color: "#FFD700",
+    },
       completeButton: {
         backgroundColor: "#A855F7",
         paddingVertical: 12,
@@ -2003,6 +2037,28 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         color: "white",
         fontSize: 16,
         fontWeight: "600",
+      },
+      workoutPillCompact: {
+        flex: 1,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: "#F3F4F6",
+        borderWidth: 1,
+        borderColor: "#E5E7EB",
+        alignItems: 'center',
+      },
+      workoutPillCompactActive: {
+        backgroundColor: "#FFD700" + "20",
+        borderColor: "#FFD700",
+      },
+      workoutPillTextCompact: {
+        fontSize: 12,
+        color: "#6B7280",
+        fontWeight: '500',
+      },
+      workoutPillTextCompactActive: {
+        color: "#FFD700",
       },
       updateButton: {
         backgroundColor: "#F3F4F6",
@@ -2077,8 +2133,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         alignItems: "center",
       },
       workoutToggleOptionActive: {
-        backgroundColor: "#A855F7" + "20",
-        borderColor: "#A855F7",
+        backgroundColor: "#FFD700" + "20",
+        borderColor: "#FFD700",
       },
       workoutToggleText: {
         fontSize: 16,
@@ -2086,7 +2142,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontWeight: "500",
       },
       workoutToggleTextActive: {
-        color: "#A855F7",
+        color: "#FFD700",
       },
       modalProgressContainer: {
         flex: 1,
@@ -2105,8 +2161,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         alignItems: "center",
       },
       modalProgressItemActive: {
-        backgroundColor: "#A855F7" + "20",
-        borderColor: "#A855F7",
+        backgroundColor: "#FFD700" + "20",
+        borderColor: "#FFD700",
       },
       modalProgressText: {
         fontSize: 14,
@@ -2114,7 +2170,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
         fontWeight: "500",
       },
       modalProgressTextActive: {
-        color: "#A855F7",
+        color: "#FFD700",
       },
       modalFooter: {
         padding: 20,
@@ -2234,6 +2290,10 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       flex:  1,
       backgroundColor: theme.colors.background,
     },
+    contentInner: {
+      width: '100%',
+      alignSelf: 'center',
+    },
     header: {
       backgroundColor: theme.colors.background,
       paddingRight: 55,
@@ -2311,7 +2371,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
     },
     challengeGradient: {
       padding: 20,
-      height: 140,
+      height: bp.isTablet ? 170 : 140,
       flexDirection: "row",
       justifyContent: "space-between",
       position: "relative",
@@ -2320,12 +2380,13 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       fontSize: 24,
       fontWeight: "bold",
       color: theme.colors.text,
-      lineHeight: 28,
+      lineHeight: 29,
       marginBottom: 4,
     },
     challengeSubtitle: {
       fontSize: 14,
       color: theme.colors.text,
+      lineHeight: Math.round(14 * 1.3),
       marginBottom: 16,
     },
     progressIndicators: {
@@ -2407,12 +2468,13 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
     planGrid: {
       flexDirection: bp.isSmallPhone ? "column" : "row",
       justifyContent: bp.isSmallPhone ? "flex-start" : "space-between",
+      alignSelf: 'stretch',
       marginBottom: 20,
       gap: 12,
     },
     planCard: {
-      width: bp.isSmallPhone ? fullWidthCard : calcPlanCardWidth,
-      height: 200,
+      width: bp.isSmallPhone ? oneColWidth : twoColWidth,
+      minHeight: bp.isTablet ? 240 : 200,
       borderRadius: 20,
       padding: 16,
       position: "relative",
@@ -2447,16 +2509,19 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       fontSize: normalizeFont(18),
       fontWeight: "bold",
       color: theme.colors.text,
+      lineHeight: Math.round(normalizeFont(18) * 1.25),
       marginBottom: 8,
     },
     planCardSubtitle: {
       fontSize: normalizeFont(12),
       color: theme.colors.text,
+      lineHeight: Math.round(normalizeFont(12) * 1.3),
       marginBottom: 4,
     },
     planCardDetail: {
       fontSize: smallFont,
       color: theme.colors.text,
+      lineHeight: Math.round(smallFont * 1.3),
     },
     planCardFooter: {
       flexDirection: "row",
@@ -2829,16 +2894,37 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       color: theme.colors.text + "AA",
       flexShrink: 1,
       flex: 1,
+      textAlign: "right",
     },
-    starsContainer: {
-      flexDirection: "row",
-      gap: 4,
-    },
+      starsContainer: {
+        flexDirection: "row",
+        gap: 4,
+      },
+      energyBadge: {
+        paddingVertical: 2,
+        paddingHorizontal: 8,
+        borderRadius: 10,
+        backgroundColor: "#FFD700" + "20",
+        borderWidth: 1,
+        borderColor: "#FFD700",
+      },
     progressScaleContainer: {
       flex: 1,
       flexDirection: "row",
       gap: 8,
       justifyContent: "space-between",
+    },
+    progressPillsCompactContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      gap: 8,
+      justifyContent: 'space-between',
+    },
+    workoutPillsCompactContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      gap: 8,
+      justifyContent: 'space-between',
     },
     progressScaleItem: {
       flex: 1,
@@ -2850,11 +2936,18 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       borderColor: "#E5E7EB",
       alignItems: "center",
     },
+    progressScaleItemActive: {
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
+    },
     progressScaleText: {
       fontSize: 12,
       color: "#6B7280",
       fontWeight: "500",
       textAlign: "center",
+    },
+    progressScaleTextActive: {
+      color: "#FFD700",
     },
     completeButton: {
       backgroundColor: "#A855F7",
@@ -2866,6 +2959,50 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       color: "white",
       fontSize: 16,
       fontWeight: "600",
+    },
+    workoutPillCompact: {
+      flex: 1,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+    },
+    workoutPillCompactActive: {
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
+    },
+    workoutPillTextCompact: {
+      fontSize: 12,
+      color: theme.colors.text + 'AA',
+      fontWeight: '500',
+    },
+    workoutPillTextCompactActive: {
+      color: "#FFD700",
+    },
+    progressPillCompact: {
+      flex: 1,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+    },
+    progressPillCompactActive: {
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
+    },
+    progressPillTextCompact: {
+      fontSize: 12,
+      color: theme.colors.text + 'AA',
+      fontWeight: '500',
+    },
+    progressPillTextCompactActive: {
+      color: "#FFD700",
     },
     updateButton: {
       backgroundColor: theme.colors.background,
@@ -2940,8 +3077,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       alignItems: "center",
     },
     workoutToggleOptionActive: {
-      backgroundColor: "#A855F7" + "20",
-      borderColor: "#A855F7",
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
     },
     workoutToggleText: {
       fontSize: 16,
@@ -2949,7 +3086,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       fontWeight: "500",
     },
     workoutToggleTextActive: {
-      color: "#A855F7",
+      color: "#FFD700",
     },
     modalProgressContainer: {
       flex: 1,
@@ -2968,8 +3105,8 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       alignItems: "center",
     },
     modalProgressItemActive: {
-      backgroundColor: "#A855F7" + "20",
-      borderColor: "#A855F7",
+      backgroundColor: "#FFD700" + "20",
+      borderColor: "#FFD700",
     },
     modalProgressText: {
       fontSize: 14,
@@ -2977,7 +3114,7 @@ function getStyles(isDarkMode: boolean, theme: any, bp: ReturnType<typeof useBre
       fontWeight: "500",
     },
     modalProgressTextActive: {
-      color: "#A855F7",
+      color: "#FFD700",
     },
     modalFooter: {
       padding: 20,

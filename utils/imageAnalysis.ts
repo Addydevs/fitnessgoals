@@ -44,7 +44,7 @@ export class ImageAnalysis {
    */
   async initialize(): Promise<void> {
     try {
-      console.log("Initializing TensorFlow.js for React Native...")
+  // ...removed console.log...
 
       // Wait for TensorFlow to be ready
       await tf.ready()
@@ -56,9 +56,9 @@ export class ImageAnalysis {
           // Try GPU backend first for better performance
           await tf.setBackend("rn-webgl")
           backendSet = true
-          console.log("TensorFlow.js initialized with rn-webgl backend")
+          // ...removed console.log...
         } catch (error) {
-          console.log("rn-webgl backend not available, trying cpu...")
+          // ...removed console.log...
         }
       }
 
@@ -66,7 +66,7 @@ export class ImageAnalysis {
         try {
           await tf.setBackend("cpu")
           backendSet = true
-          console.log("TensorFlow.js initialized with CPU backend")
+          // ...removed console.log...
         } catch (error) {
           console.error("Failed to set CPU backend:", error)
         }
@@ -76,7 +76,7 @@ export class ImageAnalysis {
         throw new Error("No suitable TensorFlow.js backend available")
       }
 
-      console.log("TensorFlow.js initialized with backend:", tf.getBackend())
+  // ...removed console.log...
       this.isInitialized = true
     } catch (error) {
       console.error("Failed to initialize TensorFlow.js:", error)

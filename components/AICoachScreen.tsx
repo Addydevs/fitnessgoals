@@ -11,7 +11,6 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -21,9 +20,12 @@ import {
   useColorScheme,
   View
 } from "react-native"
+import Markdown from "react-native-markdown-display"
+import { SafeAreaView } from "react-native-safe-area-context"
 import { useTheme } from "../contexts/ThemeContext"
 import { ImageAnalysis } from "../utils/imageAnalysis"
 import { supabase, SupabaseService } from "../utils/supabase"
+import StripePayment from "./StripePayment"
 
 interface Message {
   id: string
@@ -70,16 +72,69 @@ export default function AICoachScreen() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [progressData, setProgressData] = useState<ProgressData>({})
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [trialExpired, setTrialExpired] = useState(false)
+  const [paymentComplete, setPaymentComplete] = useState(false)
+  // Example: Check trial and payment status (replace with your logic)
+  const [userId, setUserId] = useState<string | null>(null);
+  const checkTrialAndPayment = async () => {
+    // Fetch user info from Supabase
+    const { data } = await supabase.auth.getUser();
+    const uid = data?.user?.id || null;
+    setUserId(uid);
+    // TODO: Replace with your DB logic
+    // Simulate trial expired after 7 days
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() - 8); // Simulate expired
+    const now = new Date();
+    setTrialExpired(now > trialEnd);
+    // Check payment status from Supabase
+    if (uid) {
+      const { data: paymentData, error } = await supabase
+        .from('payments')
+        .select('paid, updated_at, subscription_type')
+        .eq('user_id', uid)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      if (
+        paymentData &&
+        paymentData.length > 0 &&
+        paymentData[0].paid &&
+        paymentData[0].updated_at &&
+        paymentData[0].subscription_type
+      ) {
+        const updatedAt = new Date(paymentData[0].updated_at).getTime();
+        let expiry = updatedAt;
+        if (paymentData[0].subscription_type === 'monthly') {
+          expiry += 30 * 24 * 60 * 60 * 1000; // 1 month
+        } else if (paymentData[0].subscription_type === 'yearly') {
+          expiry += 365 * 24 * 60 * 60 * 1000; // 1 year
+        }
+        if (expiry > Date.now()) {
+          setPaymentComplete(true);
+        } else {
+          setPaymentComplete(false);
+        }
+      } else {
+        setPaymentComplete(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    checkTrialAndPayment();
+  }, []); // Run once on mount
 
   const scrollViewRef = useRef<ScrollView>(null)
   const imageAnalysis = useRef(new ImageAnalysis())
   const streamingAnimation = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
-    initializeCoach()
-    loadUserProfile()
-    startStreamingAnimation()
-  }, [])
+    if (!trialExpired || paymentComplete) {
+      initializeCoach();
+      loadUserProfile();
+      startStreamingAnimation();
+    }
+  }, [trialExpired, paymentComplete]);
 
   const startStreamingAnimation = () => {
     Animated.loop(
@@ -186,11 +241,18 @@ export default function AICoachScreen() {
 
   const sendToAIWithStreaming = async (payload: any, messageId: string) => {
     try {
+      console.log("Invoking Supabase Edge Function 'aicoach' with payload:", payload)
       const { data, error } = await supabase.functions.invoke("aicoach", {
         body: payload,
       })
 
-      if (error) throw error
+      console.log("Supabase Edge Function 'aicoach' response - data:", data)
+      console.log("Supabase Edge Function 'aicoach' response - error:", error)
+
+      if (error) {
+        console.error("Supabase function invocation error:", error)
+        throw error
+      }
 
       setIsStreaming(false)
 
@@ -205,10 +267,22 @@ export default function AICoachScreen() {
 
       // Simulate streaming effect
       await simulateStreamingText(responseText, messageId)
-    } catch (error) {
-      console.error("AI request failed:", error)
+    } catch (error: any) {
+      console.error("AI request failed:", error.message || error)
       setIsStreaming(false)
-      throw error
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? {
+                ...msg,
+                text:
+                  (msg.text || "") +
+                  `\n\nI'm temporarily unavailable. Please try again in a moment. 🔄 Error: ${error.message || "Unknown error"}`,
+                isStreaming: false,
+              }
+            : msg,
+        ),
+      )
     }
   }
 
@@ -248,15 +322,28 @@ export default function AICoachScreen() {
       enhancedText += `\nFitness level: ${userProfile.fitnessLevel}`
     }
 
-    return {
+    const payload: RequestPayload = {
       text: enhancedText,
-      goal: userProfile?.fitnessGoal || "",
-      userProfile: {
-        fitnessLevel: userProfile?.fitnessLevel || "beginner",
-        age: userProfile?.age ? Number.parseInt(userProfile.age) : undefined,
-        injuries: userProfile?.injuries || [],
-      },
+      streaming: false, // Frontend will simulate streaming from a complete response
     }
+
+    if (userProfile) {
+      payload.userProfile = {
+        fitnessLevel: userProfile.fitnessLevel,
+        age: parseInt(userProfile.age),
+        injuries: userProfile.injuries,
+      }
+    }
+
+    if (userProfile?.fitnessGoal) {
+      payload.goal = userProfile.fitnessGoal
+    }
+
+    if (progressData.analysisResults) {
+      payload.analysisData = progressData.analysisResults
+    }
+
+    return payload
   }
 
   const handlePhotoUpload = async () => {
@@ -514,16 +601,40 @@ export default function AICoachScreen() {
             },
           ]}
         >
-          <Text
-            style={[
-              styles.messageText,
-              {
-                color: isUser ? theme.colors.background : theme.colors.text,
-              },
-            ]}
-          >
-            {message.text}
-          </Text>
+          {message.text ? (
+            isUser ? (
+              <Text
+                style={[
+                  styles.messageText,
+                  {
+                    color: theme.colors.background,
+                  },
+                ]}
+              >
+                {message.text}
+              </Text>
+            ) : (
+              <Markdown
+                style={{
+                  body: {
+                    color: theme.colors.text,
+                    fontSize: 15,
+                    lineHeight: 22,
+                  },
+                  heading1: { color: theme.colors.text, fontSize: 20, fontWeight: "bold", marginBottom: 6 },
+                  heading2: { color: theme.colors.text, fontSize: 18, fontWeight: "bold", marginBottom: 4 },
+                  bullet_list: { marginVertical: 6 },
+                  list_item: { color: theme.colors.text },
+                  strong: { fontWeight: "700" },
+                  paragraph: { marginTop: 4, marginBottom: 8 },
+                  code_inline: { backgroundColor: theme.colors.card, color: theme.colors.text },
+                  link: { color: theme.colors.primary },
+                }}
+              >
+                {message.text}
+              </Markdown>
+            )
+          ) : null}
 
           {/* Render all numerical analysis data if available */}
           {message.analysisData && (
@@ -581,6 +692,17 @@ export default function AICoachScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        {trialExpired && !paymentComplete && (
+          <View style={styles.paymentOverlay}>
+            <Text style={styles.paymentMessage}>
+              Your free trial has ended. Please pay to continue using the AI Coach.
+            </Text>
+            {userId && (
+              <StripePayment userId={userId} onPaymentSuccess={checkTrialAndPayment} />
+            )}
+          </View>
+        )}
+
         {statusMessage ? (
           <View style={{ padding: 12, backgroundColor: theme.colors.card, borderRadius: 10, margin: 10, marginTop: 60 }}>
             <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 15 }}>{statusMessage}</Text>
@@ -633,18 +755,34 @@ export default function AICoachScreen() {
                   },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.messageText,
-                    {
-                      color: message.type === "user"
-                        ? (isDarkMode ? theme.colors.background : theme.colors.background)
-                        : (isDarkMode ? theme.colors.text : theme.colors.text),
-                    },
-                  ]}
-                >
-                  {message.text}
-                </Text>
+                {message.text ? (
+                  message.type === "user" ? (
+                    <Text
+                      style={[
+                        styles.messageText,
+                        { color: isDarkMode ? theme.colors.background : theme.colors.background },
+                      ]}
+                    >
+                      {message.text}
+                    </Text>
+                  ) : (
+                    <Markdown
+                      style={{
+                        body: { color: theme.colors.text, fontSize: 15, lineHeight: 22 },
+                        heading1: { color: theme.colors.text, fontSize: 20, fontWeight: "bold", marginBottom: 6 },
+                        heading2: { color: theme.colors.text, fontSize: 18, fontWeight: "bold", marginBottom: 4 },
+                        bullet_list: { marginVertical: 6 },
+                        list_item: { color: theme.colors.text },
+                        strong: { fontWeight: "700" },
+                        paragraph: { marginTop: 4, marginBottom: 8 },
+                        code_inline: { backgroundColor: theme.colors.card, color: theme.colors.text },
+                        link: { color: theme.colors.primary },
+                      }}
+                    >
+                      {message.text}
+                    </Markdown>
+                  )
+                ) : null}
                 {/* ...existing code for analysisData, streaming, timestamp... */}
               </View>
             </View>
@@ -759,6 +897,25 @@ const getStyles = (isDarkMode: boolean, theme: any, screenWidth: number) =>
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    paymentOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.8)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000,
+      padding: 20,
+    },
+    paymentMessage: {
+      textAlign: 'center',
+      margin: 20,
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: 'white',
     },
     header: {
       paddingHorizontal: 20,

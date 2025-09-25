@@ -6,12 +6,17 @@ import { useFocusEffect } from '@react-navigation/native';
 import { router, Stack } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import Modal from 'react-native-modal';
+import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../constants/legal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { cancelAllNotifications, requestPermissions, scheduleDailySummary, sendImmediateSummary } from '../../utils/notifications';
 import { supabase } from '../../utils/supabase';
 import { onUserChange } from '../../utils/userEvents';
 
 export default function SettingsScreen() {
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalContent, setModalContent] = useState('');
   const [user, setUser] = useState<{ fullName: string; email: string; avatar?: string | null }>({ fullName: 'User', email: 'user@example.com' });
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -488,13 +493,32 @@ export default function SettingsScreen() {
           <SettingsItem
             icon="document-text-outline"
             title="Terms of Service"
-            onPress={() => Alert.alert('Terms of Service', 'Terms coming soon!')}
+            onPress={() => {
+              setModalTitle('Terms of Service');
+              setModalContent(TERMS_OF_SERVICE);
+              setModalVisible(true);
+            }}
           />
           <SettingsItem
             icon="shield-outline"
             title="Privacy Policy"
-            onPress={() => Alert.alert('Privacy Policy', 'Privacy policy coming soon!')}
+            onPress={() => {
+              setModalTitle('Privacy Policy');
+              setModalContent(PRIVACY_POLICY);
+              setModalVisible(true);
+            }}
           />
+    <Modal isVisible={modalVisible} onBackdropPress={() => setModalVisible(false)}>
+      <View style={{ backgroundColor: 'white', borderRadius: 12, padding: 20, maxHeight: '80%' }}>
+        <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>{modalTitle}</Text>
+        <ScrollView>
+          <Text style={{ fontSize: 14 }}>{modalContent}</Text>
+        </ScrollView>
+        <TouchableOpacity onPress={() => setModalVisible(false)} style={{ marginTop: 16, alignSelf: 'center' }}>
+          <Text style={{ color: '#A855F7', fontWeight: 'bold', fontSize: 16 }}>Close</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
           <SettingsItem
             icon="information-circle-outline"
             title="About"
