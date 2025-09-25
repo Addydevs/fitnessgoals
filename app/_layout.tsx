@@ -5,10 +5,10 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, {
-    createContext,
-    useEffect,
-    useMemo,
-    useState,
+  createContext,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
 import { useColorScheme, View } from "react-native";
 import "react-native-reanimated";
@@ -139,17 +139,31 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <Stack screenOptions={{ headerShown: false }}>
             {token ? (
-              <Stack.Screen
-                name="(tabs)"
-                options={{
-                  headerShown: false,
-                  contentStyle: {
-                    backgroundColor: isDarkMode
-                      ? Colors.dark.background
-                      : Colors.light.background,
-                  },
-                }}
-              />
+              <>
+                <Stack.Screen
+                  name="(tabs)"
+                  options={{
+                    headerShown: false,
+                    contentStyle: {
+                      backgroundColor: isDarkMode
+                        ? Colors.dark.background
+                        : Colors.light.background,
+                    },
+                  }}
+                />
+                <Stack.Screen
+                  name="(settings)"
+                  options={{
+                    headerShown: false,
+                    contentStyle: {
+                      backgroundColor: isDarkMode
+                        ? Colors.dark.background
+                        : Colors.light.background,
+                    },
+                  }}
+                />
+                <Stack.Screen name="+not-found" options={{ headerShown: false }} />
+              </>
             ) : (
               <Stack.Screen
                 name="(auth)"
@@ -164,18 +178,6 @@ export default function RootLayout() {
                 }}
               />
             )}
-            <Stack.Screen
-              name="(settings)"
-              options={{
-                headerShown: false,
-                contentStyle: {
-                  backgroundColor: isDarkMode
-                    ? Colors.dark.background
-                    : Colors.light.background,
-                },
-              }}
-            />
-            <Stack.Screen name="+not-found" options={{ headerShown: false }} />
           </Stack>
           <StatusBar style={isDarkMode ? "light" : "dark"} />
         </SafeAreaProvider>

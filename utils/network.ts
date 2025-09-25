@@ -10,7 +10,7 @@ export class NetworkManager {
       const wasConnected = this.isConnected;
       this.isConnected = state.isConnected ?? false;
       
-      console.log('[Network] Connection status:', this.isConnected);
+  // ...removed console.log...
       
       // Notify listeners
       this.listeners.forEach(listener => listener(this.isConnected));
@@ -61,7 +61,7 @@ export class NetworkManager {
   }
 
   private static async processOfflineOperations() {
-    console.log('[Network] Processing offline queue...');
+  // ...removed console.log...
     
     await OfflineQueue.processQueue(async (operation) => {
       try {

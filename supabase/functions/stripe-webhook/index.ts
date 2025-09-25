@@ -59,7 +59,7 @@ serve(async (req) => {
   }
 
   const event = JSON.parse(new TextDecoder().decode(rawBody));
-  console.log('Stripe Webhook received event type:', event.type);
+    // ...removed console.log...
 
   if (event.type === 'setup_intent.succeeded') { // Changed to setup_intent.succeeded
     const setupIntent = event.data.object;
@@ -77,7 +77,7 @@ serve(async (req) => {
       console.error('Error updating payment status in Supabase:', error.message);
       return new Response(JSON.stringify({ error: 'Failed to update payment status' }), { status: 500 });
     }
-    console.log('Payment status updated for setup_intent:', setupIntent.id, 'User:', userId);
+      // ...removed console.log...
   } else if (event.type === 'payment_intent.succeeded') {
     // This block might still be useful if you also handle one-time payments
     const paymentIntent = event.data.object;
@@ -94,9 +94,9 @@ serve(async (req) => {
       console.error('Error updating payment status for payment_intent in Supabase:', error.message);
       return new Response(JSON.stringify({ error: 'Failed to update payment status for payment intent' }), { status: 500 });
     }
-    console.log('Payment status updated for payment_intent:', paymentIntent.id, 'User:', userId);
+      // ...removed console.log...
   } else {
-    console.log('Unhandled Stripe event type:', event.type);
+      // ...removed console.log...
   }
 
   return new Response('Webhook received', { status: 200 });

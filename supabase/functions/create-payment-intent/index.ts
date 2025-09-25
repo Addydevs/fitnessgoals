@@ -23,7 +23,7 @@ serve(async (req) => {
 
   try {
     const { userId, amount, currency, subscriptionType } = await req.json();
-    console.log('Received payload for payment intent:', { userId, amount, currency, subscriptionType });
+    // ...removed console.log...
 
     // TODO: Check trial status from your DB here
     // If trial expired, proceed to payment
@@ -42,7 +42,7 @@ serve(async (req) => {
 
     if (existingCustomer) {
       customerId = existingCustomer.stripe_customer_id;
-      console.log('Retrieved existing Stripe customer:', customerId);
+      // ...removed console.log...
     } else {
       const customer = await stripe.customers.create({
         metadata: { userId },
@@ -52,7 +52,7 @@ serve(async (req) => {
         user_id: userId,
         stripe_customer_id: customerId,
       });
-      console.log('Created new Stripe customer:', customerId);
+      // ...removed console.log...
     }
 
     // 2. Create an Ephemeral Key for the Customer
@@ -60,7 +60,7 @@ serve(async (req) => {
       { customer: customerId },
       { apiVersion: '2022-11-15' }
     );
-    console.log('Created Ephemeral Key for customer:', customerId);
+    // ...removed console.log...
 
     // 3. Create a Payment Intent for immediate charge
     const paymentIntent = await stripe.paymentIntents.create({
@@ -70,7 +70,7 @@ serve(async (req) => {
       setup_future_usage: 'off_session', // Optional: save card for future use
       metadata: { userId, subscriptionType },
     });
-    console.log('Created Payment Intent:', paymentIntent.id);
+    // ...removed console.log...
 
     // Store payment intent in Supabase payments table
     await supabase.from('payments').upsert({

@@ -5,7 +5,7 @@ export async function createPaymentIntent(userId: string, amount: number, curren
 	try {
 		const url = 'https://vpnitpweduycfmndmxsf.supabase.co/functions/v1/create-payment-intent';
 		const requestBody = { userId, amount, currency, subscriptionType };
-		console.log('Attempting to call Supabase Edge Function:', url, 'with body:', requestBody);
+		// ...removed console.log...
 
 		const { data: { session } } = await supabase.auth.getSession();
 		const accessToken = session?.access_token;
@@ -30,7 +30,7 @@ export async function createPaymentIntent(userId: string, amount: number, curren
 		}
 
 		const data = await res.json();
-		console.log('Received response from Supabase Edge Function:', data);
+		// ...removed console.log...
 		return {
 			paymentIntentClientSecret: data.paymentIntentClientSecret,
 			ephemeralKeySecret: data.ephemeralKeySecret,
