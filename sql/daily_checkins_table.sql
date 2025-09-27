@@ -22,18 +22,23 @@ CREATE INDEX IF NOT EXISTS daily_checkins_user_id_idx ON daily_checkins(user_id)
 -- Enable Row Level Security
 ALTER TABLE daily_checkins ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies
+-- Make policies idempotent
+DROP POLICY IF EXISTS "Users can view their own check-ins" ON daily_checkins;
+DROP POLICY IF EXISTS "Users can insert their own check-ins" ON daily_checkins;
+DROP POLICY IF EXISTS "Users can update their own check-ins" ON daily_checkins;
+DROP POLICY IF EXISTS "Users can delete their own check-ins" ON daily_checkins;
+
 CREATE POLICY "Users can view their own check-ins" ON daily_checkins
-    FOR SELECT USING (auth.uid() = user_id);
+  FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert their own check-ins" ON daily_checkins
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own check-ins" ON daily_checkins
-    FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete their own check-ins" ON daily_checkins
-    FOR DELETE USING (auth.uid() = user_id);
+  FOR DELETE USING (auth.uid() = user_id);
 
 -- Create trigger to automatically update the updated_at column
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -44,6 +49,8 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Recreate trigger idempotently
+DROP TRIGGER IF EXISTS update_daily_checkins_updated_at ON daily_checkins;
 CREATE TRIGGER update_daily_checkins_updated_at
     BEFORE UPDATE ON daily_checkins
     FOR EACH ROW

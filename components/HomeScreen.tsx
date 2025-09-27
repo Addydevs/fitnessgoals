@@ -261,7 +261,6 @@ export default function HomeScreen({
 
             if (!user?.id) {
               setUser(null);
-              setUserPhotos([]);
               setUserStats({
                 totalPhotos: 0,
                 currentStreak: 0,
@@ -294,22 +293,22 @@ export default function HomeScreen({
               return next;
             });
 
-            // photos
+            // photos — normalize to created_at (fallback to timestamp)
             const { data: photosData } = await supabase
                 .from("photos")
-                .select("id,timestamp,analysis,url,user_id")
+                .select("id, url, analysis, user_id, timestamp, created_at")
                 .eq("user_id", user.id)
-                .order("timestamp", { ascending: true });
+                .order("created_at", { ascending: true });
 
             if (cancelled) return;
 
-            setUserPhotos(photosData || []);
-
-            const totalPhotos = photosData?.length || 0;
-            const lastPhotoDate = totalPhotos > 0 ? photosData![totalPhotos - 1].timestamp : null;
-            const startDate = totalPhotos > 0 ? photosData![0].timestamp : new Date().toISOString();
-            const currentStreak = getCurrentStreak(photosData || []);
-            const photosThisWeek = getPhotosThisWeek(photosData || []);
+            const rows = photosData || [];
+            const totalPhotos = rows.length;
+            const lastPhotoDate = totalPhotos > 0 ? (rows[totalPhotos - 1].created_at || rows[totalPhotos - 1].timestamp) : null;
+            const startDate = totalPhotos > 0 ? (rows[0].created_at || rows[0].timestamp) : new Date().toISOString();
+            const normalized = rows.map((r: any) => ({ timestamp: r.created_at || r.timestamp }));
+            const currentStreak = getCurrentStreak(normalized as any);
+            const photosThisWeek = getPhotosThisWeek(normalized as any);
 
             setUserStats({
               totalPhotos,
