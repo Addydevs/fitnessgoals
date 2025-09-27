@@ -55,7 +55,7 @@ export default function RootLayout() {
           try {
             await setAccessToken(userToken);
           } catch (err) {
-            console.warn('Failed to set supabase auth from stored token', err);
+            console.warn('Login Issue: Your session expired or is invalid. Please log out and log back in. If you still have trouble, make sure you’re using the latest version of the app.');
           }
         }
 

@@ -252,6 +252,7 @@ export default function Auth() {
           )}
         </Text>
         {/* Confirmation Modal */}
+        {/*
         {showConfirmModal && (
           <View style={styles.confirmModal}>
             <Text style={styles.confirmTitle}>Confirm your email</Text>
@@ -267,6 +268,7 @@ export default function Auth() {
             </Pressable>
           </View>
         )}
+        */}
       </View>
     </LinearGradient>
   );
