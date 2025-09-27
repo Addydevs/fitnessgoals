@@ -25,7 +25,7 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { useTheme } from "../contexts/ThemeContext"
 import { ImageAnalysis } from "../utils/imageAnalysis"
 import { supabase, SupabaseService } from "../utils/supabase"
-import StripePayment from "./StripePayment"
+// ...existing code...
 
 interface Message {
   id: string
@@ -72,69 +72,17 @@ export default function AICoachScreen() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [progressData, setProgressData] = useState<ProgressData>({})
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [trialExpired, setTrialExpired] = useState(false)
-  const [paymentComplete, setPaymentComplete] = useState(false)
-  // Example: Check trial and payment status (replace with your logic)
-  const [userId, setUserId] = useState<string | null>(null);
-  const checkTrialAndPayment = async () => {
-    // Fetch user info from Supabase
-    const { data } = await supabase.auth.getUser();
-    const uid = data?.user?.id || null;
-    setUserId(uid);
-    // TODO: Replace with your DB logic
-    // Simulate trial expired after 7 days
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() - 8); // Simulate expired
-    const now = new Date();
-    setTrialExpired(now > trialEnd);
-    // Check payment status from Supabase
-    if (uid) {
-      const { data: paymentData, error } = await supabase
-        .from('payments')
-        .select('paid, updated_at, subscription_type')
-        .eq('user_id', uid)
-        .order('updated_at', { ascending: false })
-        .limit(1);
-      if (
-        paymentData &&
-        paymentData.length > 0 &&
-        paymentData[0].paid &&
-        paymentData[0].updated_at &&
-        paymentData[0].subscription_type
-      ) {
-        const updatedAt = new Date(paymentData[0].updated_at).getTime();
-        let expiry = updatedAt;
-        if (paymentData[0].subscription_type === 'monthly') {
-          expiry += 30 * 24 * 60 * 60 * 1000; // 1 month
-        } else if (paymentData[0].subscription_type === 'yearly') {
-          expiry += 365 * 24 * 60 * 60 * 1000; // 1 year
-        }
-        if (expiry > Date.now()) {
-          setPaymentComplete(true);
-        } else {
-          setPaymentComplete(false);
-        }
-      } else {
-        setPaymentComplete(false);
-      }
-    }
-  };
-
-  useEffect(() => {
-    checkTrialAndPayment();
-  }, []); // Run once on mount
+  // ...existing code...
 
   const scrollViewRef = useRef<ScrollView>(null)
   const imageAnalysis = useRef(new ImageAnalysis())
   const streamingAnimation = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
-    if (!trialExpired || paymentComplete) {
-      initializeCoach();
-      loadUserProfile();
-      startStreamingAnimation();
-    }
-  }, [trialExpired, paymentComplete]);
+    initializeCoach();
+    loadUserProfile();
+    startStreamingAnimation();
+  }, []);
 
   const startStreamingAnimation = () => {
     Animated.loop(
@@ -692,16 +640,7 @@ export default function AICoachScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        {trialExpired && !paymentComplete && (
-          <View style={styles.paymentOverlay}>
-            <Text style={styles.paymentMessage}>
-              Your free trial has ended. Please pay to continue using the AI Coach.
-            </Text>
-            {userId && (
-              <StripePayment userId={userId} onPaymentSuccess={checkTrialAndPayment} />
-            )}
-          </View>
-        )}
+        {/* Payment and trial overlays removed */}
 
         {statusMessage ? (
           <View style={{ padding: 12, backgroundColor: theme.colors.card, borderRadius: 10, margin: 10, marginTop: 60 }}>
@@ -898,25 +837,7 @@ const getStyles = (isDarkMode: boolean, theme: any, screenWidth: number) =>
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    paymentOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.8)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 1000,
-      padding: 20,
-    },
-    paymentMessage: {
-      textAlign: 'center',
-      margin: 20,
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: 'white',
-    },
+    // ...existing code...
     header: {
       paddingHorizontal: 20,
       paddingTop: 60,
