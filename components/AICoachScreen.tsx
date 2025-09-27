@@ -72,6 +72,10 @@ export default function AICoachScreen() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [progressData, setProgressData] = useState<ProgressData>({})
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  // Trial UI state (no checkout)
+  const [trialExpired, setTrialExpired] = useState(false)
+  const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null)
+  const TRIAL_DAYS = 7
   // ...existing code...
 
   const scrollViewRef = useRef<ScrollView>(null)
@@ -82,7 +86,29 @@ export default function AICoachScreen() {
     initializeCoach();
     loadUserProfile();
     startStreamingAnimation();
+    computeTrial();
+    // refresh the badge at next local midnight
+    const now = new Date();
+    const next = new Date(now); next.setHours(24,0,0,0);
+    const t = setTimeout(() => computeTrial(), next.getTime() - now.getTime());
+    return () => clearTimeout(t);
   }, []);
+
+  const computeTrial = async () => {
+    try {
+      const { data } = await supabase.auth.getUser();
+      const createdAtISO = data?.user?.created_at;
+      if (!createdAtISO) { setTrialExpired(true); setTrialDaysLeft(null); return; }
+      const DAY = 24*60*60*1000;
+      const start = new Date(createdAtISO); start.setHours(0,0,0,0);
+      const today = new Date(); today.setHours(0,0,0,0);
+      const diffDays = Math.floor((today.getTime() - start.getTime())/DAY);
+      const left = Math.max(0, TRIAL_DAYS - diffDays);
+      setTrialDaysLeft(left);
+      const trialEnd = new Date(start); trialEnd.setDate(trialEnd.getDate()+TRIAL_DAYS);
+      setTrialExpired(today.getTime() >= trialEnd.getTime());
+    } catch {}
+  }
 
   const startStreamingAnimation = () => {
     Animated.loop(
@@ -654,10 +680,27 @@ export default function AICoachScreen() {
           style={styles.header}
         >
           <View style={styles.headerContent}>
-            <Text style={[styles.headerTitle, { color: isDarkMode ? theme.colors.text : theme.colors.primary }]}>AI Fitness Coach</Text>
-            <View style={[styles.statusBadge, { backgroundColor: isDarkMode ? theme.colors.primary : theme.colors.accent }]}>
-              <View style={[styles.statusDot, { backgroundColor: isDarkMode ? theme.colors.background : theme.colors.primary }]} />
-              <Text style={[styles.statusText, { color: isDarkMode ? theme.colors.background : theme.colors.primary }]}>Online</Text>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+              style={[styles.headerTitle, { color: isDarkMode ? theme.colors.text : theme.colors.primary }]}
+            >
+              AI Fitness Coach
+            </Text>
+          </View>
+          <View style={styles.headerMetaRow}>
+            {!trialExpired && trialDaysLeft !== null && (
+              <View style={[styles.trialPill, isDarkMode ? { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.18)' } : { backgroundColor: '#E6F0FF', borderColor: theme.colors.primary } ]}>
+                <Ionicons name="time-outline" size={14} color={isDarkMode ? theme.colors.text : theme.colors.primary} />
+                <Text style={[styles.trialPillText, { color: isDarkMode ? theme.colors.text : theme.colors.primary }]}>
+                  Trial: {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'} left
+                </Text>
+              </View>
+            )}
+            <View style={[styles.statusBadge, isDarkMode ? { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.18)', borderWidth: 1 } : { backgroundColor: theme.colors.accent } ]}>
+              <View style={[styles.statusDot, { backgroundColor: isDarkMode ? '#22C55E' : theme.colors.primary }]} />
+              <Text style={[styles.statusText, { color: isDarkMode ? theme.colors.text : theme.colors.primary }]}>Online</Text>
             </View>
           </View>
 
@@ -845,8 +888,15 @@ const getStyles = (isDarkMode: boolean, theme: any, screenWidth: number) =>
     },
     headerContent: {
       flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
+      justifyContent: "flex-start",
+      alignItems: "flex-end",
+    },
+    headerMetaRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 6,
     },
     headerTitle: {
       fontSize: 28,
@@ -856,6 +906,21 @@ const getStyles = (isDarkMode: boolean, theme: any, screenWidth: number) =>
       textShadowColor: isDarkMode ? 'transparent' : theme.colors.border,
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 0,
+      flexShrink: 1,
+    },
+    trialPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      marginRight: 6,
+    },
+    trialPillText: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginLeft: 6,
     },
     statusBadge: {
       flexDirection: "row",
