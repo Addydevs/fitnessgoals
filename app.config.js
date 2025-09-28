@@ -7,7 +7,13 @@
 // const uploadPreset = Constants.expoConfig.extra.EXPO_PUBLIC_UPLOAD_PRESET;
 // const supabaseProjectRef = Constants.expoConfig.extra.EXPO_PUBLIC_SUPABASE_PROJECT_REF;
 // expo app.config.js to inject env variables from .env
-import 'dotenv/config';
+// Load .env if dotenv is available; don't crash if not installed yet
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('dotenv').config();
+} catch (_) {
+  // noop – allow Expo CLI to run even before deps are installed
+}
 
 export default ({ config }) => {
   return {

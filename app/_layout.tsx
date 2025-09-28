@@ -14,6 +14,7 @@ import { useColorScheme, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { setAccessToken, supabase } from '../utils/supabase';
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 
 export interface AuthContextType {
   token: string | null;
@@ -136,8 +137,9 @@ export default function RootLayout() {
   return (
     <CustomThemeProvider>
       <AuthContext.Provider value={authContext}>
-        <SafeAreaProvider>
-          <Stack screenOptions={{ headerShown: false }}>
+        <SubscriptionProvider>
+          <SafeAreaProvider>
+            <Stack screenOptions={{ headerShown: false }}>
             {token ? (
               <>
                 <Stack.Screen
@@ -178,9 +180,10 @@ export default function RootLayout() {
                 }}
               />
             )}
-          </Stack>
-          <StatusBar style={isDarkMode ? "light" : "dark"} />
-        </SafeAreaProvider>
+            </Stack>
+            <StatusBar style={isDarkMode ? "light" : "dark"} />
+          </SafeAreaProvider>
+        </SubscriptionProvider>
       </AuthContext.Provider>
     </CustomThemeProvider>
   );

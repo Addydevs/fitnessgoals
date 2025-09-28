@@ -3,7 +3,7 @@
 import { Ionicons } from "@expo/vector-icons"
 import * as ImagePicker from "expo-image-picker"
 import { LinearGradient } from "expo-linear-gradient"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useContext } from "react"
 import {
   ActivityIndicator,
   Alert,
@@ -22,7 +22,9 @@ import {
 } from "react-native"
 import Markdown from "react-native-markdown-display"
 import { SafeAreaView } from "react-native-safe-area-context"
+import Paywall from "./Paywall"
 import { useTheme } from "../contexts/ThemeContext"
+import { SubscriptionContext } from "@/contexts/SubscriptionContext"
 import { ImageAnalysis } from "../utils/imageAnalysis"
 import { supabase, SupabaseService } from "../utils/supabase"
 // ...existing code...
@@ -63,6 +65,7 @@ export default function AICoachScreen() {
 
   // Theme colors
   const { isDarkMode, theme } = useTheme()
+  const subCtx = useContext(SubscriptionContext)
   const styles = getStyles(isDarkMode, theme, screenWidth)
 
   const [messages, setMessages] = useState<Message[]>([])
@@ -94,6 +97,11 @@ export default function AICoachScreen() {
     return () => clearTimeout(t);
   }, []);
 
+  // Recompute trial badge when subscription state changes
+  useEffect(() => {
+    computeTrial();
+  }, [subCtx?.isSubscribed])
+
   const computeTrial = async () => {
     try {
       const { data } = await supabase.auth.getUser();
@@ -104,9 +112,16 @@ export default function AICoachScreen() {
       const today = new Date(); today.setHours(0,0,0,0);
       const diffDays = Math.floor((today.getTime() - start.getTime())/DAY);
       const left = Math.max(0, TRIAL_DAYS - diffDays);
-      setTrialDaysLeft(left);
       const trialEnd = new Date(start); trialEnd.setDate(trialEnd.getDate()+TRIAL_DAYS);
-      setTrialExpired(today.getTime() >= trialEnd.getTime());
+      const expired = today.getTime() >= trialEnd.getTime();
+      // If user is subscribed, treat as not expired and hide badge
+      if (subCtx?.isSubscribed) {
+        setTrialExpired(false);
+        setTrialDaysLeft(null);
+      } else {
+        setTrialExpired(expired);
+        setTrialDaysLeft(left);
+      }
     } catch {}
   }
 
@@ -659,6 +674,9 @@ export default function AICoachScreen() {
     )
   }
 
+  // Determine if paywall should be shown (trial ended and not subscribed)
+  const showPaywall = trialExpired && !(subCtx?.isSubscribed)
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -860,6 +878,13 @@ export default function AICoachScreen() {
             </ScrollView>
           </View>
         </View>
+        <Paywall
+          visible={showPaywall}
+          priceText={(subCtx?.monthly?.price ? `${subCtx.monthly.price}/month` : "$4.99/month")}
+          purchasing={!!subCtx?.purchasing}
+          onPurchase={() => subCtx?.purchaseMonthly?.()}
+          onRestore={() => subCtx?.restore?.()}
+        />
       </SafeAreaView>
     </KeyboardAvoidingView>
   )
