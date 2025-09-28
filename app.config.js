@@ -16,13 +16,18 @@ try {
 }
 
 export default ({ config }) => {
+  // Only override values if env vars are defined; otherwise keep app.json defaults
+  const extra = {
+    ...config.extra,
+    EXPO_PUBLIC_SUPABASE_URL:
+      process.env.EXPO_PUBLIC_SUPABASE_URL ?? config.extra?.EXPO_PUBLIC_SUPABASE_URL,
+    EXPO_PUBLIC_SUPABASE_ANON_KEY:
+      process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? config.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? config.extra?.OPENAI_API_KEY,
+  };
+
   return {
     ...config,
-    extra: {
-      ...config.extra,
-      EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    },
+    extra,
   };
 };
