@@ -430,6 +430,8 @@ export default function HomeScreen({
     try {
       await AsyncStorage.setItem("hasSeenWelcome", "true")
       setShowWelcome(false)
+      // Take the user directly to capture/analysis so the primary flow is obvious
+      try { navigation?.navigate("aicoach") } catch {}
     } catch (error) {
       console.error("Error saving welcome status:", error)
     }

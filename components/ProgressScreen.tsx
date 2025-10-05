@@ -17,6 +17,9 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { router } from 'expo-router'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import Layout, { ModernCard, ModernHeader, SectionHeader } from "./Layout";
 
 // Helper to push notification to AsyncStorage
@@ -415,6 +418,23 @@ export default function ProgressScreen() {
       >
         <ActivityIndicator size="large" color={primary} />
       </View>
+    )
+  }
+
+  if (!loading && photos.length === 0) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <View style={{ alignItems: 'center' }}>
+          <MaterialCommunityIcons name="camera" size={48} color={primary} />
+          <Text style={{ marginTop: 12, fontSize: 18, fontWeight: '700', color: palette.text }}>No progress photos yet</Text>
+          <Text style={{ marginTop: 6, fontSize: 14, color: sub, textAlign: 'center' }}>
+            Start by capturing a progress photo. The AI will analyze changes and track your journey over time.
+          </Text>
+          <TouchableOpacity onPress={() => router.navigate('/(tabs)/aicoach')} style={{ marginTop: 14, backgroundColor: primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }}>
+            <Text style={{ color: 'white', fontWeight: '700' }}>Capture First Photo</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     )
   }
 

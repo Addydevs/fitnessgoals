@@ -22,8 +22,10 @@ import {
 } from "react-native"
 import Markdown from "react-native-markdown-display"
 import { SafeAreaView } from "react-native-safe-area-context"
+import Constants from 'expo-constants'
 import Paywall from "./Paywall"
 import { useTheme } from "../contexts/ThemeContext"
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { SubscriptionContext } from "@/contexts/SubscriptionContext"
 import { ImageAnalysis } from "../utils/imageAnalysis"
 import { supabase, SupabaseService } from "../utils/supabase"
@@ -79,6 +81,9 @@ export default function AICoachScreen() {
   const [trialExpired, setTrialExpired] = useState(false)
   const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null)
   const TRIAL_DAYS = 7
+  const [paywallDismissed, setPaywallDismissed] = useState(false)
+  const [showCameraTip, setShowCameraTip] = useState(false)
+  const [hasAnyPhoto, setHasAnyPhoto] = useState<boolean>(false)
   // ...existing code...
 
   const scrollViewRef = useRef<ScrollView>(null)
@@ -90,6 +95,12 @@ export default function AICoachScreen() {
     loadUserProfile();
     startStreamingAnimation();
     computeTrial();
+    (async () => {
+      try {
+        const seen = await AsyncStorage.getItem('hasSeenCameraTip')
+        if (seen !== 'true') setShowCameraTip(true)
+      } catch {}
+    })()
     // refresh the badge at next local midnight
     const now = new Date();
     const next = new Date(now); next.setHours(24,0,0,0);
@@ -97,9 +108,25 @@ export default function AICoachScreen() {
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    // Check if the user has any photos uploaded already
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) return;
+        const { count } = await supabase
+          .from('photos')
+          .select('id', { head: true, count: 'exact' })
+          .eq('user_id', user.id);
+        setHasAnyPhoto((count ?? 0) > 0);
+      } catch {}
+    })();
+  }, []);
+
   // Recompute trial badge when subscription state changes
   useEffect(() => {
     computeTrial();
+    setPaywallDismissed(false)
   }, [subCtx?.isSubscribed])
 
   const computeTrial = async () => {
@@ -182,6 +209,11 @@ export default function AICoachScreen() {
   }
 
   const handleSendMessage = async () => {
+    if (showPaywall) {
+      try { setPaywallDismissed(false) } catch {}
+      Alert.alert('Subscription required', 'Your free trial has ended. Subscribe to continue using the AI Coach.')
+      return
+    }
     const text = inputText.trim()
     if (!text || isTyping) return
 
@@ -336,6 +368,11 @@ export default function AICoachScreen() {
   }
 
   const handlePhotoUpload = async () => {
+    if (showPaywall) {
+      try { setPaywallDismissed(false) } catch {}
+      Alert.alert('Subscription required', 'Your free trial has ended. Subscribe to analyze photos.')
+      return
+    }
     try {
       console.log(" Starting photo upload process ===")
 
@@ -675,7 +712,10 @@ export default function AICoachScreen() {
   }
 
   // Determine if paywall should be shown (trial ended and not subscribed)
-  const showPaywall = trialExpired && !(subCtx?.isSubscribed)
+  const disablePaywall = (Constants?.expoConfig as any)?.extra?.EXPO_PUBLIC_DISABLE_PAYWALL === 'true' || process.env.EXPO_PUBLIC_DISABLE_PAYWALL === 'true'
+  const allowDismiss = (Constants?.expoConfig as any)?.extra?.EXPO_PUBLIC_ALLOW_PAYWALL_DISMISS === 'true' || process.env.EXPO_PUBLIC_ALLOW_PAYWALL_DISMISS === 'true'
+  const showPaywall = !disablePaywall && trialExpired && !(subCtx?.isSubscribed)
+  const paywallVisible = showPaywall && !(allowDismiss && paywallDismissed)
 
   return (
     <KeyboardAvoidingView
@@ -741,6 +781,17 @@ export default function AICoachScreen() {
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
           showsVerticalScrollIndicator={false}
         >
+          {!hasAnyPhoto && !paywallVisible && (
+            <View style={{ margin: 14, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: isDarkMode ? theme.colors.surface : '#F8FAFF' }}>
+              <Text style={{ fontWeight: '700', color: theme.colors.text, marginBottom: 6 }}>Upload a progress photo</Text>
+              <Text style={{ color: theme.colors.subtitle, marginBottom: 10 }}>
+                The AI Coach gives the best guidance when you upload a progress photo. Tap below to add your first photo.
+              </Text>
+              <TouchableOpacity onPress={handlePhotoUpload} style={{ alignSelf: 'flex-start', backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}>
+                <Text style={{ color: theme.colors.background, fontWeight: '700' }}>Upload Photo</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           {messages.map((message) => (
             <View key={message.id} style={[styles.messageContainer, message.type === "user" ? styles.userMessage : styles.aiMessage]}>
               <View
@@ -851,7 +902,7 @@ export default function AICoachScreen() {
           </View>
           <View style={styles.quickActions}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {quickActionButtons.map((action, index) => (
+              {quickActionButtons(handlePhotoUpload).map((action, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
@@ -861,7 +912,10 @@ export default function AICoachScreen() {
                       borderColor: theme.colors.border,
                     },
                   ]}
-                  onPress={() => setInputText(action.text)}
+                  onPress={() => {
+                    if (action.onPress) { action.onPress(); }
+                    else if (action.text) { setInputText(action.text); }
+                  }}
                 >
                   <Text
                     style={[
@@ -878,19 +932,38 @@ export default function AICoachScreen() {
             </ScrollView>
           </View>
         </View>
+        {/* One-time onboarding nudge to upload a photo */}
+        {showCameraTip && !paywallVisible && (
+          <View style={{ position: 'absolute', bottom: 140, left: 16, right: 16, alignItems: 'center' }}>
+            <View style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderWidth: 1, padding: 12, borderRadius: 12 }}>
+              <Text style={{ color: theme.colors.text, fontWeight: '600', textAlign: 'center' }}>
+                Tip: Tap the camera to upload a progress photo for AI analysis.
+              </Text>
+              <TouchableOpacity
+                onPress={async () => { setShowCameraTip(false); try { await AsyncStorage.setItem('hasSeenCameraTip', 'true') } catch {} }}
+                style={{ marginTop: 8, alignSelf: 'center' }}
+              >
+                <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Got it</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         <Paywall
-          visible={showPaywall}
+          visible={paywallVisible}
           priceText={(subCtx?.monthly?.price ? `${subCtx.monthly.price}/month` : "$4.99/month")}
           purchasing={!!subCtx?.purchasing}
           onPurchase={() => subCtx?.purchaseMonthly?.()}
           onRestore={() => subCtx?.restore?.()}
+          onClose={allowDismiss ? () => setPaywallDismissed(true) : undefined}
         />
       </SafeAreaView>
     </KeyboardAvoidingView>
   )
 }
 
-const quickActionButtons = [
+type QuickAction = { icon: string; label: string; text?: string; onPress?: () => void }
+const quickActionButtons = (onUpload: () => void): QuickAction[] => [
+  { icon: "📸", label: "Upload Photo", onPress: onUpload },
   { icon: "💪", label: "Weekly Plan", text: "Create my weekly workout plan" },
   { icon: "🥗", label: "Nutrition", text: "What should I eat for my goals?" },
   { icon: "📊", label: "Progress", text: "Analyze my fitness progress" },
