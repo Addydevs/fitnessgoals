@@ -29,7 +29,7 @@ export default function SubscriptionScreen() {
         await Linking.openURL('https://apps.apple.com/account/subscriptions')
       } else {
         const pkg = (Constants?.expoConfig as any)?.android?.package || 'com.addyde.capturefit'
-        const sku = sub?.monthly?.productId || 'com.addyde.capturefit.pro.monthly'
+        const sku = sub?.monthly?.productId || 'om.capturefit.monthly_premium'
         const url = `https://play.google.com/store/account/subscriptions?sku=${encodeURIComponent(sku)}&package=${encodeURIComponent(pkg)}`
         await Linking.openURL(url)
       }
@@ -131,4 +131,3 @@ const styles = StyleSheet.create({
   secondaryText: { fontSize: 14, fontWeight: '600' },
   help: { fontSize: 12, textAlign: 'center', marginTop: 10 },
 })
-

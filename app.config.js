@@ -24,6 +24,17 @@ export default ({ config }) => {
     EXPO_PUBLIC_SUPABASE_ANON_KEY:
       process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? config.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? config.extra?.OPENAI_API_KEY,
+    // Pass through all public IAP/RevenueCat vars so they're available via Constants.expoConfig.extra
+    EXPO_PUBLIC_IAP_PRODUCT_MONTHLY:
+      process.env.EXPO_PUBLIC_IAP_PRODUCT_MONTHLY ?? config.extra?.EXPO_PUBLIC_IAP_PRODUCT_MONTHLY,
+    EXPO_PUBLIC_RC_IOS_KEY:
+      process.env.EXPO_PUBLIC_RC_IOS_KEY ?? config.extra?.EXPO_PUBLIC_RC_IOS_KEY,
+    EXPO_PUBLIC_RC_ANDROID_KEY:
+      process.env.EXPO_PUBLIC_RC_ANDROID_KEY ?? config.extra?.EXPO_PUBLIC_RC_ANDROID_KEY,
+    EXPO_PUBLIC_RC_ENTITLEMENT_ID:
+      process.env.EXPO_PUBLIC_RC_ENTITLEMENT_ID ?? config.extra?.EXPO_PUBLIC_RC_ENTITLEMENT_ID,
+    EXPO_PUBLIC_DISABLE_PAYWALL:
+      process.env.EXPO_PUBLIC_DISABLE_PAYWALL ?? config.extra?.EXPO_PUBLIC_DISABLE_PAYWALL,
   };
 
   return {

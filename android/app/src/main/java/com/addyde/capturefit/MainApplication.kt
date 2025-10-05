@@ -1,4 +1,4 @@
-package com.anonymous.fitnessprogressmvp
+package com.addyde.capturefit
 
 import android.app.Application
 import android.content.res.Configuration

@@ -171,6 +171,37 @@ Deno.serve(async (req) => {
     // ignore; plan stays 'free'
   }
 
+  // If not PRO by our payments table, cross-check RevenueCat entitlements
+  if (plan === 'free') {
+    const RC_KEY = Deno.env.get('REVENUECAT_REST_API_KEY') || ''
+    const ENT_ID = (Deno.env.get('RC_ENTITLEMENT_ID') || 'subscription')
+    if (RC_KEY) {
+      try {
+        const rcRes = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}` , {
+          headers: { Authorization: `Bearer ${RC_KEY}` },
+        })
+        if (rcRes.ok) {
+          const rc = await rcRes.json()
+          const ents = rc?.subscriber?.entitlements || {}
+          const keys = Object.keys(ents)
+          // Case-insensitive match for entitlement key
+          const entKey = keys.find(k => k.toLowerCase() === ENT_ID.toLowerCase())
+          const ent = entKey ? ents[entKey] : null
+          const expires = ent?.expires_date ? Date.parse(ent.expires_date) : 0
+          if (expires && expires > Date.now()) {
+            plan = 'pro'
+            // Best-effort: mirror to payments table so other functions can rely on it
+            try {
+              await admin.from('payments').upsert({ user_id: userId, paid: true, subscription_type: 'monthly', updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+            } catch {}
+          }
+        }
+      } catch (_) {
+        // ignore RC failures and keep plan as free
+      }
+    }
+  }
+
   // Limits
   const DAY = 24 * 60 * 60 * 1000
   const now = new Date()

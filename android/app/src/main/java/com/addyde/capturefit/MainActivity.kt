@@ -1,4 +1,4 @@
-package com.anonymous.fitnessprogressmvp
+package com.addyde.capturefit
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.anonymous.fitnessprogressmvp'
+    namespace 'com.addyde.capturefit'
     defaultConfig {
-        applicationId 'com.anonymous.fitnessprogressmvp'
+        applicationId 'com.addyde.capturefit'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

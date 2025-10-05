@@ -8,15 +8,21 @@ type Props = {
   purchasing?: boolean
   onPurchase: () => void
   onRestore: () => void
+  onClose?: () => void
 }
 
-export default function Paywall({ visible, priceText = '$4.99/month', purchasing = false, onPurchase, onRestore }: Props) {
+export default function Paywall({ visible, priceText = '$4.99/month', purchasing = false, onPurchase, onRestore, onClose }: Props) {
   const { isDarkMode, theme } = useTheme()
 
   return (
-    <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen">
+    <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
       <View style={[styles.overlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.9)' : 'rgba(0,0,0,0.75)' }]}>
         <View style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          {onClose ? (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={styles.closeBtn}>
+              <Text style={[styles.closeText, { color: theme.colors.subtitle }]}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
           <Text style={[styles.title, { color: theme.colors.text }]}>Unlock CaptureFit Pro</Text>
           <Text style={[styles.subtitle, { color: theme.colors.subtitle }]}>Your 7‑day free trial has ended.</Text>
 
@@ -34,8 +40,8 @@ export default function Paywall({ visible, priceText = '$4.99/month', purchasing
           </View>
 
           <Text style={[styles.price, { color: theme.colors.text }]}>{priceText}</Text>
-          <Text style={[styles.disclaimer, { color: theme.colors.subtitle }]}>
-            Cancel anytime in {Platform.OS === 'ios' ? 'Settings > Apple ID > Subscriptions' : 'Google Play > Payments & subscriptions'}.
+          <Text style={[styles.disclaimer, { color: theme.colors.subtitle }]}> 
+            Auto‑renewing monthly subscription. Payment is charged to your Apple ID at confirmation. Unless canceled at least 24 hours before the end of the trial or current period, your subscription renews automatically. Manage or cancel anytime in {Platform.OS === 'ios' ? 'Settings > Apple ID > Subscriptions' : 'Google Play > Payments & subscriptions'}.
           </Text>
 
           <TouchableOpacity
@@ -53,6 +59,11 @@ export default function Paywall({ visible, priceText = '$4.99/month', purchasing
           <TouchableOpacity onPress={onRestore} style={styles.restoreBtn} disabled={purchasing}>
             <Text style={[styles.restoreText, { color: theme.colors.primary }]}>Restore Purchases</Text>
           </TouchableOpacity>
+          {onClose ? (
+            <TouchableOpacity onPress={onClose} style={styles.secondaryBtn} disabled={purchasing}>
+              <Text style={[styles.secondaryText, { color: theme.colors.subtitle }]}>Maybe later</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -73,6 +84,14 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
     borderWidth: 1,
   },
+  closeBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 6,
+    zIndex: 2,
+  },
+  closeText: { fontSize: 18 },
   title: {
     fontSize: 22,
     fontWeight: '700',
@@ -128,5 +147,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  secondaryBtn: { marginTop: 6, alignItems: 'center' },
+  secondaryText: { fontSize: 13, fontWeight: '500' },
 })
-
