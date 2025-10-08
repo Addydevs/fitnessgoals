@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useContext } from "react"
 import {
   ActivityIndicator,
   Alert,
+  ActionSheetIOS,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
@@ -367,6 +368,29 @@ export default function AICoachScreen() {
     return payload
   }
 
+  const pickFromLibrary = async () => {
+    return ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.8,
+      allowsMultipleSelection: false,
+      selectionLimit: 1,
+      exif: false,
+      base64: true,
+    })
+  }
+
+  const pickFromCamera = async () => {
+    return ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.8,
+      base64: true,
+    })
+  }
+
   const handlePhotoUpload = async () => {
     if (showPaywall) {
       try { setPaywallDismissed(false) } catch {}
@@ -391,17 +415,33 @@ export default function AICoachScreen() {
         return
       }
 
-      console.log("Launching image picker with enhanced options...")
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [3, 4],
-        quality: 0.8,
-        allowsMultipleSelection: false,
-        selectionLimit: 1,
-        exif: false,
-        base64: true, // Request base64 directly from ImagePicker
-      })
+      // Let the user choose Camera or Library
+      let result: ImagePicker.ImagePickerResult
+      if (Platform.OS === 'ios') {
+        const idx = await new Promise<number>((resolve) => {
+          ActionSheetIOS.showActionSheetWithOptions(
+            {
+              options: ['Take Photo', 'Choose from Library', 'Cancel'],
+              cancelButtonIndex: 2,
+              userInterfaceStyle: isDarkMode ? 'dark' : 'light',
+            },
+            (buttonIndex) => resolve(buttonIndex),
+          )
+        })
+        if (idx === 2) { console.log('Picker cancelled from action sheet'); return }
+        result = idx === 0 ? await pickFromCamera() : await pickFromLibrary()
+      } else {
+        // Simple Alert for Android and other platforms
+        const choice = await new Promise<'camera' | 'library' | 'cancel'>((resolve) => {
+          Alert.alert('Add Photo', 'Choose a source', [
+            { text: 'Take Photo', onPress: () => resolve('camera') },
+            { text: 'Choose from Library', onPress: () => resolve('library') },
+            { text: 'Cancel', onPress: () => resolve('cancel'), style: 'cancel' },
+          ])
+        })
+        if (choice === 'cancel') { console.log('Picker cancelled'); return }
+        result = choice === 'camera' ? await pickFromCamera() : await pickFromLibrary()
+      }
 
       console.log("Image picker result:", {
         canceled: result.canceled,

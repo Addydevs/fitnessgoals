@@ -46,6 +46,10 @@ export default function SubscriptionScreen() {
     try { await sub.restore() } catch {}
   }
 
+  const policyUrl = (Constants?.expoConfig as any)?.extra?.PRIVACY_POLICY_URL || ''
+  const termsUrl = (Constants?.expoConfig as any)?.extra?.TERMS_OF_USE_URL || ''
+  const onOpen = async (url: string) => { try { if (url) await Linking.openURL(url) } catch {} }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Stack.Screen
@@ -73,6 +77,22 @@ export default function SubscriptionScreen() {
           <Text style={[styles.value, { color: theme.colors.text }]}>{priceDisplay}</Text>
         </View>
 
+        {/* What you get */}
+        <View style={{ marginTop: 12 }}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>What you get</Text>
+          {[
+            'Unlimited AI Coach chats',
+            'Progress photo analysis with AI',
+            'Personalized workout & nutrition tips',
+            'Weekly plan suggestions and progress tracking',
+          ].map((f) => (
+            <View key={f} style={styles.featureRow}>
+              <Text style={styles.featureIcon}>✅</Text>
+              <Text style={[styles.featureText, { color: theme.colors.text }]}>{f}</Text>
+            </View>
+          ))}
+        </View>
+
         <View style={{ height: 10 }} />
 
         {sub?.isSubscribed ? (
@@ -97,7 +117,23 @@ export default function SubscriptionScreen() {
           <Text style={[styles.secondaryText, { color: theme.colors.primary }]}>Restore Purchases</Text>
         </TouchableOpacity>
 
-        <Text style={[styles.help, { color: theme.colors.subtitle }]}>Cancel anytime in your {Platform.OS === 'ios' ? 'Apple ID Subscriptions' : 'Google Play Subscriptions'}.</Text>
+        <Text style={[styles.help, { color: theme.colors.subtitle }]}>Auto‑renewing monthly subscription. Payment is charged to your {Platform.OS === 'ios' ? 'Apple ID' : 'Google Play account'} at confirmation. Unless canceled at least 24 hours before the end of the trial or current period, your subscription renews automatically. Manage or cancel anytime in {Platform.OS === 'ios' ? 'Settings › Apple ID › Subscriptions' : 'Google Play › Payments & subscriptions'}.</Text>
+
+        {(policyUrl || termsUrl) && (
+          <View style={styles.linksRow}>
+            {policyUrl ? (
+              <TouchableOpacity onPress={() => onOpen(policyUrl)}>
+                <Text style={[styles.linkText, { color: theme.colors.primary }]}>Privacy Policy</Text>
+              </TouchableOpacity>
+            ) : null}
+            {policyUrl && termsUrl ? <Text style={[styles.linkDivider, { color: theme.colors.subtitle }]}> • </Text> : null}
+            {termsUrl ? (
+              <TouchableOpacity onPress={() => onOpen(termsUrl)}>
+                <Text style={[styles.linkText, { color: theme.colors.primary }]}>Terms of Use</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        )}
       </View>
     </SafeAreaView>
   )
@@ -112,6 +148,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   title: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', marginTop: 4, marginBottom: 6 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 4 },
+  featureIcon: { marginRight: 8, fontSize: 16 },
+  featureText: { fontSize: 14 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -130,4 +170,7 @@ const styles = StyleSheet.create({
   secondaryBtn: { marginTop: 10, alignItems: 'center' },
   secondaryText: { fontSize: 14, fontWeight: '600' },
   help: { fontSize: 12, textAlign: 'center', marginTop: 10 },
+  linksRow: { marginTop: 8, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  linkText: { fontSize: 13, fontWeight: '600' },
+  linkDivider: { fontSize: 13 },
 })
