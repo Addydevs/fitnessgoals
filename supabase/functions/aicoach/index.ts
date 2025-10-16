@@ -62,31 +62,6 @@ Deno.serve(async (req) => {
     return new Response("Method Not Allowed", { status: 405, headers: corsHeaders })
   }
 
-  // Auth: require a valid Supabase JWT
-  const authHeader = req.headers.get('authorization') || req.headers.get('Authorization')
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-    return new Response(JSON.stringify({ error: 'Missing or invalid authorization header' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-  const accessToken = authHeader.split(' ')[1]
-
-  // Create admin client to verify token and query usage/payments
-  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-  const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
-
-  const { data: userRes, error: userErr } = await admin.auth.getUser(accessToken)
-  if (userErr || !userRes?.user) {
-    return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-  const userId = userRes.user.id
-
   // Safer JSON parsing
   let body: RequestPayload
   try {
@@ -149,100 +124,6 @@ Deno.serve(async (req) => {
   if (goal) systemMessage += `\n- Primary Goal: ${goal}`
   if (analysisData) systemMessage += `\n\n📊 Latest Analysis Data Available - Use this to provide specific, data-driven coaching advice.`
 
-  // Enforce usage limits before calling OpenAI
-  // Determine plan; default to free. If payments table missing or query fails, keep free.
-  let plan: 'free' | 'pro' = 'free'
-  try {
-    const { data: payRows } = await admin
-      .from('payments')
-      .select('paid, updated_at, subscription_type')
-      .eq('user_id', userId)
-      .eq('paid', true)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-    if (payRows && payRows.length) {
-      const p = payRows[0] as any
-      const start = new Date(p.updated_at).getTime()
-      const nowMs = Date.now()
-      const horizon = p.subscription_type === 'yearly' ? 365 : 30
-      if (start + horizon * 24 * 60 * 60 * 1000 > nowMs) plan = 'pro'
-    }
-  } catch (e) {
-    // ignore; plan stays 'free'
-  }
-
-  // If not PRO by our payments table, cross-check RevenueCat entitlements
-  if (plan === 'free') {
-    const RC_KEY = Deno.env.get('REVENUECAT_REST_API_KEY') || ''
-    const ENT_ID = (Deno.env.get('RC_ENTITLEMENT_ID') || 'subscription')
-    if (RC_KEY) {
-      try {
-        const rcRes = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}` , {
-          headers: { Authorization: `Bearer ${RC_KEY}` },
-        })
-        if (rcRes.ok) {
-          const rc = await rcRes.json()
-          const ents = rc?.subscriber?.entitlements || {}
-          const keys = Object.keys(ents)
-          // Case-insensitive match for entitlement key
-          const entKey = keys.find(k => k.toLowerCase() === ENT_ID.toLowerCase())
-          const ent = entKey ? ents[entKey] : null
-          const expires = ent?.expires_date ? Date.parse(ent.expires_date) : 0
-          if (expires && expires > Date.now()) {
-            plan = 'pro'
-            // Best-effort: mirror to payments table so other functions can rely on it
-            try {
-              await admin.from('payments').upsert({ user_id: userId, paid: true, subscription_type: 'monthly', updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-            } catch {}
-          }
-        }
-      } catch (_) {
-        // ignore RC failures and keep plan as free
-      }
-    }
-  }
-
-  // Limits
-  const DAY = 24 * 60 * 60 * 1000
-  const now = new Date()
-  const startOfDay = new Date(now); startOfDay.setHours(0,0,0,0)
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-  try {
-    if (plan === 'free') {
-      // Free: 10 chats/day
-      const { count } = await admin
-        .from('usage_events')
-        .select('id', { head: true, count: 'exact' })
-        .eq('user_id', userId)
-        .eq('kind', 'ai_chat')
-        .gte('created_at', startOfDay.toISOString())
-      if ((count ?? 0) >= 10) {
-        return new Response(JSON.stringify({ error: 'Daily free limit (10) reached. Try again tomorrow or upgrade.' }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-    } else {
-      // Pro: 300 chats/month
-      const { count } = await admin
-        .from('usage_events')
-        .select('id', { head: true, count: 'exact' })
-        .eq('user_id', userId)
-        .eq('kind', 'ai_chat')
-        .gte('created_at', startOfMonth.toISOString())
-      if ((count ?? 0) >= 300) {
-        return new Response(JSON.stringify({ error: 'Monthly limit (300) reached. Please wait for the next period.' }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-    }
-  } catch (limitErr) {
-    console.warn('Usage check failed:', limitErr)
-    // Soft-fail to avoid breaking users if DB is down
-  }
-
   // OpenAI call with hard timeout
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -264,7 +145,7 @@ Deno.serve(async (req) => {
         ],
         max_tokens: 400, // Reduced from 800 for faster responses
         temperature: 0.7,
-        stream: false, // Disable streaming to the client, as frontend will simulate
+        stream: streaming,
       }),
     })
   } catch (err) {
@@ -305,11 +186,6 @@ Deno.serve(async (req) => {
   const aiResponse =
       data.choices?.[0]?.message?.content ||
       "I'm having trouble generating a response right now. Let me try again! 🤔💪"
-
-  // Log usage event (best effort)
-  try {
-    await admin.from('usage_events').insert({ user_id: userId, kind: 'ai_chat' })
-  } catch {}
 
   return new Response(JSON.stringify({ response: aiResponse }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },

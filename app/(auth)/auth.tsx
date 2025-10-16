@@ -23,6 +23,10 @@ export default function Auth() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendError, setResendError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const inputTextColor = isDark ? "#F3F4F6" : theme.colors.text;
@@ -48,6 +52,36 @@ export default function Auth() {
       } else {
         setConfirmError("");
       }
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setResetLoading(true);
+    setResetMessage("");
+    
+    if (!resetEmail.trim()) {
+      setResetMessage("Please enter your email address.");
+      setResetLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: 'capturefit://reset-password'
+      });
+      
+      if (error) throw error;
+      
+      setResetMessage("Password reset email sent! Check your inbox and follow the link to reset your password.");
+      setTimeout(() => {
+        setShowResetModal(false);
+        setResetEmail("");
+        setResetMessage("");
+      }, 3000);
+    } catch (error: any) {
+      setResetMessage(error.message || "Failed to send reset email. Please try again.");
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -233,7 +267,7 @@ export default function Auth() {
           </>
         )}
         {mode === 'login' && (
-          <Pressable onPress={() => setFeedback('Please contact support to reset your password.') /* Replace with real flow */}>
+          <Pressable onPress={() => setShowResetModal(true)}>
             <Text style={styles.forgotText}>Forgot password?</Text>
           </Pressable>
         )}
@@ -269,6 +303,42 @@ export default function Auth() {
           </View>
         )}
         */}
+        
+        {/* Reset Password Modal */}
+        {showResetModal && (
+          <View style={styles.confirmModal}>
+            <View style={styles.resetModalContent}>
+              <Text style={styles.confirmTitle}>Reset Password</Text>
+              <Text style={styles.confirmText}>
+                Enter your email address and we'll send you a link to reset your password.
+              </Text>
+              <TextInput
+                placeholder="Email Address"
+                value={resetEmail}
+                onChangeText={setResetEmail}
+                style={[styles.input, { color: inputTextColor, backgroundColor: inputBgColor, marginBottom: 16 }]}
+                placeholderTextColor={placeholderColor}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              {resetMessage ? (
+                <Text style={{ color: resetMessage.includes('sent') ? 'green' : 'red', marginBottom: 16, textAlign: 'center' }}>
+                  {resetMessage}
+                </Text>
+              ) : null}
+              <Pressable style={styles.resendButton} onPress={handleForgotPassword} disabled={resetLoading}>
+                <Text style={styles.resendButtonText}>{resetLoading ? 'Sending...' : 'Send Reset Email'}</Text>
+              </Pressable>
+              <Pressable style={styles.closeModalButton} onPress={() => {
+                setShowResetModal(false);
+                setResetEmail("");
+                setResetMessage("");
+              }}>
+                <Text style={styles.closeModalText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </View>
     </LinearGradient>
   );
@@ -288,16 +358,23 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 20,
   },
+  resetModalContent: {
+    backgroundColor: '#fff',
+    padding: 24,
+    borderRadius: 12,
+    width: '100%',
+    maxWidth: 400,
+  },
   confirmTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#fff',
+    color: '#000',
     marginBottom: 12,
     textAlign: 'center',
   },
   confirmText: {
     fontSize: 16,
-    color: '#fff',
+    color: '#000',
     marginBottom: 18,
     textAlign: 'center',
   },

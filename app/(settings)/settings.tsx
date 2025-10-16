@@ -361,12 +361,6 @@ export default function SettingsScreen() {
             onPress={() => router.push('/(settings)/change-password')}
           />
           <SettingsItem
-            icon="card-outline"
-            title="Subscription"
-            subtitle="$4.99/month • Manage plan"
-            onPress={() => router.push('/(settings)/subscription')}
-          />
-          <SettingsItem
             icon="trash-outline"
             title="Delete Account"
             subtitle="Permanently remove your account"
