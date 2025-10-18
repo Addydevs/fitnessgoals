@@ -16,8 +16,8 @@ import {
     Text,
     TouchableOpacity,
     View,
-} from "react-native";
-import Layout, { ModernCard, ModernHeader, SectionHeader } from "./Layout";
+} from "react-native"
+import Layout, { ModernCard, ModernHeader, SectionHeader } from "./Layout"
 
 // Helper to push notification to AsyncStorage
 async function pushNotification(message: string) {

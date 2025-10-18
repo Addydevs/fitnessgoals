@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { supabase } from '../utils/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '@/constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { supabase } from '../utils/supabase';
 
 export default function ResetPasswordPage() {
   const router = useRouter();

@@ -66,12 +66,17 @@ export default function Auth() {
     }
 
     try {
+      console.log('Attempting to send reset email to:', resetEmail);
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: 'capturefit://reset-password'
+        redirectTo: __DEV__ ? 'http://localhost:8081/reset-password' : 'capturefit://reset-password'
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Reset email error:', error);
+        throw error;
+      }
       
+      console.log('Reset email sent successfully');
       setResetMessage("Password reset email sent! Check your inbox and follow the link to reset your password.");
       setTimeout(() => {
         setShowResetModal(false);
@@ -79,6 +84,7 @@ export default function Auth() {
         setResetMessage("");
       }, 3000);
     } catch (error: any) {
+      console.error('Catch block error:', error);
       setResetMessage(error.message || "Failed to send reset email. Please try again.");
     } finally {
       setResetLoading(false);
