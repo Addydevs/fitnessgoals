@@ -157,18 +157,10 @@ Deno.serve(async (req) => {
   try {
     const { data: prof } = await admin
       .from('profiles')
-      .select('*')
+      .select('premium_access')
       .eq('id', userId)
       .single()
-    const manualPremium = !!(
-      (prof as any)?.is_premium ||
-      (prof as any)?.premium ||
-      (prof as any)?.bypass_paywall ||
-      (prof as any)?.allow_premium ||
-      (prof as any)?.has_premium ||
-      (prof as any)?.admin === true ||
-      (prof as any)?.role === 'admin'
-    )
+    const manualPremium = !!((prof as any)?.premium_access === true)
     if (manualPremium) plan = 'pro'
   } catch (_) {
     // ignore
