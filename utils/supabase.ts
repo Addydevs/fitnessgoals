@@ -127,6 +127,7 @@ export interface UserProfile {
   injuries?: string[];
   created_at: string;
   updated_at: string;
+  premium_access?: boolean;
 }
 
 export class SupabaseService {
