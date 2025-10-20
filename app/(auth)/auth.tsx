@@ -33,6 +33,19 @@ export default function Auth() {
   const inputBgColor = isDark ? "#1F2937" : "#fff";
   const placeholderColor = isDark ? "#9CA3AF" : "#6B7280";
 
+  // Check for password recovery flag on mount
+  React.useEffect(() => {
+    const checkPasswordRecovery = async () => {
+      const isRecovery = await AsyncStorage.getItem('passwordRecovery');
+      if (isRecovery === 'true') {
+        console.log('Password recovery flag detected, redirecting to reset-password screen');
+        await AsyncStorage.removeItem('passwordRecovery');
+        router.replace('/(auth)/reset-password');
+      }
+    };
+    checkPasswordRecovery();
+  }, []);
+
   // Password validation function
   const validatePassword = (pwd: string) => {
     if (pwd.length < 8) return "Password must be at least 8 characters.";
@@ -58,7 +71,7 @@ export default function Auth() {
   const handleForgotPassword = async () => {
     setResetLoading(true);
     setResetMessage("");
-    
+
     if (!resetEmail.trim()) {
       setResetMessage("Please enter your email address.");
       setResetLoading(false);
@@ -70,12 +83,12 @@ export default function Auth() {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
         redirectTo: __DEV__ ? 'http://localhost:8081/reset-password' : 'capturefit://reset-password'
       });
-      
+
       if (error) {
         console.error('Reset email error:', error);
         throw error;
       }
-      
+
       console.log('Reset email sent successfully');
       setResetMessage("Password reset email sent! Check your inbox and follow the link to reset your password.");
       setTimeout(() => {
@@ -273,7 +286,7 @@ export default function Auth() {
           </>
         )}
         {mode === 'login' && (
-          <Pressable onPress={() => setShowResetModal(true)}>
+          <Pressable onPress={() => router.push('/(auth)/forgot-password')}>
             <Text style={styles.forgotText}>Forgot password?</Text>
           </Pressable>
         )}
@@ -309,7 +322,7 @@ export default function Auth() {
           </View>
         )}
         */}
-        
+
         {/* Reset Password Modal */}
         {showResetModal && (
           <View style={styles.confirmModal}>

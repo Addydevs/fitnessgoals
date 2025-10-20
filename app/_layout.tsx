@@ -10,7 +10,7 @@ import React, {
     useMemo,
     useState,
 } from "react";
-import { useColorScheme, View } from "react-native";
+import { Linking, useColorScheme, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { setAccessToken, supabase } from '../utils/supabase';
@@ -40,6 +40,7 @@ export default function RootLayout() {
   });
   const [token, setToken] = useState<string | null>(null);
   const [, setChecking] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const systemColorScheme = useColorScheme();
   // Start the app in dark mode so the initial background is black and fits the logo.
   // Stored preference (if any) will be loaded in useEffect and override this.
@@ -74,6 +75,122 @@ export default function RootLayout() {
     };
     loadSettings();
   }, [systemColorScheme]);
+
+  // Handle deep linking for password reset
+  useEffect(() => {
+    // Handle the initial URL if the app was opened via a deep link
+    const handleInitialURL = async () => {
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl) {
+        handleDeepLink(initialUrl);
+      }
+    };
+
+    // Handle subsequent deep links while the app is running
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    handleInitialURL();
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const handleDeepLink = async (url: string) => {
+    console.log('=== DEEP LINK RECEIVED ===');
+    console.log('URL:', url);
+
+    // Check if this is a password reset link
+    if (url.includes('reset-password') || url.includes('type=recovery')) {
+      console.log('🔐 Password reset link detected');
+
+      try {
+        // Extract the tokens from the URL - handle both exp:// and capturefit:// schemes
+        let urlObj: URL;
+        if (url.startsWith('exp://')) {
+          urlObj = new URL(url.replace('exp://', 'https://'));
+        } else if (url.startsWith('capturefit://')) {
+          urlObj = new URL(url.replace('capturefit://', 'https://dummy.com/'));
+        } else {
+          urlObj = new URL(url);
+        }
+
+        const access_token = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]+)/)?.[1];
+        const refresh_token = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]+)/)?.[1];
+        const type = urlObj.searchParams.get('type') || urlObj.hash.match(/type=([^&]+)/)?.[1];
+
+        // Also check if the original URL contains type=recovery anywhere
+        const isRecovery = url.includes('type=recovery') || type === 'recovery';
+
+        console.log('Extracted params:', {
+          hasAccessToken: !!access_token,
+          hasRefreshToken: !!refresh_token,
+          type,
+          isRecovery,
+        });
+
+        // If we have the tokens from the URL, set the session
+        if (access_token && refresh_token && isRecovery) {
+          console.log('Setting session from password reset link...');
+
+          const { data, error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+
+          if (error) {
+            console.error('❌ Error setting session from deep link:', error);
+          } else {
+            console.log('✅ Session set successfully!');
+            console.log('User:', data.session?.user?.email);
+            // The onAuthStateChange listener below will handle the PASSWORD_RECOVERY event
+          }
+        } else {
+          console.warn('⚠️ Missing required parameters in password reset link');
+        }
+      } catch (err) {
+        console.error('❌ Error processing password recovery link:', err);
+      }
+    }
+  };
+
+  // Listen for Supabase auth state changes to detect password recovery
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event);
+
+      if (event === 'PASSWORD_RECOVERY') {
+        // User clicked the reset password link in their email
+        // Supabase has automatically authenticated them with a temporary session
+        // Store a flag to redirect them to reset password screen
+        console.log('Password recovery mode - setting flag');
+        await AsyncStorage.setItem('passwordRecovery', 'true');
+
+        // Set recovery mode flag to prevent routing to authenticated screens
+        setIsPasswordRecovery(true);
+
+        // DO NOT set token here - keep user in auth flow
+        // The session is handled by Supabase internally for password reset
+      }
+
+      // Update token when session changes (but not during password recovery)
+      if (session?.access_token && event !== 'PASSWORD_RECOVERY') {
+        setToken(session.access_token);
+        await AsyncStorage.setItem('userToken', session.access_token);
+      }
+
+      // Clear recovery mode when signed in successfully
+      if (event === 'SIGNED_IN') {
+        setIsPasswordRecovery(false);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   const authContext = useMemo(
     () => ({
@@ -140,18 +257,32 @@ export default function RootLayout() {
         <SubscriptionProvider>
           <SafeAreaProvider>
             <Stack screenOptions={{ headerShown: false }}>
-            {token ? (
-              <Stack.Screen
-                name="(tabs)"
-                options={{
-                  headerShown: false,
-                  contentStyle: {
-                    backgroundColor: isDarkMode
-                      ? Colors.dark.background
-                      : Colors.light.background,
-                  },
-                }}
-              />
+            {token && !isPasswordRecovery ? (
+              <>
+                <Stack.Screen
+                  name="(tabs)"
+                  options={{
+                    headerShown: false,
+                    contentStyle: {
+                      backgroundColor: isDarkMode
+                        ? Colors.dark.background
+                        : Colors.light.background,
+                    },
+                  }}
+                />
+                <Stack.Screen
+                  name="(settings)"
+                  options={{
+                    headerShown: false,
+                    contentStyle: {
+                      backgroundColor: isDarkMode
+                        ? Colors.dark.background
+                        : Colors.light.background,
+                    },
+                  }}
+                />
+                <Stack.Screen name="+not-found" options={{ headerShown: false }} />
+              </>
             ) : (
               <Stack.Screen
                 name="(auth)"
@@ -166,18 +297,6 @@ export default function RootLayout() {
                 }}
               />
             )}
-            <Stack.Screen
-              name="(settings)"
-              options={{
-                headerShown: false,
-                contentStyle: {
-                  backgroundColor: isDarkMode
-                    ? Colors.dark.background
-                    : Colors.light.background,
-                },
-              }}
-            />
-            <Stack.Screen name="+not-found" options={{ headerShown: false }} />
             </Stack>
             <StatusBar style={isDarkMode ? "light" : "dark"} />
           </SafeAreaProvider>

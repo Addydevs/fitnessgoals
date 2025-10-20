@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(ls -la \"app/(auth)/\")",
+      "Bash(git ls-files \"app/(auth)/\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
