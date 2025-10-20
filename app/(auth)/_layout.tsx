@@ -21,6 +21,8 @@ export default function AuthLayout() {
     <Stack initialRouteName={onboarded ? "auth" : "index"}>
       <Stack.Screen name="index" options={{headerShown:false }} />
       <Stack.Screen name="auth" options={{headerShown: false }} />
+      <Stack.Screen name="forgot-password" options={{headerShown: false }} />
+      <Stack.Screen name="reset-password" options={{headerShown: false }} />
     </Stack>
   );
 }
