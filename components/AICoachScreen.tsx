@@ -3,26 +3,31 @@
 import { Ionicons } from "@expo/vector-icons"
 import * as ImagePicker from "expo-image-picker"
 import { LinearGradient } from "expo-linear-gradient"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useContext } from "react"
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useColorScheme,
-    View
+  ActivityIndicator,
+  Alert,
+  ActionSheetIOS,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View
 } from "react-native"
 import Markdown from "react-native-markdown-display"
+import { SafeAreaView } from "react-native-safe-area-context"
+import Constants from 'expo-constants'
+import Paywall from "./Paywall"
 import { useTheme } from "../contexts/ThemeContext"
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { SubscriptionContext } from "@/contexts/SubscriptionContext"
 import { ImageAnalysis } from "../utils/imageAnalysis"
 import { supabase, SupabaseService } from "../utils/supabase"
 
@@ -62,6 +67,7 @@ export default function AICoachScreen() {
 
   // Theme colors
   const { isDarkMode, theme } = useTheme()
+  const subCtx = useContext(SubscriptionContext)
   const styles = getStyles(isDarkMode, theme, screenWidth)
 
   const [messages, setMessages] = useState<Message[]>([])
@@ -71,16 +77,80 @@ export default function AICoachScreen() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [progressData, setProgressData] = useState<ProgressData>({})
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  // Trial UI state (no checkout)
+  const [trialExpired, setTrialExpired] = useState(false)
+  const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null)
+  const TRIAL_DAYS = 7
+  const [paywallDismissed, setPaywallDismissed] = useState(false)
+  const [showCameraTip, setShowCameraTip] = useState(false)
+  const [hasAnyPhoto, setHasAnyPhoto] = useState<boolean>(false)
+  // ...existing code...
 
   const scrollViewRef = useRef<ScrollView>(null)
   const imageAnalysis = useRef(new ImageAnalysis())
   const streamingAnimation = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
-    initializeCoach()
-    loadUserProfile()
-    startStreamingAnimation()
-  }, [])
+    initializeCoach();
+    loadUserProfile();
+    startStreamingAnimation();
+    computeTrial();
+    (async () => {
+      try {
+        const seen = await AsyncStorage.getItem('hasSeenCameraTip')
+        if (seen !== 'true') setShowCameraTip(true)
+      } catch {}
+    })()
+    // refresh the badge at next local midnight
+    const now = new Date();
+    const next = new Date(now); next.setHours(24,0,0,0);
+    const t = setTimeout(() => computeTrial(), next.getTime() - now.getTime());
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    // Check if the user has any photos uploaded already
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) return;
+        const { count } = await supabase
+          .from('photos')
+          .select('id', { head: true, count: 'exact' })
+          .eq('user_id', user.id);
+        setHasAnyPhoto((count ?? 0) > 0);
+      } catch {}
+    })();
+  }, []);
+
+  // Recompute trial badge when subscription state changes
+  useEffect(() => {
+    computeTrial();
+    setPaywallDismissed(false)
+  }, [subCtx?.isSubscribed])
+
+  const computeTrial = async () => {
+    try {
+      const { data } = await supabase.auth.getUser();
+      const createdAtISO = data?.user?.created_at;
+      if (!createdAtISO) { setTrialExpired(true); setTrialDaysLeft(null); return; }
+      const DAY = 24*60*60*1000;
+      const start = new Date(createdAtISO); start.setHours(0,0,0,0);
+      const today = new Date(); today.setHours(0,0,0,0);
+      const diffDays = Math.floor((today.getTime() - start.getTime())/DAY);
+      const left = Math.max(0, TRIAL_DAYS - diffDays);
+      const trialEnd = new Date(start); trialEnd.setDate(trialEnd.getDate()+TRIAL_DAYS);
+      const expired = today.getTime() >= trialEnd.getTime();
+      // If user is subscribed, treat as not expired and hide badge
+      if (subCtx?.isSubscribed) {
+        setTrialExpired(false);
+        setTrialDaysLeft(null);
+      } else {
+        setTrialExpired(expired);
+        setTrialDaysLeft(left);
+      }
+    } catch {}
+  }
 
   const startStreamingAnimation = () => {
     Animated.loop(
@@ -139,6 +209,11 @@ export default function AICoachScreen() {
   }
 
   const handleSendMessage = async () => {
+    if (showPaywall) {
+      try { setPaywallDismissed(false) } catch {}
+      Alert.alert('Subscription required', 'Your free trial has ended. Subscribe to continue using the AI Coach.')
+      return
+    }
     const text = inputText.trim()
     if (!text || isTyping) return
 
@@ -260,7 +335,35 @@ export default function AICoachScreen() {
     }
   }
 
+  const pickFromLibrary = async () => {
+    return ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.8,
+      allowsMultipleSelection: false,
+      selectionLimit: 1,
+      exif: false,
+      base64: true,
+    })
+  }
+
+  const pickFromCamera = async () => {
+    return ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.8,
+      base64: true,
+    })
+  }
+
   const handlePhotoUpload = async () => {
+    if (showPaywall) {
+      try { setPaywallDismissed(false) } catch {}
+      Alert.alert('Subscription required', 'Your free trial has ended. Subscribe to analyze photos.')
+      return
+    }
     try {
       console.log(" Starting photo upload process ===")
 
@@ -279,17 +382,33 @@ export default function AICoachScreen() {
         return
       }
 
-      console.log("Launching image picker with enhanced options...")
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [3, 4],
-        quality: 0.8,
-        allowsMultipleSelection: false,
-        selectionLimit: 1,
-        exif: false,
-        base64: true, // Request base64 directly from ImagePicker
-      })
+      // Let the user choose Camera or Library
+      let result: ImagePicker.ImagePickerResult
+      if (Platform.OS === 'ios') {
+        const idx = await new Promise<number>((resolve) => {
+          ActionSheetIOS.showActionSheetWithOptions(
+            {
+              options: ['Take Photo', 'Choose from Library', 'Cancel'],
+              cancelButtonIndex: 2,
+              userInterfaceStyle: isDarkMode ? 'dark' : 'light',
+            },
+            (buttonIndex) => resolve(buttonIndex),
+          )
+        })
+        if (idx === 2) { console.log('Picker cancelled from action sheet'); return }
+        result = idx === 0 ? await pickFromCamera() : await pickFromLibrary()
+      } else {
+        // Simple Alert for Android and other platforms
+        const choice = await new Promise<'camera' | 'library' | 'cancel'>((resolve) => {
+          Alert.alert('Add Photo', 'Choose a source', [
+            { text: 'Take Photo', onPress: () => resolve('camera') },
+            { text: 'Choose from Library', onPress: () => resolve('library') },
+            { text: 'Cancel', onPress: () => resolve('cancel'), style: 'cancel' },
+          ])
+        })
+        if (choice === 'cancel') { console.log('Picker cancelled'); return }
+        result = choice === 'camera' ? await pickFromCamera() : await pickFromLibrary()
+      }
 
       console.log("Image picker result:", {
         canceled: result.canceled,
@@ -599,6 +718,12 @@ export default function AICoachScreen() {
     )
   }
 
+  // Determine if paywall should be shown (trial ended and not subscribed)
+  const disablePaywall = (Constants?.expoConfig as any)?.extra?.EXPO_PUBLIC_DISABLE_PAYWALL === 'true' || process.env.EXPO_PUBLIC_DISABLE_PAYWALL === 'true'
+  const allowDismiss = (Constants?.expoConfig as any)?.extra?.EXPO_PUBLIC_ALLOW_PAYWALL_DISMISS === 'true' || process.env.EXPO_PUBLIC_ALLOW_PAYWALL_DISMISS === 'true'
+  const showPaywall = !disablePaywall && trialExpired && !(subCtx?.isSubscribed)
+  const paywallVisible = showPaywall && !(allowDismiss && paywallDismissed)
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -618,10 +743,27 @@ export default function AICoachScreen() {
           style={styles.header}
         >
           <View style={styles.headerContent}>
-            <Text style={[styles.headerTitle, { color: isDarkMode ? theme.colors.text : theme.colors.primary }]}>AI Fitness Coach</Text>
-            <View style={[styles.statusBadge, { backgroundColor: isDarkMode ? theme.colors.primary : theme.colors.accent }]}>
-              <View style={[styles.statusDot, { backgroundColor: isDarkMode ? theme.colors.background : theme.colors.primary }]} />
-              <Text style={[styles.statusText, { color: isDarkMode ? theme.colors.background : theme.colors.primary }]}>Online</Text>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+              style={[styles.headerTitle, { color: isDarkMode ? theme.colors.text : theme.colors.primary }]}
+            >
+              AI Fitness Coach
+            </Text>
+          </View>
+          <View style={styles.headerMetaRow}>
+            {!trialExpired && trialDaysLeft !== null && (
+              <View style={[styles.trialPill, isDarkMode ? { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.18)' } : { backgroundColor: '#E6F0FF', borderColor: theme.colors.primary } ]}>
+                <Ionicons name="time-outline" size={14} color={isDarkMode ? theme.colors.text : theme.colors.primary} />
+                <Text style={[styles.trialPillText, { color: isDarkMode ? theme.colors.text : theme.colors.primary }]}>
+                  Trial: {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'} left
+                </Text>
+              </View>
+            )}
+            <View style={[styles.statusBadge, isDarkMode ? { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.18)', borderWidth: 1 } : { backgroundColor: theme.colors.accent } ]}>
+              <View style={[styles.statusDot, { backgroundColor: isDarkMode ? '#22C55E' : theme.colors.primary }]} />
+              <Text style={[styles.statusText, { color: isDarkMode ? theme.colors.text : theme.colors.primary }]}>Online</Text>
             </View>
           </View>
 
@@ -644,6 +786,17 @@ export default function AICoachScreen() {
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
           showsVerticalScrollIndicator={false}
         >
+          {!hasAnyPhoto && !paywallVisible && (
+            <View style={{ margin: 14, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: isDarkMode ? theme.colors.surface : '#F8FAFF' }}>
+              <Text style={{ fontWeight: '700', color: theme.colors.text, marginBottom: 6 }}>Upload a progress photo</Text>
+              <Text style={{ color: theme.colors.subtitle, marginBottom: 10 }}>
+                The AI Coach gives the best guidance when you upload a progress photo. Tap below to add your first photo.
+              </Text>
+              <TouchableOpacity onPress={handlePhotoUpload} style={{ alignSelf: 'flex-start', backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}>
+                <Text style={{ color: theme.colors.background, fontWeight: '700' }}>Upload Photo</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           {messages.map((message) => (
             <View key={message.id} style={[styles.messageContainer, message.type === "user" ? styles.userMessage : styles.aiMessage]}>
               <View
@@ -754,7 +907,7 @@ export default function AICoachScreen() {
           </View>
           <View style={styles.quickActions}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {quickActionButtons.map((action, index) => (
+              {quickActionButtons(handlePhotoUpload).map((action, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
@@ -764,7 +917,10 @@ export default function AICoachScreen() {
                       borderColor: theme.colors.border,
                     },
                   ]}
-                  onPress={() => setInputText(action.text)}
+                  onPress={() => {
+                    if (action.onPress) { action.onPress(); }
+                    else if (action.text) { setInputText(action.text); }
+                  }}
                 >
                   <Text
                     style={[
@@ -781,12 +937,38 @@ export default function AICoachScreen() {
             </ScrollView>
           </View>
         </View>
+        {/* One-time onboarding nudge to upload a photo */}
+        {showCameraTip && !paywallVisible && (
+          <View style={{ position: 'absolute', bottom: 140, left: 16, right: 16, alignItems: 'center' }}>
+            <View style={{ backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderWidth: 1, padding: 12, borderRadius: 12 }}>
+              <Text style={{ color: theme.colors.text, fontWeight: '600', textAlign: 'center' }}>
+                Tip: Tap the camera to upload a progress photo for AI analysis.
+              </Text>
+              <TouchableOpacity
+                onPress={async () => { setShowCameraTip(false); try { await AsyncStorage.setItem('hasSeenCameraTip', 'true') } catch {} }}
+                style={{ marginTop: 8, alignSelf: 'center' }}
+              >
+                <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Got it</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        <Paywall
+          visible={paywallVisible}
+          priceText={(subCtx?.monthly?.price ? `${subCtx.monthly.price}/month` : "$4.99/month")}
+          purchasing={!!subCtx?.purchasing}
+          onPurchase={() => subCtx?.purchaseMonthly?.()}
+          onRestore={() => subCtx?.restore?.()}
+          onClose={allowDismiss ? () => setPaywallDismissed(true) : undefined}
+        />
       </SafeAreaView>
     </KeyboardAvoidingView>
   )
 }
 
-const quickActionButtons = [
+type QuickAction = { icon: string; label: string; text?: string; onPress?: () => void }
+const quickActionButtons = (onUpload: () => void): QuickAction[] => [
+  { icon: "📸", label: "Upload Photo", onPress: onUpload },
   { icon: "💪", label: "Weekly Plan", text: "Create my weekly workout plan" },
   { icon: "🥗", label: "Nutrition", text: "What should I eat for my goals?" },
   { icon: "📊", label: "Progress", text: "Analyze my fitness progress" },
@@ -808,8 +990,15 @@ const getStyles = (isDarkMode: boolean, theme: any, screenWidth: number) =>
     },
     headerContent: {
       flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
+      justifyContent: "flex-start",
+      alignItems: "flex-end",
+    },
+    headerMetaRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 6,
     },
     headerTitle: {
       fontSize: 28,
@@ -819,6 +1008,21 @@ const getStyles = (isDarkMode: boolean, theme: any, screenWidth: number) =>
       textShadowColor: isDarkMode ? 'transparent' : theme.colors.border,
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 0,
+      flexShrink: 1,
+    },
+    trialPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      marginRight: 6,
+    },
+    trialPillText: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginLeft: 6,
     },
     statusBadge: {
       flexDirection: "row",

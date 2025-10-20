@@ -159,6 +159,32 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         setIsSubscribed(active)
       } catch {}
 
+      // Manual premium bypass via profiles table
+      try {
+        const { data: userRes } = await supabase.auth.getUser()
+        const uid = userRes?.user?.id
+        if (uid) {
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', uid)
+            .single()
+          const manualPremium = !!(
+            (prof as any)?.is_premium ||
+            (prof as any)?.premium ||
+            (prof as any)?.bypass_paywall ||
+            (prof as any)?.allow_premium ||
+            (prof as any)?.has_premium ||
+            (prof as any)?.admin === true ||
+            (prof as any)?.role === 'admin'
+          )
+          if (manualPremium) {
+            dlog('manual premium override from profiles table')
+            setIsSubscribed(true)
+          }
+        }
+      } catch {}
+
       await loadCached()
     } finally {
       setInitialized(true)

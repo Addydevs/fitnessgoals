@@ -14,7 +14,7 @@ import { Linking, useColorScheme, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { setAccessToken, supabase } from '../utils/supabase';
-import {SubscriptionProvider} from "@/contexts/SubscriptionContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 
 export interface AuthContextType {
   token: string | null;
