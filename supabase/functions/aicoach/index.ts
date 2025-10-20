@@ -152,6 +152,27 @@ Deno.serve(async (req) => {
   // Enforce usage limits before calling OpenAI
   // Determine plan; default to free. If payments table missing or query fails, keep free.
   let plan: 'free' | 'pro' = 'free'
+
+  // Manual premium bypass via profiles table (treat as pro)
+  try {
+    const { data: prof } = await admin
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    const manualPremium = !!(
+      (prof as any)?.is_premium ||
+      (prof as any)?.premium ||
+      (prof as any)?.bypass_paywall ||
+      (prof as any)?.allow_premium ||
+      (prof as any)?.has_premium ||
+      (prof as any)?.admin === true ||
+      (prof as any)?.role === 'admin'
+    )
+    if (manualPremium) plan = 'pro'
+  } catch (_) {
+    // ignore
+  }
   try {
     const { data: payRows } = await admin
       .from('payments')
