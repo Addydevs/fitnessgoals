@@ -166,10 +166,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         if (uid) {
           const { data: prof } = await supabase
             .from('profiles')
-            .select('premium_access')
+            .select('"Premium access"')
             .eq('id', uid)
             .single()
-          const manualPremium = !!((prof as any)?.premium_access === true)
+          const manualPremium = !!(prof && (prof as any)["Premium access"] === true)
           if (manualPremium) {
             dlog('manual premium override from profiles table')
             setIsSubscribed(true)
