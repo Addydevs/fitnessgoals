@@ -30,7 +30,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { SubscriptionContext } from "@/contexts/SubscriptionContext"
 import { ImageAnalysis } from "../utils/imageAnalysis"
 import { supabase, SupabaseService } from "../utils/supabase"
-// ...existing code...
 
 interface Message {
   id: string
@@ -263,18 +262,11 @@ export default function AICoachScreen() {
 
   const sendToAIWithStreaming = async (payload: any, messageId: string) => {
     try {
-      console.log("Invoking Supabase Edge Function 'aicoach' with payload:", payload)
       const { data, error } = await supabase.functions.invoke("aicoach", {
         body: payload,
       })
 
-      console.log("Supabase Edge Function 'aicoach' response - data:", data)
-      console.log("Supabase Edge Function 'aicoach' response - error:", error)
-
-      if (error) {
-        console.error("Supabase function invocation error:", error)
-        throw error
-      }
+      if (error) throw error
 
       setIsStreaming(false)
 
@@ -289,22 +281,10 @@ export default function AICoachScreen() {
 
       // Simulate streaming effect
       await simulateStreamingText(responseText, messageId)
-    } catch (error: any) {
-      console.error("AI request failed:", error.message || error)
+    } catch (error) {
+      console.error("AI request failed:", error)
       setIsStreaming(false)
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId
-            ? {
-                ...msg,
-                text:
-                  (msg.text || "") +
-                  `\n\nI'm temporarily unavailable. Please try again in a moment. 🔄 Error: ${error.message || "Unknown error"}`,
-                isStreaming: false,
-              }
-            : msg,
-        ),
-      )
+      throw error
     }
   }
 
@@ -344,28 +324,15 @@ export default function AICoachScreen() {
       enhancedText += `\nFitness level: ${userProfile.fitnessLevel}`
     }
 
-    const payload: RequestPayload = {
+    return {
       text: enhancedText,
-      streaming: false, // Frontend will simulate streaming from a complete response
+      goal: userProfile?.fitnessGoal || "",
+      userProfile: {
+        fitnessLevel: userProfile?.fitnessLevel || "beginner",
+        age: userProfile?.age ? Number.parseInt(userProfile.age) : undefined,
+        injuries: userProfile?.injuries || [],
+      },
     }
-
-    if (userProfile) {
-      payload.userProfile = {
-        fitnessLevel: userProfile.fitnessLevel,
-        age: parseInt(userProfile.age),
-        injuries: userProfile.injuries,
-      }
-    }
-
-    if (userProfile?.fitnessGoal) {
-      payload.goal = userProfile.fitnessGoal
-    }
-
-    if (progressData.analysisResults) {
-      payload.analysisData = progressData.analysisResults
-    }
-
-    return payload
   }
 
   const pickFromLibrary = async () => {
@@ -764,8 +731,6 @@ export default function AICoachScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        {/* Payment and trial overlays removed */}
-
         {statusMessage ? (
           <View style={{ padding: 12, backgroundColor: theme.colors.card, borderRadius: 10, margin: 10, marginTop: 60 }}>
             <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 15 }}>{statusMessage}</Text>
@@ -1018,7 +983,6 @@ const getStyles = (isDarkMode: boolean, theme: any, screenWidth: number) =>
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    // ...existing code...
     header: {
       paddingHorizontal: 20,
       paddingTop: 60,

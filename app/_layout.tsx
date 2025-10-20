@@ -5,10 +5,10 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, {
-  createContext,
-  useEffect,
-  useMemo,
-  useState,
+    createContext,
+    useEffect,
+    useMemo,
+    useState,
 } from "react";
 import { useColorScheme, View } from "react-native";
 import "react-native-reanimated";
@@ -56,7 +56,7 @@ export default function RootLayout() {
           try {
             await setAccessToken(userToken);
           } catch (err) {
-            console.warn('Login Issue: Your session expired or is invalid. Please log out and log back in. If you still have trouble, make sure you’re using the latest version of the app.');
+            console.warn('Failed to set supabase auth from stored token', err);
           }
         }
 
@@ -141,31 +141,17 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <Stack screenOptions={{ headerShown: false }}>
             {token ? (
-              <>
-                <Stack.Screen
-                  name="(tabs)"
-                  options={{
-                    headerShown: false,
-                    contentStyle: {
-                      backgroundColor: isDarkMode
-                        ? Colors.dark.background
-                        : Colors.light.background,
-                    },
-                  }}
-                />
-                <Stack.Screen
-                  name="(settings)"
-                  options={{
-                    headerShown: false,
-                    contentStyle: {
-                      backgroundColor: isDarkMode
-                        ? Colors.dark.background
-                        : Colors.light.background,
-                    },
-                  }}
-                />
-                <Stack.Screen name="+not-found" options={{ headerShown: false }} />
-              </>
+              <Stack.Screen
+                name="(tabs)"
+                options={{
+                  headerShown: false,
+                  contentStyle: {
+                    backgroundColor: isDarkMode
+                      ? Colors.dark.background
+                      : Colors.light.background,
+                  },
+                }}
+              />
             ) : (
               <Stack.Screen
                 name="(auth)"
@@ -180,6 +166,18 @@ export default function RootLayout() {
                 }}
               />
             )}
+            <Stack.Screen
+              name="(settings)"
+              options={{
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: isDarkMode
+                    ? Colors.dark.background
+                    : Colors.light.background,
+                },
+              }}
+            />
+            <Stack.Screen name="+not-found" options={{ headerShown: false }} />
             </Stack>
             <StatusBar style={isDarkMode ? "light" : "dark"} />
           </SafeAreaProvider>

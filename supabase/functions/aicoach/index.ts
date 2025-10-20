@@ -264,7 +264,7 @@ Deno.serve(async (req) => {
         ],
         max_tokens: 400, // Reduced from 800 for faster responses
         temperature: 0.7,
-        stream: false, // Disable streaming to the client, as frontend will simulate
+        stream: streaming,
       }),
     })
   } catch (err) {
