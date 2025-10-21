@@ -27,8 +27,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Install Supabase CLI
-        run: npm install -g supabase
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Deploy aicoach function
         run: supabase functions deploy aicoach --project-ref $SUPABASE_PROJECT_REF --no-verify-jwt
