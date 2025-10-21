@@ -83,6 +83,24 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     try {
       dlog('init start', { platform: Platform.OS, productFallback: MONTHLY_PRODUCT_ID, entitlement: RC_ENTITLEMENT_ID, rcIOS: !!RC_IOS_KEY, rcAndroid: !!RC_ANDROID_KEY })
       if (initialized) return
+
+      // Early manual premium bypass (runs even in Expo Go)
+      try {
+        const { data: userRes } = await supabase.auth.getUser()
+        const uid = userRes?.user?.id
+        if (uid) {
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('premium_access')
+            .eq('id', uid)
+            .single()
+          if ((prof as any)?.premium_access === true) {
+            dlog('manual premium override (early) from profiles table')
+            setIsSubscribed(true)
+          }
+        }
+      } catch {}
+
       if (IS_EXPO_GO) {
         dlog('Expo Go detected; skipping Purchases.configure. Use a Dev Build to test IAP.')
         setInitialized(true)
