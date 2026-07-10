@@ -270,6 +270,9 @@ export default function TabLayout() {
           }}
         />
   {/* Settings tab removed. Now accessible from Profile tab only. */}
+        {/* Training and workout screens are unfinished — hidden from the tab bar until they ship. */}
+        <Tabs.Screen name="training" options={{ href: null }} />
+        <Tabs.Screen name="workout" options={{ href: null }} />
       </Tabs>
     </PhotoContext.Provider>
   );

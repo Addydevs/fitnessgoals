@@ -1,6 +1,7 @@
 import { AuthContext } from "@/app/_layout"
 import { Colors } from "@/constants/Colors"
 import { useTheme } from "@/contexts/ThemeContext"
+import { SubscriptionContext } from "@/contexts/SubscriptionContext"
 import { supabase } from "@/utils/supabase"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { memo, useCallback, useContext, useEffect, useMemo, useState } from "react"
@@ -44,10 +45,20 @@ async function pushNotification(message: string) {
 
 
 // Define the Photo type locally if it's not easily importable
+interface AIScores {
+  overall_progress?: number
+  leanness?: number
+  muscle_definition?: number
+  posture?: number
+  photo_quality?: number
+  focus_areas?: string[]
+}
+
 interface Photo {
   id: string
   url: string
   created_at: string
+  ai_scores?: AIScores | null
 }
 
 const { width } = Dimensions.get("window")
@@ -146,17 +157,54 @@ const WeeklyChart = memo(({ weeklyPhotoCounts, maxWeeklyPhotos, primary, sub, th
 })
 WeeklyChart.displayName = "WeeklyChart"
 
+// Trend of AI-assessed progress scores (0-100) across recent analyzed photos
+const AIScoreTrend = memo(({ entries, primary, sub, theme }: {
+  entries: { label: string; value: number }[]
+  primary: string
+  sub: string
+  theme: any
+}) => {
+  const maxBarHeight = 80
+
+  return (
+    <View style={[styles.chartContainer, { backgroundColor: theme.colors.card }]}>
+      {entries.map((entry, index) => (
+        <View key={index} style={styles.barWrapper}>
+          <Text style={[styles.trendValue, { color: sub }]}>{entry.value}</Text>
+          <View
+            style={[styles.bar, { height: Math.max((entry.value / 100) * maxBarHeight, 2), backgroundColor: primary }]}
+          />
+          <Text style={[styles.barLabel, { color: sub }]}>{entry.label}</Text>
+        </View>
+      ))}
+    </View>
+  )
+})
+AIScoreTrend.displayName = "AIScoreTrend"
+
 const calculateStats = (photos: Photo[]) => {
   if (photos.length === 0) {
     return {
+      totalPhotos: 0,
       currentStreak: 0,
       daysTracked: 0,
+      longestStreak: 0,
+      averagePerWeek: 0,
+      firstPhotoDate: null as string | null,
+      lastPhotoDate: null as string | null,
       weeklyPhotoCounts: Array.from({ length: 7 }, (_, i) => ({
         day: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", { weekday: "short" }),
         value: 0,
       })),
     }
   }
+
+  // Work on a chronological copy for trend calculations
+  const sortedByDate = [...photos].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  )
+  const first = new Date(sortedByDate[0].created_at)
+  const last = new Date(sortedByDate[sortedByDate.length - 1].created_at)
 
   // Calculate current streak more efficiently
   let currentStreak = 0
@@ -170,13 +218,49 @@ const calculateStats = (photos: Photo[]) => {
     checkDate.setDate(today.getDate() - i)
     if (photoDates.has(checkDate.toDateString())) {
       currentStreak++
-    } else {
+    } else if (i > 0) {
+      // Once we break the streak after at least one match, we can stop
       break
     }
   }
 
   // Calculate days tracked (already optimized with Set)
   const daysTracked = photoDates.size
+
+  // Calculate longest streak across entire history
+  let longestStreak = 0
+  if (photoDates.size > 0) {
+    const uniqueDates = Array.from(photoDates)
+      .map((d) => new Date(d))
+      .sort((a, b) => a.getTime() - b.getTime())
+
+    let streak = 1
+    longestStreak = 1
+
+    for (let i = 1; i < uniqueDates.length; i++) {
+      const prev = uniqueDates[i - 1]
+      const curr = uniqueDates[i]
+      const diffDays = Math.round(
+        (curr.getTime() - prev.getTime()) / (24 * 60 * 60 * 1000),
+      )
+      if (diffDays === 1) {
+        streak += 1
+        if (streak > longestStreak) longestStreak = streak
+      } else {
+        streak = 1
+      }
+    }
+  }
+
+  // Average photos per week over tracking period
+  const totalDays =
+    Math.max(
+      1,
+      Math.round((last.getTime() - first.getTime()) / (24 * 60 * 60 * 1000)) + 1,
+    )
+  const totalWeeks = totalDays / 7
+  const averagePerWeek =
+    totalWeeks > 0 ? Number((photos.length / totalWeeks).toFixed(1)) : 0
 
   // Calculate weekly photo counts more efficiently
   const weeklyPhotoCounts = Array.from({ length: 7 }, (_, i) => {
@@ -203,7 +287,16 @@ const calculateStats = (photos: Photo[]) => {
     }
   })
 
-  return { currentStreak, daysTracked, weeklyPhotoCounts }
+  return {
+    totalPhotos: photos.length,
+    currentStreak,
+    daysTracked,
+    longestStreak,
+    averagePerWeek,
+    firstPhotoDate: first.toISOString(),
+    lastPhotoDate: last.toISOString(),
+    weeklyPhotoCounts,
+  }
 }
 
 export default function ProgressScreen() {
@@ -217,6 +310,7 @@ export default function ProgressScreen() {
   const [isEditMode, setIsEditMode] = useState(false)
 
   const auth = useContext(AuthContext)
+  const subCtx = useContext(SubscriptionContext)
   const { token } = auth || {}
   const [session, setSession] = useState<any>(null)
 
@@ -245,6 +339,32 @@ export default function ProgressScreen() {
     [stats.weeklyPhotoCounts],
   )
 
+  // AI progress scores of the most recent analyzed photos, oldest → newest
+  const aiTrend = useMemo(() => {
+    return photos
+      .filter((p) => typeof p.ai_scores?.overall_progress === "number")
+      .slice(0, 10)
+      .reverse()
+      .map((p) => {
+        const d = new Date(p.created_at)
+        return {
+          label: `${d.getMonth() + 1}/${d.getDate()}`,
+          value: Math.max(0, Math.min(100, Math.round(p.ai_scores!.overall_progress!))),
+        }
+      })
+  }, [photos])
+
+  const hasPhotoToday = useMemo(() => {
+    if (!photos.length) return false
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return photos.some((p) => {
+      const d = new Date(p.created_at)
+      d.setHours(0, 0, 0, 0)
+      return d.getTime() === today.getTime()
+    })
+  }, [photos])
+
   const fetchPhotosFromDB = useCallback(async (userId: string, showLoading = true) => {
     if (showLoading) setLoading(true)
     setError(null)
@@ -252,7 +372,7 @@ export default function ProgressScreen() {
     try {
       const { data, error } = await supabase
         .from("photos")
-        .select("id, url, created_at")
+        .select("id, url, created_at, ai_scores")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(100) // Limit initial load for better performance
@@ -468,6 +588,20 @@ export default function ProgressScreen() {
           <StatsCard value={stats.daysTracked} label="Days Tracked" color={primary} />
         </View>
 
+        {!hasPhotoToday && photos.length > 0 && (
+          <ModernCard>
+            <Text style={[styles.summaryText, { color: palette.text }]}>
+              No photo logged yet today. Add a new progress photo to keep your streak going and get a fresh AI comparison against your last check‑in.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.navigate('/(tabs)/aicoach')}
+              style={{ marginTop: 10, alignSelf: "flex-start", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: primary }}
+            >
+              <Text style={{ color: "white", fontWeight: "700", fontSize: 13 }}>Add Today&apos;s Photo</Text>
+            </TouchableOpacity>
+          </ModernCard>
+        )}
+
         <SectionHeader title="Weekly Activity" />
         <WeeklyChart
           weeklyPhotoCounts={stats.weeklyPhotoCounts}
@@ -476,6 +610,91 @@ export default function ProgressScreen() {
           sub={sub}
           theme={theme}
         />
+
+        {aiTrend.length >= 2 && (
+          <>
+            <SectionHeader title="AI Progress Trend" />
+            <AIScoreTrend entries={aiTrend} primary={primary} sub={sub} theme={theme} />
+          </>
+        )}
+
+        {!subCtx?.isSubscribed && photos.length >= 4 && (
+          <>
+            <SectionHeader title="Go Deeper with Pro" />
+            <ModernCard>
+              <Text style={[styles.summaryText, { color: palette.text }]}>
+                You’re consistently capturing your progress. CaptureFit Pro turns these photos into richer insights and AI‑guided plans.
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.navigate('/(tabs)/aicoach')}
+                style={{ marginTop: 10, alignSelf: "flex-start", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: primary }}
+              >
+                <Text style={{ color: "white", fontWeight: "700", fontSize: 13 }}>Open AI Coach</Text>
+              </TouchableOpacity>
+            </ModernCard>
+          </>
+        )}
+
+        <SectionHeader title="Progress Summary" />
+        <ModernCard>
+          <Text style={[styles.summaryText, { color: palette.text }]}>
+            {(() => {
+              if (!stats.totalPhotos) {
+                return "Add your first progress photo to start tracking your journey over time."
+              }
+
+              const start = stats.firstPhotoDate
+                ? new Date(stats.firstPhotoDate)
+                : null
+              const startedOn = start
+                ? start.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "recently"
+
+              const lines: string[] = []
+              lines.push(
+                `You started tracking on ${startedOn} with ${stats.totalPhotos} progress photo${
+                  stats.totalPhotos === 1 ? "" : "s"
+                }.`,
+              )
+
+              if (stats.daysTracked > 0) {
+                lines.push(
+                  `You've logged photos on ${stats.daysTracked} day${
+                    stats.daysTracked === 1 ? "" : "s"
+                  } so far.`,
+                )
+              }
+
+              if (stats.averagePerWeek > 0) {
+                lines.push(
+                  `On average that's about ${stats.averagePerWeek} photo${
+                    stats.averagePerWeek >= 2 ? "s" : ""
+                  } per week.`,
+                )
+              }
+
+              if (stats.longestStreak > 0) {
+                lines.push(
+                  `Your best streak is ${stats.longestStreak} day${
+                    stats.longestStreak === 1 ? "" : "s"
+                  } in a row.`,
+                )
+              }
+
+              if (stats.currentStreak > 0) {
+                lines.push(
+                  `You're currently on a ${stats.currentStreak}-day streak — keep it going!`,
+                )
+              }
+
+              return lines.join(" ")
+            })()}
+          </Text>
+        </ModernCard>
 
         <SectionHeader title="All Photos" />
         <View style={styles.photoActionsRow}>
@@ -589,6 +808,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
   },
+  summaryText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
   chartContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -608,6 +831,11 @@ const styles = StyleSheet.create({
   barLabel: {
     marginTop: 5,
     fontSize: 12,
+  },
+  trendValue: {
+    marginBottom: 4,
+    fontSize: 11,
+    fontWeight: "600",
   },
   photoGrid: {
     flexDirection: "row",

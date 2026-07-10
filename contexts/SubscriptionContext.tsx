@@ -13,11 +13,13 @@ interface SubscriptionContextType {
   initialized: boolean
   products: IAPProduct[]
   monthly?: IAPProduct
+  annual?: IAPProduct
   purchasing: boolean
   isSubscribed: boolean
   latestPurchase?: PurchaseInfo | null
   init: () => Promise<void>
   purchaseMonthly: () => Promise<void>
+  purchaseAnnual: () => Promise<void>
   restore: () => Promise<void>
 }
 
@@ -34,6 +36,8 @@ const IS_EXPO_GO = (Constants as any)?.appOwnership === 'expo'
 const PURCHASE_TIMEOUT_MS = 20000
 const MONTHLY_PRODUCT_ID =
   process.env.EXPO_PUBLIC_IAP_PRODUCT_MONTHLY || EX.EXPO_PUBLIC_IAP_PRODUCT_MONTHLY || 'om.capturefit.monthly_premium'
+const ANNUAL_PRODUCT_ID =
+  process.env.EXPO_PUBLIC_IAP_PRODUCT_ANNUAL || EX.EXPO_PUBLIC_IAP_PRODUCT_ANNUAL || 'om.capturefit.annual_premium'
 const RC_IOS_KEY = process.env.EXPO_PUBLIC_RC_IOS_KEY || EX.EXPO_PUBLIC_RC_IOS_KEY || ''
 const RC_ANDROID_KEY = process.env.EXPO_PUBLIC_RC_ANDROID_KEY || EX.EXPO_PUBLIC_RC_ANDROID_KEY || ''
 const RC_ENTITLEMENT_ID = process.env.EXPO_PUBLIC_RC_ENTITLEMENT_ID || EX.EXPO_PUBLIC_RC_ENTITLEMENT_ID || 'pro'
@@ -48,6 +52,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const inFlightRef = useRef(false)
 
   const monthly = useMemo(() => products.find(p => p.productId === MONTHLY_PRODUCT_ID), [products])
+  const annual = useMemo(() => products.find(p => p.productId === ANNUAL_PRODUCT_ID), [products])
 
   const validateWithServer = useCallback(async (info: Partial<PurchaseInfo>) => {
     try {
@@ -153,18 +158,26 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         }
         const offerings = await RC.getOfferings()
         const current = offerings?.current
-        let monthlyPkg: any = current?.monthly
-        if (!monthlyPkg && current?.availablePackages?.length) {
-          monthlyPkg = current.availablePackages.find((p: any) => (p?.packageType || '').toString().toLowerCase() === 'monthly')
-        }
-        if (monthlyPkg) {
-          const prod = monthlyPkg.product || monthlyPkg.storeProduct || {}
+        const resolvePkg = (pkg: any, fallbackId: string): IAPProduct => {
+          const prod = pkg.product || pkg.storeProduct || {}
           const priceString = prod.priceString || prod.localizedPriceString || ''
-          const productId = prod.identifier || prod.productIdentifier || prod.sku || MONTHLY_PRODUCT_ID
-          setProducts([{ productId, price: priceString, title: prod.title, _rcPackage: monthlyPkg }])
-          dlog('offerings resolved', { productId, priceString })
+          const productId = prod.identifier || prod.productIdentifier || prod.sku || fallbackId
+          return { productId, price: priceString, title: prod.title, _rcPackage: pkg }
+        }
+        const findPkg = (direct: any, type: string) =>
+          direct || current?.availablePackages?.find((p: any) => (p?.packageType || '').toString().toLowerCase() === type)
+
+        const found: IAPProduct[] = []
+        const monthlyPkg = findPkg(current?.monthly, 'monthly')
+        if (monthlyPkg) found.push(resolvePkg(monthlyPkg, MONTHLY_PRODUCT_ID))
+        const annualPkg = findPkg(current?.annual, 'annual')
+        if (annualPkg) found.push(resolvePkg(annualPkg, ANNUAL_PRODUCT_ID))
+
+        if (found.length) {
+          setProducts(found)
+          dlog('offerings resolved', found.map(f => ({ productId: f.productId, price: f.price })))
         } else {
-          dlog('no monthly package found in offerings')
+          dlog('no monthly/annual packages found in offerings')
         }
       } catch {}
 
@@ -202,9 +215,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     }
   }, [initialized, loadCached])
 
-  const purchaseMonthly = useCallback(async () => {
-    if (!MONTHLY_PRODUCT_ID) return
-    if (inFlightRef.current) { dlog('purchaseMonthly: already in progress'); return }
+  const purchasePlan = useCallback(async (planType: 'monthly' | 'annual') => {
+    const targetProductId = planType === 'annual' ? ANNUAL_PRODUCT_ID : MONTHLY_PRODUCT_ID
+    if (!targetProductId) return
+    if (inFlightRef.current) { dlog('purchasePlan: already in progress'); return }
     inFlightRef.current = true
     setPurchasing(true)
     try {
@@ -212,21 +226,24 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       if (!RC) {
         setPurchasing(false)
         Alert.alert('Purchases unavailable', 'In‑app purchases are not available on this build.')
-        dlog('purchaseMonthly: RC missing')
+        dlog('purchasePlan: RC missing')
         return
       }
       if (!RC_IOS_KEY && Platform.OS === 'ios') {
         setPurchasing(false)
         Alert.alert('Purchases misconfigured', 'Missing RevenueCat iOS API key. Please rebuild with the correct environment variables.')
-        dlog('purchaseMonthly: iOS key missing')
+        dlog('purchasePlan: iOS key missing')
         return
       }
-      let pkg = products.find(p => p._rcPackage)?._rcPackage
+      let pkg = products.find(p => p.productId === targetProductId && p._rcPackage)?._rcPackage
       if (!pkg) {
-        try { const o = await RC.getOfferings(); pkg = o?.current?.monthly } catch {}
+        try {
+          const o = await RC.getOfferings()
+          pkg = planType === 'annual' ? o?.current?.annual : o?.current?.monthly
+        } catch {}
       }
-      dlog('purchaseMonthly begin', { hasPkg: !!pkg, MONTHLY_PRODUCT_ID })
-      const call = pkg ? RC.purchasePackage(pkg) : RC.purchaseProduct(MONTHLY_PRODUCT_ID)
+      dlog('purchasePlan begin', { planType, hasPkg: !!pkg, targetProductId })
+      const call = pkg ? RC.purchasePackage(pkg) : RC.purchaseProduct(targetProductId)
       const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Timed out waiting for App Store response')), PURCHASE_TIMEOUT_MS))
       const res = await Promise.race([call, timeout]) as any
       dlog('purchaseMonthly result', { productIdentifier: res?.productIdentifier, transactionIdentifier: res?.transactionIdentifier })
@@ -237,7 +254,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       setIsSubscribed(active)
 
       try {
-        const prodId = res?.productIdentifier || MONTHLY_PRODUCT_ID
+        const prodId = res?.productIdentifier || targetProductId
         const receipt = res?.transactionIdentifier || 'rc'
         setLatestPurchase({ productId: prodId, purchaseTime: Date.now(), receipt })
         await AsyncStorage.multiSet([[AS_KEY_PRODUCT, prodId], [AS_KEY_RECEIPT, String(receipt)]])
@@ -248,10 +265,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       const code = e?.code || e?.userInfo?.code
       const userCancelled = e?.userCancelled === true || String(code).toLowerCase().includes('cancel')
       if (userCancelled) {
-        dlog('purchaseMonthly cancelled by user')
+        dlog('purchasePlan cancelled by user')
       } else {
         const msg = e?.message || 'Purchase failed. Please try again.'
-        dlog('purchaseMonthly error', { code, message: e?.message })
+        dlog('purchasePlan error', { code, message: e?.message })
         try { Alert.alert('Purchase failed', String(msg)) } catch {}
       }
     } finally {
@@ -259,6 +276,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       inFlightRef.current = false
     }
   }, [products, validateWithServer])
+
+  const purchaseMonthly = useCallback(() => purchasePlan('monthly'), [purchasePlan])
+  const purchaseAnnual = useCallback(() => purchasePlan('annual'), [purchasePlan])
 
   const restore = useCallback(async () => {
     try {
@@ -279,7 +299,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     init()
   }, [init])
 
-  const value: SubscriptionContextType = useMemo(() => ({ initialized, products, monthly, purchasing, isSubscribed, latestPurchase, init, purchaseMonthly, restore }), [initialized, products, monthly, purchasing, isSubscribed, latestPurchase, init, purchaseMonthly, restore])
+  const value: SubscriptionContextType = useMemo(() => ({ initialized, products, monthly, annual, purchasing, isSubscribed, latestPurchase, init, purchaseMonthly, purchaseAnnual, restore }), [initialized, products, monthly, annual, purchasing, isSubscribed, latestPurchase, init, purchaseMonthly, purchaseAnnual, restore])
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>
 }

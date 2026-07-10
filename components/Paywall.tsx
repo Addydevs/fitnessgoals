@@ -1,18 +1,22 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Modal, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Platform } from 'react-native'
 import { useTheme } from '@/contexts/ThemeContext'
 
 type Props = {
   visible: boolean
   priceText?: string
+  annualPriceText?: string
   purchasing?: boolean
   onPurchase: () => void
+  onPurchaseAnnual?: () => void
   onRestore: () => void
   onClose?: () => void
 }
 
-export default function Paywall({ visible, priceText = '$4.99/month', purchasing = false, onPurchase, onRestore, onClose }: Props) {
+export default function Paywall({ visible, priceText = '$4.99/month', annualPriceText, purchasing = false, onPurchase, onPurchaseAnnual, onRestore, onClose }: Props) {
   const { isDarkMode, theme } = useTheme()
+  const hasAnnual = !!(annualPriceText && onPurchaseAnnual)
+  const [plan, setPlan] = useState<'monthly' | 'annual'>(hasAnnual ? 'annual' : 'monthly')
 
   return (
     <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
@@ -24,13 +28,15 @@ export default function Paywall({ visible, priceText = '$4.99/month', purchasing
             </TouchableOpacity>
           ) : null}
           <Text style={[styles.title, { color: theme.colors.text }]}>Unlock CaptureFit Pro</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.subtitle }]}>Your 7‑day free trial has ended.</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.subtitle }]}>
+            Get the full AI coach experience for your fitness journey.
+          </Text>
 
           <View style={styles.features}>
             {[
-              'Unlimited AI Coach chats',
-              'Progress photo analysis',
-              'Personalized plans & tips',
+              'Unlimited AI Coach chats tailored to your goals',
+              'Advanced progress photo analysis with trends',
+              'Personalized workout and habit suggestions',
             ].map((f) => (
               <View key={f} style={styles.featureRow}>
                 <Text style={styles.featureIcon}>✅</Text>
@@ -39,14 +45,46 @@ export default function Paywall({ visible, priceText = '$4.99/month', purchasing
             ))}
           </View>
 
-          <Text style={[styles.price, { color: theme.colors.text }]}>{priceText}</Text>
-          <Text style={[styles.disclaimer, { color: theme.colors.subtitle }]}> 
-            Auto‑renewing monthly subscription. Payment is charged to your Apple ID at confirmation. Unless canceled at least 24 hours before the end of the trial or current period, your subscription renews automatically. Manage or cancel anytime in {Platform.OS === 'ios' ? 'Settings > Apple ID > Subscriptions' : 'Google Play > Payments & subscriptions'}.
+          {hasAnnual ? (
+            <View style={styles.planRow}>
+              <TouchableOpacity
+                style={[
+                  styles.planOption,
+                  { borderColor: plan === 'annual' ? theme.colors.primary : theme.colors.border },
+                ]}
+                onPress={() => setPlan('annual')}
+                disabled={purchasing}
+              >
+                <Text style={[styles.planBadge, { color: theme.colors.primary }]}>Best value</Text>
+                <Text style={[styles.planTitle, { color: theme.colors.text }]}>Annual</Text>
+                <Text style={[styles.planPrice, { color: theme.colors.text }]}>{annualPriceText}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.planOption,
+                  { borderColor: plan === 'monthly' ? theme.colors.primary : theme.colors.border },
+                ]}
+                onPress={() => setPlan('monthly')}
+                disabled={purchasing}
+              >
+                <Text style={[styles.planBadge, { color: 'transparent' }]}> </Text>
+                <Text style={[styles.planTitle, { color: theme.colors.text }]}>Monthly</Text>
+                <Text style={[styles.planPrice, { color: theme.colors.text }]}>{priceText}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={[styles.price, { color: theme.colors.text }]}>{priceText}</Text>
+          )}
+          <Text style={[styles.disclaimer, { color: theme.colors.subtitle }]}>
+            Start with a 7‑day free trial. Cancel anytime before renewal to avoid charges.
+          </Text>
+          <Text style={[styles.disclaimer, { color: theme.colors.subtitle, marginTop: 2 }]}>
+            Auto‑renewing subscription billed to your {Platform.OS === 'ios' ? 'Apple ID' : 'Google Play'} account. Manage or cancel in your device subscriptions settings.
           </Text>
 
           <TouchableOpacity
             style={[styles.cta, { backgroundColor: theme.colors.primary, opacity: purchasing ? 0.7 : 1 }]}
-            onPress={onPurchase}
+            onPress={hasAnnual && plan === 'annual' ? onPurchaseAnnual : onPurchase}
             disabled={purchasing}
           >
             {purchasing ? (
@@ -123,6 +161,33 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 10,
+  },
+  planRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  planOption: {
+    flex: 1,
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  planBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  planTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  planPrice: {
+    fontSize: 14,
+    marginTop: 2,
   },
   disclaimer: {
     fontSize: 12,

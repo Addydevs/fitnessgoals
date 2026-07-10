@@ -28,7 +28,7 @@ import Paywall from "./Paywall"
 import { useTheme } from "../contexts/ThemeContext"
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { SubscriptionContext } from "@/contexts/SubscriptionContext"
-import { ImageAnalysis } from "../utils/imageAnalysis"
+import ProgressCamera from "./ProgressCamera"
 import { supabase, SupabaseService } from "../utils/supabase"
 
 interface Message {
@@ -87,8 +87,12 @@ export default function AICoachScreen() {
   // ...existing code...
 
   const scrollViewRef = useRef<ScrollView>(null)
-  const imageAnalysis = useRef(new ImageAnalysis())
   const streamingAnimation = useRef(new Animated.Value(0)).current
+  const [progressCameraVisible, setProgressCameraVisible] = useState(false)
+  const [ghostUri, setGhostUri] = useState<string | null>(null)
+  const USAGE_KEY = "aicoach_usage_v1"
+  const DAILY_CHAT_LIMIT = 10
+  const DAILY_PHOTO_LIMIT = 3
 
   useEffect(() => {
     initializeCoach();
@@ -180,14 +184,58 @@ export default function AICoachScreen() {
       }
 
       setMessages([welcomeMessage])
-
-      // Initialize TensorFlow.js
-      await imageAnalysis.current.initialize()
-
-      console.log("AI Coach initialized successfully")
     } catch (error) {
       console.error("AI Coach initialization failed:", error)
     }
+  }
+
+  type UsageCounters = {
+    date: string
+    chat: number
+    photo: number
+  }
+
+  const loadUsage = async (): Promise<UsageCounters> => {
+    try {
+      const raw = await AsyncStorage.getItem(USAGE_KEY)
+      const today = new Date().toISOString().slice(0, 10)
+      if (!raw) {
+        return { date: today, chat: 0, photo: 0 }
+      }
+      const parsed = JSON.parse(raw) as UsageCounters
+      if (parsed.date !== today) {
+        return { date: today, chat: 0, photo: 0 }
+      }
+      return parsed
+    } catch {
+      const today = new Date().toISOString().slice(0, 10)
+      return { date: today, chat: 0, photo: 0 }
+    }
+  }
+
+  const saveUsage = async (usage: UsageCounters) => {
+    try {
+      await AsyncStorage.setItem(USAGE_KEY, JSON.stringify(usage))
+    } catch {
+      // ignore
+    }
+  }
+
+  const checkAndIncrementUsage = async (kind: "chat" | "photo"): Promise<boolean> => {
+    // Subscribed users and disabled paywall builds are unlimited
+    if (subCtx?.isSubscribed) return true
+    const usage = await loadUsage()
+    const limit = kind === "chat" ? DAILY_CHAT_LIMIT : DAILY_PHOTO_LIMIT
+    const current = kind === "chat" ? usage.chat : usage.photo
+    if (current >= limit) {
+      return false
+    }
+    const next: UsageCounters =
+      kind === "chat"
+        ? { ...usage, chat: current + 1 }
+        : { ...usage, photo: current + 1 }
+    await saveUsage(next)
+    return true
   }
 
   const loadUserProfile = async () => {
@@ -216,6 +264,15 @@ export default function AICoachScreen() {
     }
     const text = inputText.trim()
     if (!text || isTyping) return
+
+    const allowed = await checkAndIncrementUsage("chat")
+    if (!allowed) {
+      Alert.alert(
+        "Daily chat limit reached",
+        `You’ve reached the free daily limit of ${DAILY_CHAT_LIMIT} AI messages. Subscribe to CaptureFit Pro for unlimited chats.`
+      )
+      return
+    }
 
     try {
       const userMessage: Message = {
@@ -324,6 +381,12 @@ export default function AICoachScreen() {
       enhancedText += `\nFitness level: ${userProfile.fitnessLevel}`
     }
 
+    // Build conversation history from recent messages (last 10)
+    const conversationHistory = messages.slice(-10).map(msg => ({
+      role: msg.type === "user" ? "user" : "assistant",
+      content: msg.text
+    }))
+
     return {
       text: enhancedText,
       goal: userProfile?.fitnessGoal || "",
@@ -332,6 +395,7 @@ export default function AICoachScreen() {
         age: userProfile?.age ? Number.parseInt(userProfile.age) : undefined,
         injuries: userProfile?.injuries || [],
       },
+      conversationHistory, // Add conversation memory
     }
   }
 
@@ -358,10 +422,128 @@ export default function AICoachScreen() {
     })
   }
 
+  // Fetch the latest photo (for the ghost overlay) and open the progress camera
+  const openProgressCamera = async () => {
+    try {
+      const user = await SupabaseService.getCurrentUser()
+      if (user) {
+        const { data: lastPhoto } = await supabase
+          .from("photos")
+          .select("url")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        setGhostUri(lastPhoto?.url || null)
+      } else {
+        setGhostUri(null)
+      }
+    } catch {
+      setGhostUri(null)
+    }
+    setProgressCameraVisible(true)
+  }
+
+  // Upload a captured/picked photo, then have the coach analyze the actual
+  // image (with the previous photo as a labeled baseline when one exists).
+  const processProgressPhoto = async (asset: { uri: string; base64?: string | null }) => {
+    if (!asset.base64) {
+      Alert.alert("Upload Error", "Failed to process image data. Please try again.")
+      return
+    }
+
+    setIsAnalyzing(true)
+    try {
+      const user = await SupabaseService.getCurrentUser()
+      if (!user) {
+        Alert.alert("Authentication Error", "Please sign in to upload photos.")
+        setIsAnalyzing(false)
+        return
+      }
+
+      // Previous photo becomes the comparison baseline for the AI
+      const { data: lastPhoto } = await supabase
+        .from("photos")
+        .select("url")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const previousPhotoUrl: string | null = lastPhoto?.url || null
+
+      setStatusMessage("Uploading photo...")
+      const { data: uploadData, error: uploadError } = await supabase.functions.invoke("upload-photo", {
+        body: {
+          fileName: `${Date.now()}_progress.jpg`,
+          fileBase64: asset.base64,
+          contentType: "image/jpeg",
+        },
+      })
+      if (uploadError) throw new Error(`Edge Function upload failed: ${uploadError.message}`)
+      if (!uploadData?.publicUrl) throw new Error("Edge Function did not return a valid public URL")
+      const photoUrl = uploadData.publicUrl as string
+      setStatusMessage("")
+
+      setProgressData({
+        previousPhoto: previousPhotoUrl || undefined,
+        currentPhoto: photoUrl,
+      })
+
+      const userMessage: Message = {
+        id: generateMessageId(),
+        type: "user",
+        text: "I uploaded a new progress photo for analysis! 📸",
+        timestamp: Date.now(),
+        images: [asset.uri],
+      }
+      setMessages((prev) => [...prev, userMessage])
+      setIsAnalyzing(false)
+
+      const photoPrompt = previousPhotoUrl
+        ? "I just uploaded a new progress photo. Compare it with my previous photo and give me honest, specific feedback on what changed and what to focus on next. 💪"
+        : "I just uploaded my first progress photo — my baseline. Assess my starting point and tell me what to focus on. 💪"
+
+      const payload = {
+        ...(await preparePayload(photoPrompt)),
+        imageUrl: photoUrl,
+        previousImageUrl: previousPhotoUrl || undefined,
+      }
+
+      const streamingMessage: Message = {
+        id: generateMessageId(),
+        type: "ai",
+        text: "",
+        timestamp: Date.now(),
+        images: [],
+        isStreaming: true,
+      }
+      setMessages((prev) => [...prev, streamingMessage])
+      await sendToAIWithStreaming(payload, streamingMessage.id)
+    } catch (error) {
+      console.error("❌ Photo analysis failed:", error)
+      setIsAnalyzing(false)
+      setStatusMessage("")
+
+      let errorMessage = "Failed to analyze photo. Please try again."
+      if ((error as Error)?.message?.includes("Edge Function")) {
+        errorMessage = "Failed to upload photo. Please check your internet connection."
+      }
+      Alert.alert("Analysis Error", errorMessage)
+    }
+  }
+
   const handlePhotoUpload = async () => {
     if (showPaywall) {
       try { setPaywallDismissed(false) } catch {}
       Alert.alert('Subscription required', 'Your free trial has ended. Subscribe to analyze photos.')
+      return
+    }
+    const allowed = await checkAndIncrementUsage("photo")
+    if (!allowed) {
+      Alert.alert(
+        "Daily photo limit reached",
+        `You’ve reached the free daily limit of ${DAILY_PHOTO_LIMIT} photo analyses. Subscribe to CaptureFit Pro for unlimited photo insights.`
+      )
       return
     }
     try {
@@ -396,7 +578,8 @@ export default function AICoachScreen() {
           )
         })
         if (idx === 2) { console.log('Picker cancelled from action sheet'); return }
-        result = idx === 0 ? await pickFromCamera() : await pickFromLibrary()
+        if (idx === 0) { await openProgressCamera(); return }
+        result = await pickFromLibrary()
       } else {
         // Simple Alert for Android and other platforms
         const choice = await new Promise<'camera' | 'library' | 'cancel'>((resolve) => {
@@ -407,7 +590,8 @@ export default function AICoachScreen() {
           ])
         })
         if (choice === 'cancel') { console.log('Picker cancelled'); return }
-        result = choice === 'camera' ? await pickFromCamera() : await pickFromLibrary()
+        if (choice === 'camera') { await openProgressCamera(); return }
+        result = await pickFromLibrary()
       }
 
       console.log("Image picker result:", {
@@ -426,173 +610,7 @@ export default function AICoachScreen() {
       })
 
       if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0]
-        console.log("✓ Image selected successfully:", asset.uri)
-        console.log("Image dimensions:", asset.width, "x", asset.height)
-        console.log("File size:", asset.fileSize, "bytes")
-
-        if (!asset.base64) {
-          console.error("❌ No base64 data available from ImagePicker")
-          Alert.alert("Upload Error", "Failed to process image data. Please try again.")
-          return
-        }
-
-        setIsAnalyzing(true)
-
-        try {
-          console.log("Getting current user...")
-          const user = await SupabaseService.getCurrentUser()
-          if (!user) {
-            console.log("❌ User not authenticated")
-            Alert.alert("Authentication Error", "Please sign in to upload photos.")
-            setIsAnalyzing(false)
-            return
-          }
-          console.log("✓ User authenticated:", user.id)
-
-          console.log("Fetching previous photos for comparison...")
-          const { data: lastPhoto, error: fetchError } = await supabase
-            .from("photos")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .single()
-
-          let previousPhotoUrl = null
-          if (!fetchError && lastPhoto) {
-            previousPhotoUrl = lastPhoto.url || SupabaseService.getPhotoUrl(lastPhoto.file_name)
-            console.log("✓ Found previous photo for comparison:", previousPhotoUrl)
-          } else {
-            console.log("No previous photo found, this will be the first photo")
-            if (fetchError && fetchError.code !== "PGRST116") {
-              console.log("Previous photo fetch error:", fetchError)
-            }
-          }
-
-          const fileName = `${user.id}/${Date.now()}_progress.jpg`
-          console.log("Preparing file upload via Edge Function:", fileName)
-
-          console.log("✓ Base64 data available from ImagePicker, length:", asset.base64.length)
-
-          const uploadPayload = {
-            userId: user.id,
-            fileName,
-            fileBase64: asset.base64,
-            contentType: "image/jpeg",
-          }
-
-          console.log("Invoking upload-photo Edge Function with payload structure:", {
-            userId: uploadPayload.userId,
-            fileName: uploadPayload.fileName,
-            contentType: uploadPayload.contentType,
-            base64Length: uploadPayload.fileBase64.length,
-          })
-
-          const { data: uploadData, error: uploadError } = await supabase.functions.invoke("upload-photo", {
-            body: uploadPayload,
-          })
-
-          if (uploadError) {
-            console.error("❌ Upload-photo Edge Function error:", uploadError)
-            throw new Error(`Edge Function upload failed: ${uploadError.message}`)
-          }
-
-          console.log("Edge Function response:", uploadData)
-
-          if (!uploadData?.publicUrl) {
-            console.error("❌ No public URL returned from Edge Function:", uploadData)
-            throw new Error("Edge Function did not return a valid public URL")
-          }
-
-            const photoUrl = uploadData.publicUrl
-            setStatusMessage("Starting image analysis...")
-            const currentAnalysis = await imageAnalysis.current.analyzeSingleImage(asset.uri)
-            setStatusMessage("")
-
-          let comparisonAnalysis = null
-          let progressMessage = ""
-
-          if (previousPhotoUrl) {
-            setStatusMessage("Performing progress comparison...")
-            comparisonAnalysis = await imageAnalysis.current.compareImages(previousPhotoUrl, asset.uri)
-            setStatusMessage("")
-
-            progressMessage =
-              `\n\n📊Progress Comparison Results\n` +
-              `• Overall Progress Score: ${comparisonAnalysis.progressScore}/100\n` +
-              `• Total Change: ${comparisonAnalysis.changePercentage}%\n` +
-              `• Upper Body: ${comparisonAnalysis.regionAnalysis.upper.score}/100\n` +
-              `• Core: ${comparisonAnalysis.regionAnalysis.middle.score}/100\n` +
-              `• Lower Body: ${comparisonAnalysis.regionAnalysis.lower.score}/100\n\n` +
-              `🎯Recommendations\n${comparisonAnalysis.recommendations.map((r) => `• ${r}`).join("\n")}`
-          } else {
-            progressMessage =
-              "\n\n📸First Progress Photo\nThis is your baseline photo. Upload another photo later to see your progress comparison!"
-          }
-
-          // Update progress data with Edge Function photo URL
-          setProgressData({
-            previousPhoto: previousPhotoUrl,
-            currentPhoto: photoUrl,
-            analysisResults: currentAnalysis,
-            comparisonResults: comparisonAnalysis,
-          })
-
-          const photoMessage =
-            `📸New Progress Photo Analyzed\n\n` +
-            `🔍Image Analysis\n` +
-            `• Muscle Definition Score: ${currentAnalysis.muscleDefinitionScore.toFixed(1)}/100\n` +
-            `• Image Quality: ${currentAnalysis.imageQuality.quality} (${currentAnalysis.imageQuality.score}/100)\n` +
-            `• Lighting Quality: ${currentAnalysis.lightingQuality.quality}\n` +
-            `• Edge Intensity: ${currentAnalysis.edgeIntensity.toFixed(3)}\n` +
-            `• Contrast: ${currentAnalysis.contrast.toFixed(3)}` +
-            progressMessage +
-            `\n\nPlease provide personalized coaching advice based on these results! 💪`
-
-          // Add user message with photo
-          const userMessage: Message = {
-            id: generateMessageId(),
-            type: "user",
-            text: "I uploaded a new progress photo for analysis! 📸",
-            timestamp: Date.now(),
-            images: [asset.uri],
-            analysisData: { currentAnalysis, comparisonAnalysis },
-          }
-
-          setMessages((prev) => [...prev, userMessage])
-          setIsAnalyzing(false)
-          console.log("✓ Photo upload and analysis completed successfully")
-
-          // Send analysis to AI coach with streaming
-          const payload = await preparePayload(photoMessage)
-
-          const streamingMessage: Message = {
-            id: generateMessageId(),
-            type: "ai",
-            text: "",
-            timestamp: Date.now(),
-            images: [],
-            isStreaming: true,
-          }
-
-          setMessages((prev) => [...prev, streamingMessage])
-          await sendToAIWithStreaming(payload, streamingMessage.id)
-        } catch (error) {
-          console.error("❌ Photo analysis failed:", error)
-          setIsAnalyzing(false)
-
-          let errorMessage = "Failed to analyze photo. Please try again."
-          if (error.message?.includes("fetch")) {
-            errorMessage = "Failed to process the image file. Please try selecting a different photo."
-          } else if (error.message?.includes("Edge Function")) {
-            errorMessage = "Failed to upload photo via Edge Function. Please check your internet connection."
-          } else if (error.message?.includes("Database")) {
-            errorMessage = "Failed to save photo record. Please try again."
-          }
-
-          Alert.alert("Analysis Error", errorMessage)
-        }
+        await processProgressPhoto(result.assets[0])
       } else {
         console.log("Image picker was canceled or no image selected")
       }
@@ -600,9 +618,9 @@ export default function AICoachScreen() {
       console.error("❌ Photo upload failed:", error)
 
       let errorMessage = "Failed to upload photo. Please try again."
-      if (error.message?.includes("permission")) {
+      if ((error as Error)?.message?.includes("permission")) {
         errorMessage = "Camera or photo library permission denied. Please enable permissions in Settings."
-      } else if (error.message?.includes("picker")) {
+      } else if ((error as Error)?.message?.includes("picker")) {
         errorMessage = "Failed to open image picker. Please restart the app and try again."
       }
 
@@ -786,11 +804,30 @@ export default function AICoachScreen() {
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
           showsVerticalScrollIndicator={false}
         >
+          {!subCtx?.isSubscribed && !showPaywall && (
+            <View style={{ marginHorizontal: 14, marginTop: 4, marginBottom: 8 }}>
+              <Text style={{ fontSize: 13, color: theme.colors.subtitle }}>
+                Pro unlocks unlimited AI chats and deeper photo insights.{" "}
+                <Text
+                  style={{ color: theme.colors.primary, fontWeight: "600" }}
+                  onPress={() => {
+                    try { setPaywallDismissed(false) } catch {}
+                    if (!trialExpired) {
+                      // let trial run; user will see paywall once it ends
+                      return
+                    }
+                  }}
+                >
+                  Learn more
+                </Text>
+              </Text>
+            </View>
+          )}
           {!hasAnyPhoto && !paywallVisible && (
             <View style={{ margin: 14, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: isDarkMode ? theme.colors.surface : '#F8FAFF' }}>
-              <Text style={{ fontWeight: '700', color: theme.colors.text, marginBottom: 6 }}>Upload a progress photo</Text>
+              <Text style={{ fontWeight: '700', color: theme.colors.text, marginBottom: 6 }}>Upload your first progress photo</Text>
               <Text style={{ color: theme.colors.subtitle, marginBottom: 10 }}>
-                The AI Coach gives the best guidance when you upload a progress photo. Tap below to add your first photo.
+                Add a photo so the AI Coach can measure things like muscle definition, image quality and lighting, and then compare future photos to show your progress score and give targeted advice.
               </Text>
               <TouchableOpacity onPress={handlePhotoUpload} style={{ alignSelf: 'flex-start', backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}>
                 <Text style={{ color: theme.colors.background, fontWeight: '700' }}>Upload Photo</Text>
@@ -953,11 +990,22 @@ export default function AICoachScreen() {
             </View>
           </View>
         )}
+        <ProgressCamera
+          visible={progressCameraVisible}
+          ghostUri={ghostUri}
+          onClose={() => setProgressCameraVisible(false)}
+          onCapture={(a) => {
+            setProgressCameraVisible(false)
+            processProgressPhoto(a)
+          }}
+        />
         <Paywall
           visible={paywallVisible}
           priceText={(subCtx?.monthly?.price ? `${subCtx.monthly.price}/month` : "$4.99/month")}
+          annualPriceText={subCtx?.annual?.price ? `${subCtx.annual.price}/year` : undefined}
           purchasing={!!subCtx?.purchasing}
           onPurchase={() => subCtx?.purchaseMonthly?.()}
+          onPurchaseAnnual={subCtx?.annual ? () => subCtx?.purchaseAnnual?.() : undefined}
           onRestore={() => subCtx?.restore?.()}
           onClose={allowDismiss ? () => setPaywallDismissed(true) : undefined}
         />
@@ -969,10 +1017,20 @@ export default function AICoachScreen() {
 type QuickAction = { icon: string; label: string; text?: string; onPress?: () => void }
 const quickActionButtons = (onUpload: () => void): QuickAction[] => [
   { icon: "📸", label: "Upload Photo", onPress: onUpload },
-  { icon: "💪", label: "Weekly Plan", text: "Create my weekly workout plan" },
+  {
+    icon: "💪",
+    label: "3‑Day Plan",
+    text:
+      "Create a 3‑day per week full‑body workout plan based on my current goal and fitness level. Use only bodyweight and dumbbells and keep each session under 45 minutes.",
+  },
+  {
+    icon: "🏋️‍♀️",
+    label: "Home Plan",
+    text:
+      "Design a 4‑week home workout plan I can follow with minimal equipment (dumbbells and a chair). Include 3 sessions per week with warm‑up suggestions.",
+  },
   { icon: "🥗", label: "Nutrition", text: "What should I eat for my goals?" },
   { icon: "📊", label: "Progress", text: "Analyze my fitness progress" },
-  { icon: "🏃‍♂️", label: "Cardio", text: "Best cardio for fat loss?" },
   { icon: "🎯", label: "Form Check", text: "How can I improve my form?" },
   { icon: "💤", label: "Recovery", text: "Recovery and rest day advice" },
 ]
