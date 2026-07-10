@@ -2,9 +2,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient, type SupabaseClient, type User, type Session } from "@supabase/supabase-js";
 
-const supabaseUrl = "https://vpnitpweduycfmndmxsf.supabase.co";
-const supabaseAnonKey =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwbml0cHdlZHV5Y2ZtbmRteHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTU3MjksImV4cCI6MjA3MDg3MTcyOX0.LRVY6boXeixgCHJi1BelSdO6UHIePJYIJk-T7eWxY9s";
+import Constants from 'expo-constants';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 declare global {
   // survive Fast Refresh

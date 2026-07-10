@@ -1,0 +1,42 @@
+[
+  {
+    "id": "push_up",
+    "name": "Push-Up",
+    "primaryMuscleGroup": "Chest",
+    "equipment": "Bodyweight",
+    "difficulty": "Beginner",
+    "videoUrl": "https://media.capturefitapp.com/exercises/push_up.gif",
+    "cues": [
+      "Hands under shoulders, body in a straight line",
+      "Lower chest toward floor, elbows ~45°",
+      "Push the floor away and brace your core"
+    ]
+  },
+  {
+    "id": "goblet_squat",
+    "name": "Goblet Squat",
+    "primaryMuscleGroup": "Legs",
+    "equipment": "Dumbbell/Kettlebell",
+    "difficulty": "Beginner",
+    "videoUrl": "https://media.capturefitapp.com/exercises/goblet_squat.gif",
+    "cues": [
+      "Hold weight close to chest, elbows under",
+      "Sit hips down and back between your heels",
+      "Keep chest up and knees tracking over toes"
+    ]
+  },
+  {
+    "id": "dumbbell_row",
+    "name": "One-Arm Dumbbell Row",
+    "primaryMuscleGroup": "Back",
+    "equipment": "Dumbbell",
+    "difficulty": "Beginner",
+    "videoUrl": "https://media.capturefitapp.com/exercises/one_arm_row.gif",
+    "cues": [
+      "Support hand on bench, back flat",
+      "Pull elbow toward hip, not shoulder",
+      "Squeeze shoulder blade at the top"
+    ]
+  }
+]
+

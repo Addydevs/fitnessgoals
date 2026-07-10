@@ -8,7 +8,7 @@ import { Camera } from "expo-camera"
 // FileSystem not used in HomeScreen
 // ImagePicker not used directly in HomeScreen
 import { LinearGradient } from "expo-linear-gradient"
-import React, { useCallback, useEffect, useState } from "react"
+import React, { useCallback, useEffect, useState, useContext } from "react"
 import {
     Image,
     Modal,
@@ -23,6 +23,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context"
 
 import { useTheme } from "@/contexts/ThemeContext"
+import { SubscriptionContext } from "@/contexts/SubscriptionContext"
 import { normalizeFont, useBreakpoint } from "@/utils/responsive"
 import type { Photo, RootStackParamList } from "../app/(tabs)/_layout"; // Import Photo and RootStackParamList from _layout.tsx
 import { supabase } from "../utils/supabase"
@@ -164,6 +165,7 @@ export default function HomeScreen({
   const [todayCheckIn, setTodayCheckIn] = useState<DailyCheckIn | null>(null)
   const [yesterdayCheckIn, setYesterdayCheckIn] = useState<DailyCheckIn | null>(null)
   const [isCheckInModalVisible, setCheckInModalVisible] = useState(false)
+  const subCtx = useContext(SubscriptionContext)
 
   // 1) Memoize the helpers used by the focus effect
   const getCameraPermission = React.useCallback(async (): Promise<void> => {
