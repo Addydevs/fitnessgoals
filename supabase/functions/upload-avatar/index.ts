@@ -23,6 +23,14 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "No file uploaded" }), { status: 400 });
   }
 
+  const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5MB
+  if (!file.type?.startsWith("image/")) {
+    return new Response(JSON.stringify({ error: "Only image uploads are allowed" }), { status: 400 });
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    return new Response(JSON.stringify({ error: "File too large (max 5MB)" }), { status: 413 });
+  }
+
   const fileExt = file.name.split(".").pop();
   const fileName = `photo_${user.id}_${Date.now()}.${fileExt}`;
 

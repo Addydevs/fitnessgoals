@@ -9,6 +9,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
+// --- ABUSE / COST GUARDS ---
+const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10MB
+const MAX_BASE64_CHARS = Math.ceil(MAX_FILE_BYTES * 4 / 3) + 4
+const DAILY_UPLOAD_LIMIT = 30
+const ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"]
+
 // --- SUPABASE CLIENT SETUP ---
 const supabaseUrl = Deno.env.get("SUPABASE_URL")
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
@@ -26,19 +32,81 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { userId, fileName, fileBase64, contentType } = await req.json()
+    // Auth: the uploader is whoever the JWT says, never a userId from the body
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization")
+    if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
+      return new Response(JSON.stringify({ error: "Missing or invalid authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+    const { data: userRes, error: userErr } = await supabase.auth.getUser(authHeader.split(" ")[1])
+    if (userErr || !userRes?.user) {
+      return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+    const userId = userRes.user.id
 
-    if (!userId || !fileName || !fileBase64 || !contentType) {
+    const { fileName, fileBase64, contentType } = await req.json()
+
+    if (!fileName || !fileBase64 || !contentType) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: userId, fileName, fileBase64, contentType" }),
+        JSON.stringify({ error: "Missing required fields: fileName, fileBase64, contentType" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       )
+    }
+
+    if (!ALLOWED_CONTENT_TYPES.includes(String(contentType).toLowerCase())) {
+      return new Response(JSON.stringify({ error: "Only image uploads are allowed." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+
+    if (typeof fileBase64 !== "string" || fileBase64.length > MAX_BASE64_CHARS) {
+      return new Response(JSON.stringify({ error: "File too large (max 10MB)." }), {
+        status: 413,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+
+    // Keep uploads inside the caller's own folder; strip any path segments from fileName
+    const safeName = String(fileName).split("/").pop()!.split("\\").pop()!
+    if (!safeName) {
+      return new Response(JSON.stringify({ error: "Invalid file name." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+
+    // Daily upload cap
+    const startOfDay = new Date()
+    startOfDay.setHours(0, 0, 0, 0)
+    const { count: todayCount, error: countErr } = await supabase
+      .from("photos")
+      .select("id", { head: true, count: "exact" })
+      .eq("user_id", userId)
+      .gte("timestamp", startOfDay.toISOString())
+    if (countErr) {
+      console.error("Upload count check failed:", countErr)
+      return new Response(JSON.stringify({ error: "Upload check unavailable. Please try again shortly." }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+    if ((todayCount ?? 0) >= DAILY_UPLOAD_LIMIT) {
+      return new Response(JSON.stringify({ error: `Daily upload limit (${DAILY_UPLOAD_LIMIT}) reached.` }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
     }
 
     const fileBuffer = decode(fileBase64)
 
     // Upload to storage
-    const { error: uploadError } = await supabase.storage.from("photos").upload(`${userId}/${fileName}`, fileBuffer, {
+    const { error: uploadError } = await supabase.storage.from("photos").upload(`${userId}/${safeName}`, fileBuffer, {
       contentType,
       upsert: true,
     })
@@ -52,7 +120,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Get public URL
-    const { data: urlData } = supabase.storage.from("photos").getPublicUrl(`${userId}/${fileName}`)
+    const { data: urlData } = supabase.storage.from("photos").getPublicUrl(`${userId}/${safeName}`)
 
     const publicUrl = urlData?.publicUrl
     if (!publicUrl) {

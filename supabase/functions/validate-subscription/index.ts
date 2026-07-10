@@ -70,7 +70,9 @@ Deno.serve(async (req) => {
     })
   }
 
-  const allowedProduct = Deno.env.get('IAP_PRODUCT_MONTHLY') || 'om.capturefit.monthly_premium'
+  const MONTHLY_ID = Deno.env.get('IAP_PRODUCT_MONTHLY') || 'om.capturefit.monthly_premium'
+  const ANNUAL_ID = Deno.env.get('IAP_PRODUCT_ANNUAL') || 'om.capturefit.annual_premium'
+  const allowedProducts = new Set([MONTHLY_ID, ANNUAL_ID])
   let active = false
 
   // iOS: verify with Apple production then fallback to sandbox (21007), per Apple guidance
@@ -97,7 +99,7 @@ Deno.serve(async (req) => {
           for (const it of items) {
             const pid = it.product_id || it.productId
             const exp = Number(it.expires_date_ms || it.expires_date_ms) || 0
-            if (pid === allowedProduct && exp > now) { active = true; break }
+            if (allowedProducts.has(pid) && exp > now) { active = true; break }
           }
         }
       } catch (_) {
@@ -106,15 +108,33 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Android: minimal check (extend with Play Developer API if desired)
-  if (platform === 'android' && purchaseToken && productId === allowedProduct) {
-    active = true
-  }
-
-  // If using RevenueCat, we may only have a transaction identifier, not a base64 receipt.
-  // In that case do a minimal shape check so client UX is not blocked.
-  if (!active && productId === allowedProduct && ((receipt && receipt.length > 10) || (purchaseToken && purchaseToken.length > 10))) {
-    active = true
+  // Everything else (Android, RevenueCat transaction ids) is verified server-side
+  // against RevenueCat. Never trust the shape of a client-supplied token — that
+  // would let any signed-in user mark themselves as paid.
+  if (!active) {
+    const RC_KEY = Deno.env.get('REVENUECAT_REST_API_KEY') || ''
+    const ENT_ID = Deno.env.get('RC_ENTITLEMENT_ID') || 'pro'
+    if (RC_KEY) {
+      try {
+        // App user id in RevenueCat is the Supabase user id (set via Purchases.configure)
+        const rcRes = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`, {
+          headers: { Authorization: `Bearer ${RC_KEY}` },
+        })
+        if (rcRes.ok) {
+          const rc = await rcRes.json()
+          const ents = rc?.subscriber?.entitlements || {}
+          const entKey = Object.keys(ents).find(k => k.toLowerCase() === ENT_ID.toLowerCase())
+          const ent = entKey ? ents[entKey] : null
+          const expires = ent?.expires_date ? Date.parse(ent.expires_date) : 0
+          if (expires && expires > Date.now()) active = true
+        }
+      } catch (e) {
+        console.error('RevenueCat verification failed:', e)
+        // Fail closed: unverifiable means not active
+      }
+    } else {
+      console.error('REVENUECAT_REST_API_KEY not set; cannot verify non-Apple purchases')
+    }
   }
 
   if (!active) {
@@ -130,7 +150,7 @@ Deno.serve(async (req) => {
       .upsert({
         user_id: userId,
         paid: true,
-        subscription_type: 'monthly',
+        subscription_type: productId === ANNUAL_ID ? 'yearly' : 'monthly',
         updated_at: nowIso,
       }, { onConflict: 'user_id' })
 

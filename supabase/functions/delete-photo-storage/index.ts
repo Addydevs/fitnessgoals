@@ -55,6 +55,28 @@ serve(async (req) => {
       );
     }
 
+    // 🔒 Ownership: the storage path must be inside the caller's own folder,
+    // and the photo row must belong to them — otherwise any signed-in user
+    // could delete anyone's photos via the service-role client.
+    if (!String(path).startsWith(`${user.id}/`)) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const { data: ownedPhoto } = await supabaseAdmin
+      .from("photos")
+      .select("id")
+      .eq("id", photoId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!ownedPhoto) {
+      return new Response(
+        JSON.stringify({ error: "Photo not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     // 1️⃣ Delete from storage
     const { error: storageError } = await supabaseAdmin
       .storage
