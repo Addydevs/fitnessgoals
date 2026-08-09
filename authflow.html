@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CaptureFit Demo</title>
+  <style>
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      display:flex;justify-content:center;align-items:center;
+      min-height:100vh;padding:20px;
+    }
+    .phone { width:320px;height:640px;background:#fff;border-radius:30px;border:6px solid #1a1a1a;overflow:hidden;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.4); }
+    .screen { display:none;height:100%;flex-direction:column; }
+    .screen.active { display:flex;animation:fadeIn .4s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateX(20px);} to{opacity:1;transform:translateX(0);} }
+    .status-bar {height:44px;display:flex;justify-content:center;align-items:center;font-size:14px;font-weight:600;position:relative;color:inherit;}
+    .notch { position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:25px;background:#1a1a1a;border-radius:0 0 12px 12px; }
+    /* Intro carousel */
+    .intro {color:#fff;padding:20px;position:relative;flex:1;}
+    .intro-slide {position:absolute;top:44px;left:0;width:100%;height:calc(100% - 124px);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:0 20px;transition:transform .5s ease;}
+    .intro-slide.inactive {transform:translateX(100%);} 
+    .intro-slide.prev {transform:translateX(-100%);} 
+    .intro-slide.active {transform:translateX(0);} 
+    .intro .skip {position:absolute;top:10px;right:10px;font-size:16px;font-weight:500;cursor:pointer;}
+    .icon-wrap {width:120px;height:120px;border-radius:60px;background:rgba(255,255,255,.2);display:flex;justify-content:center;align-items:center;font-size:60px;margin-bottom:30px;}
+    .intro-title {font-size:28px;font-weight:700;margin-bottom:12px;}
+    .intro-sub {font-size:16px;line-height:22px;opacity:.9;}
+    .pager {position:absolute;bottom:80px;left:0;width:100%;display:flex;flex-direction:column;align-items:center;gap:20px;}
+    .dots {display:flex;gap:8px;}
+    .dot {width:8px;height:8px;border-radius:4px;background:rgba(255,255,255,.4);transition:.3s;width:8px;}
+    .dot.active {background:#fff;width:20px;}
+    .next {display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);padding:12px 20px;border-radius:25px;font-weight:600;cursor:pointer;transition:.3s;}
+    .next:hover {background:rgba(255,255,255,.3);transform:translateY(-2px);} 
+    /* Auth */
+    .auth {background:#fff;color:#1f2937;padding:20px;}
+    .auth-header{text-align:center;margin:20px 0 30px;}
+    .logo-bg{width:70px;height:70px;border-radius:35px;background:linear-gradient(135deg,#A855F7,#7C3AED);display:flex;justify-content:center;align-items:center;color:#fff;font-size:30px;margin:0 auto 20px;}
+    .auth-title{font-size:28px;font-weight:700;margin-bottom:6px;}
+    .auth-sub{font-size:16px;color:#6B7280;}
+    form{display:flex;flex-direction:column;gap:16px;flex:1;}
+    .input{display:flex;align-items:center;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:14px 16px;gap:12px;}
+    .input-icon{font-size:18px;color:#9CA3AF;}
+    .input input{border:none;outline:none;font-size:16px;background:transparent;flex:1;color:#1F2937;}
+    .input input::placeholder{color:#9CA3AF;}
+    .input.error{border-color:#ef4444;}
+    .error-text{color:#ef4444;font-size:12px;margin-top:-8px;}
+    .auth-btn{background:linear-gradient(135deg,#A855F7,#7C3AED);border:none;border-radius:12px;padding:16px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px;transition:.3s;display:flex;justify-content:center;align-items:center;}
+    .auth-btn:active{transform:scale(.97);} 
+    .switch{display:flex;justify-content:center;align-items:center;gap:4px;margin-top:20px;font-size:14px;}
+    .switch a{color:#A855F7;font-weight:600;cursor:pointer;}
+    .loading{border:3px solid rgba(255,255,255,.3);border-top:3px solid #fff;border-radius:50%;width:18px;height:18px;animation:spin 1s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .success{width:24px;height:24px;border-radius:12px;background:#10B981;color:#fff;display:flex;justify-content:center;align-items:center;font-size:16px;}
+    /* Home */
+    .home{background:#F3F4F6;color:#1F2937;padding:0;}
+    .home-header{padding:20px;background:#fff;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+    .welcome{font-size:18px;font-weight:600;}
+    .streak{font-size:14px;color:#6B7280;}
+    .avatar{width:40px;height:40px;border-radius:20px;background:#ccc;display:flex;justify-content:center;align-items:center;font-size:20px;}
+    .content{flex:1;overflow-y:auto;padding:20px;}
+    .capture-section{background:#fff;padding:20px;border-radius:16px;margin-bottom:20px;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.05);}
+    .capture-section button{background:linear-gradient(135deg,#A855F7,#7C3AED);border:none;color:#fff;padding:14px 20px;border-radius:12px;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;margin:0 auto 10px;cursor:pointer;}
+    .capture-section .gallery{color:#A855F7;font-size:14px;cursor:pointer;}
+    .dashboard{background:#fff;padding:20px;border-radius:16px;margin-bottom:20px;box-shadow:0 2px 6px rgba(0,0,0,.05);}
+    .chart{height:100px;background:linear-gradient(135deg,#A855F7,#7C3AED);border-radius:12px;margin-bottom:15px;opacity:.3;}
+    .stats-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px;}
+    .card{background:#fff;padding:15px;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.05);}
+    .card-title{font-size:12px;color:#6B7280;margin-bottom:4px;}
+    .card-value{font-size:18px;font-weight:600;}
+    .activity{background:#fff;padding:15px;border-radius:16px;box-shadow:0 2px 6px rgba(0,0,0,.05);}
+    .activity-item{padding:10px 0;border-bottom:1px solid #E5E7EB;font-size:14px;}
+    .activity-item:last-child{border-bottom:none;}
+    /* bottom nav */
+    .bottom-nav{height:60px;background:#fff;display:flex;justify-content:space-around;align-items:center;border-top:1px solid #E5E7EB;}
+    .bottom-nav .nav-item{display:flex;flex-direction:column;align-items:center;font-size:12px;color:#6B7280;}
+    .bottom-nav .nav-item.active{color:#A855F7;}
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <!-- Intro Screen -->
+    <div class="screen intro-screen active" id="introScreen">
+      <div class="status-bar"><div class="notch"></div><span>9:41</span></div>
+      <div class="intro" id="introContainer">
+        <div class="skip" id="skipIntro" tabindex="0">Skip</div>
+        <div class="intro-slide active" data-bg="linear-gradient(135deg,#A855F7,#7C3AED)">
+          <div class="icon-wrap">📷</div>
+          <div class="intro-title">Track Your Progress</div>
+          <div class="intro-sub">Take photos and let AI analyze your fitness journey</div>
+        </div>
+        <div class="intro-slide inactive" data-bg="linear-gradient(135deg,#10B981,#059669)">
+          <div class="icon-wrap">⚡</div>
+          <div class="intro-title">AI-Powered Analysis</div>
+          <div class="intro-sub">Get detailed insights about your body transformation</div>
+        </div>
+        <div class="intro-slide inactive" data-bg="linear-gradient(135deg,#F59E0B,#D97706)">
+          <div class="icon-wrap">📈</div>
+          <div class="intro-title">Stay Motivated</div>
+          <div class="intro-sub">Build streaks and celebrate your achievements</div>
+        </div>
+        <div class="pager">
+          <div class="dots">
+            <div class="dot active"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+          </div>
+          <div class="next" id="nextIntro">Next →</div>
+        </div>
+      </div>
+    </div>
+    <!-- Auth Screen -->
+    <div class="screen auth-screen" id="authScreen">
+      <div class="status-bar" style="color:#1F2937"><div class="notch"></div><span>9:41</span></div>
+      <div class="auth">
+        <div class="auth-header">
+          <div class="logo-bg">💪</div>
+          <div class="auth-title">CaptureFit</div>
+          <div class="auth-sub" id="authSubtitle">Welcome back!</div>
+        </div>
+        <form id="authForm" novalidate>
+          <div class="input" id="nameField" style="display:none">
+            <span class="input-icon">👤</span>
+            <input type="text" id="nameInput" placeholder="Full Name" aria-label="Full Name" />
+          </div>
+          <div class="input" id="emailField">
+            <span class="input-icon">✉️</span>
+            <input type="email" id="emailInput" placeholder="Email" aria-label="Email" />
+          </div>
+          <div class="input" id="passwordField">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="passwordInput" placeholder="Password" aria-label="Password" />
+          </div>
+          <div class="error-text" id="formError" style="display:none"></div>
+          <button type="submit" class="auth-btn" id="authBtn"><span>Sign In</span></button>
+          <div class="switch">
+            <span id="switchText">Don't have an account?</span>
+            <a id="switchLink">Sign Up</a>
+          </div>
+        </form>
+      </div>
+    </div>
+    <!-- Home Screen -->
+    <div class="screen home-screen" id="homeScreen">
+      <div class="status-bar" style="color:#1F2937"><div class="notch"></div><span>9:41</span></div>
+      <div class="home">
+        <div class="home-header">
+          <div>
+            <div class="welcome" id="welcomeUser">Welcome!</div>
+            <div class="streak" id="streakCount">Streak: 5 days</div>
+          </div>
+          <div class="avatar" aria-label="Profile">😊</div>
+        </div>
+        <div class="content">
+          <section class="capture-section" aria-label="Photo Capture">
+            <button id="captureBtn">📷 Take Progress Photo</button>
+            <div class="gallery" tabindex="0">View Gallery</div>
+            <img src="https://picsum.photos/seed/pic/80" alt="Last photo" style="margin-top:10px;border-radius:8px;width:80px;height:80px;object-fit:cover;" />
+          </section>
+          <section class="dashboard" aria-label="Progress Dashboard">
+            <div class="chart" aria-hidden="true"></div>
+            <div style="display:flex;justify-content:space-between;font-size:14px;">
+              <div>Weight: <strong>180 lbs</strong></div>
+              <div>Progress: <strong>35%</strong></div>
+            </div>
+          </section>
+          <section class="stats-cards" aria-label="Quick Stats">
+            <div class="card"><div class="card-title">Photos this week</div><div class="card-value">3</div></div>
+            <div class="card"><div class="card-title">Current streak</div><div class="card-value">5</div></div>
+            <div class="card"><div class="card-title">Weight change</div><div class="card-value">-2 lbs</div></div>
+            <div class="card"><div class="card-title">Body fat</div><div class="card-value">18%</div></div>
+          </section>
+          <section class="activity" aria-label="Recent Activity">
+            <div class="activity-item">📷 Photo added - 2h ago</div>
+            <div class="activity-item">⚡ AI analysis: "Great progress!"</div>
+            <div class="activity-item">🏆 Achievement: 5-day streak</div>
+          </section>
+        </div>
+        <nav class="bottom-nav" aria-label="Bottom Navigation">
+          <div class="nav-item active"><span>🏠</span><span>Home</span></div>
+          <div class="nav-item"><span>📷</span><span>Camera</span></div>
+          <div class="nav-item"><span>📊</span><span>Progress</span></div>
+          <div class="nav-item"><span>👤</span><span>Profile</span></div>
+        </nav>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Intro carousel functionality
+    const slides = Array.from(document.querySelectorAll('.intro-slide'));
+    const dots = Array.from(document.querySelectorAll('.dot'));
+    const introContainer = document.getElementById('introContainer');
+    let currentSlide = 0;
+    const updateSlide = () => {
+      slides.forEach((s,i)=>{
+        s.classList.remove('active','inactive','prev');
+        if(i===currentSlide){s.classList.add('active');introContainer.style.background = s.dataset.bg;}
+        else if(i<currentSlide){s.classList.add('prev');}
+        else{s.classList.add('inactive');}
+      });
+      dots.forEach((d,i)=>d.classList.toggle('active',i===currentSlide));
+      document.getElementById('nextIntro').textContent = currentSlide===2? 'Get Started':'Next →';
+    };
+    updateSlide();
+    document.getElementById('nextIntro').addEventListener('click',()=>{
+      if(currentSlide<2){currentSlide++;updateSlide();}else{showScreen('authScreen');}
+    });
+    document.getElementById('skipIntro').addEventListener('click',()=>showScreen('authScreen'));
+    // Swipe
+    let startX=null;introContainer.addEventListener('touchstart',e=>startX=e.touches[0].clientX);
+    introContainer.addEventListener('touchend',e=>{if(startX===null)return;let dx=e.changedTouches[0].clientX-startX; if(dx<-50 && currentSlide<2){currentSlide++;updateSlide();} else if(dx>50 && currentSlide>0){currentSlide--;updateSlide();} startX=null;});
+
+    // Screen navigation
+    function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+
+    // Auth functionality
+    let isSignup=false;const authForm=document.getElementById('authForm');const authBtn=document.getElementById('authBtn');const switchLink=document.getElementById('switchLink');const switchText=document.getElementById('switchText');const authSubtitle=document.getElementById('authSubtitle');const nameField=document.getElementById('nameField');const formError=document.getElementById('formError');
+    switchLink.addEventListener('click',()=>{isSignup=!isSignup;authSubtitle.textContent=isSignup?'Create your account':'Welcome back!';authBtn.innerHTML='<span>'+(isSignup?'Create Account':'Sign In')+'</span>';switchText.textContent=isSignup?'Already have an account?':'Don't have an account?';switchLink.textContent=isSignup?'Sign In':'Sign Up';nameField.style.display=isSignup?'flex':'none';formError.style.display='none';});
+    authForm.addEventListener('submit',e=>{e.preventDefault();formError.style.display='none';[emailField,passwordField,nameField].forEach(f=>f.classList.remove('error'));
+      const email=document.getElementById('emailInput').value.trim();const password=document.getElementById('passwordInput').value.trim();const name=document.getElementById('nameInput').value.trim();
+      if(!email||!/.+@.+\..+/.test(email)){emailField.classList.add('error');formError.textContent='Enter a valid email';formError.style.display='block';return;}
+      if(!password){passwordField.classList.add('error');formError.textContent='Enter password';formError.style.display='block';return;}
+      if(isSignup && !name){nameField.classList.add('error');formError.textContent='Enter your name';formError.style.display='block';return;}
+      authBtn.innerHTML='<div class="loading" aria-label="loading"></div>';
+      setTimeout(()=>{authBtn.innerHTML='<div class="success">✓</div>'; setTimeout(()=>{document.getElementById('welcomeUser').textContent='Welcome '+(name||'User')+'!';showScreen('homeScreen');authBtn.innerHTML='<span>'+ (isSignup?'Create Account':'Sign In') +'</span>';authForm.reset();if(isSignup){switchLink.click();}},800);},1000);
+    });
+  </script>
+</body>
+</html>
